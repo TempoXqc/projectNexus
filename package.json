@@ -20,10 +20,26 @@
     "vite": "^5.2.0"
   },
   "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
     "framer-motion": "^12.18.1",
     "lucide-react": "^0.516.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1"
-  }
+  },
+  "main": "postcss.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TempoXqc/projectNexus.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TempoXqc/projectNexus/issues"
+  },
+  "homepage": "https://github.com/TempoXqc/projectNexus#readme",
+  "description": ""
 }
