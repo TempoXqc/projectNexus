@@ -67,7 +67,7 @@ export function OpponentHand({ opponentHand }: { opponentHand: number[] }) {
           className="w-[140px] h-[190px] rounded shadow bg-white"
         >
           <img
-            src="/src/assets/addons/backcard.png"
+            src="/addons/backcard.png"
             alt="Opponent card"
             className="w-full h-full object-cover rounded"
           />
@@ -198,7 +198,7 @@ export default function NexusGame() {
       <div
         className="w-[85%] min-h-screen flex flex-col justify-end items-center p-4 relative"
         style={{
-          backgroundImage: 'url(/src/assets/addons/background.jpg)',
+          backgroundImage: 'url(/addons/background.jpg)',
           backgroundSize: 'cover',
           backgroundPosition: 'center'
         }}
@@ -264,7 +264,7 @@ export default function NexusGame() {
               {deck.length > 0 && (
                 <>
                   <img
-                    src="/src/assets/addons/backcard.png"
+                    src="/addons/backcard.png"
                     alt="Deck"
                     className="w-full h-full object-cover rounded shadow"
                   />
@@ -283,7 +283,7 @@ export default function NexusGame() {
               {graveyard.length > 0 && (
                 <>
                   <img
-                    src="/src/assets/addons/backcard.png"
+                    src="/addons/backcard.png"
                     alt="Graveyard"
                     className="w-full h-full object-cover rounded shadow grayscale"
                   />
