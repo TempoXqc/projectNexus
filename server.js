@@ -7,9 +7,12 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+    origin: [
+      'http://localhost:5173',
+      'https://projectnexus-nynw.onrender.com',
+    ],
+    methods: ['GET', 'POST'],
+  },
 });
 
 app.use(cors());
@@ -26,24 +29,25 @@ io.on('connection', (socket) => {
     if (!games[gameId]) {
       games[gameId] = {
         players: [socket.id],
-        chatHistory: [], // Ajouter l'historique du chat
+        chatHistory: [],
         state: {
           player1: { hand: [], field: Array(8).fill(null), deck: [], graveyard: [] },
           player2: { hand: [], field: Array(8).fill(null), deck: [], graveyard: [] },
           turn: 1,
-          activePlayer: socket.id
-        }
+          activePlayer: socket.id,
+        },
       };
+      players[socket.id] = { gameId, playerId: 1 };
+      socket.emit('gameStart', { playerId: 1, chatHistory: games[gameId].chatHistory });
     } else if (games[gameId].players.length < 2) {
       games[gameId].players.push(socket.id);
-      // Envoyer l'état initial et l'historique du chat aux deux joueurs
-      io.to(socket.id).emit('gameStart', { opponentId: games[gameId].players[0], chatHistory: games[gameId].chatHistory });
-      io.to(games[gameId].players[0]).emit('gameStart', { opponentId: socket.id, chatHistory: games[gameId].chatHistory });
+      players[socket.id] = { gameId, playerId: 2 };
+      io.to(socket.id).emit('gameStart', { playerId: 2, chatHistory: games[gameId].chatHistory });
+      io.to(games[gameId].players[0]).emit('gameStart', { playerId: 1, chatHistory: games[gameId].chatHistory });
     } else {
       socket.emit('error', 'La partie est pleine');
       return;
     }
-    players[socket.id] = { gameId, playerId: games[gameId].players.length };
   });
 
   // Jouer une carte
@@ -84,6 +88,7 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(3000, () => {
-  console.log('Serveur démarré sur le port 3000');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Serveur démarré sur le port ${PORT}`);
 });
