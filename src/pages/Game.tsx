@@ -67,7 +67,7 @@ export function OpponentHand({ opponentHand }: { opponentHand: number[] }) {
           className="w-[140px] h-[190px] rounded shadow bg-white"
         >
           <img
-            src="/public/addons/backcard.png"
+            src="/addons/backcard.png"
             alt="Opponent card"
             className="w-full h-full object-cover rounded"
           />
