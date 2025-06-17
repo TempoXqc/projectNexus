@@ -80,8 +80,8 @@ export function OpponentHand({ opponentHand }: { opponentHand: number[] }) {
 export default function NexusGame() {
   const [hand, setHand] = useState<Card[]>([]);
   const [deck, setDeck] = useState<Card[]>([]);
-  const [opponentHand, setOpponentHand] = useState<number[]>(Array(5).fill(0));
-  const [opponentField, setOpponentField] = useState<(Card | null)[]>(Array(8).fill(null));
+  const [opponentHand] = useState<number[]>(Array(5).fill(0));
+  const [opponentField] = useState<(Card | null)[]>(Array(8).fill(null));
   const [graveyard, setGraveyard] = useState<Card[]>([]);
   const [field, setField] = useState<(Card | null)[]>(Array(8).fill(null));
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
@@ -110,6 +110,7 @@ export default function NexusGame() {
 
       const compacted = newField.filter((c): c is Card => c !== null);
       while (compacted.length < newField.length) {
+        // @ts-ignore
         compacted.push(null);
       }
 
