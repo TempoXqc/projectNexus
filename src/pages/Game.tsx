@@ -131,6 +131,7 @@ export default function NexusGame() {
       newField[index] = null;
       const compacted = newField.filter((c): c is Card => c !== null);
       while (compacted.length < newField.length) {
+        // @ts-ignore
         compacted.push(null);
       }
       if (removedCard) {
@@ -140,7 +141,10 @@ export default function NexusGame() {
           }
           return prev;
         });
-        socket.emit('updateGameState', { gameId, state: { field: compacted, graveyard: [...graveyard, removedCard] } });
+        socket.emit('updateGameState', {
+          gameId,
+          state: { field: compacted, graveyard: [...graveyard, removedCard] },
+        });
       }
       return compacted;
     });
@@ -202,9 +206,9 @@ export default function NexusGame() {
       })
       .catch((err) => console.error('Failed to load cards:', err));
 
-    socket.on('gameStart', ({ opponentId, chatHistory }) => {
-      console.log('Game started, playerId:', players[socket.id]?.playerId, 'chatHistory:', chatHistory);
-      setPlayerId(players[socket.id]?.playerId || 1);
+    socket.on('gameStart', ({ chatHistory }) => {
+      console.log('Game started, socketId:', socket.id, 'chatHistory:', chatHistory);
+      setPlayerId(1); // Simplifier pour le moment
       setChatMessages(chatHistory || []);
     });
 
@@ -498,7 +502,7 @@ export default function NexusGame() {
               onChange={(e) => setChatInput(e.target.value)}
               className="flex-1 p-2 rounded bg-gray-700 text-white placeholder-white placeholder-opacity-50"
               placeholder="Écrivez un message..."
-              onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+              onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
             />
             <button
               onClick={sendChatMessage}
