@@ -9,7 +9,7 @@ interface Card {
   image: string;
 }
 
-const socket = io('http://localhost:3000'); // URL du serveur
+const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000');
 
 function getRandomHand(deck: Card[], count: number): Card[] {
   const shuffled = [...deck].sort(() => 0.5 - Math.random());
@@ -129,9 +129,8 @@ export default function NexusGame() {
       const newField = [...prevField];
       const removedCard = newField[index];
       newField[index] = null;
-      const compacted = newField.filter((c): c is Card => c !== null);
+      const compacted: (Card | null)[] = newField.filter((c): c is Card => c !== null);
       while (compacted.length < newField.length) {
-        // @ts-ignore
         compacted.push(null);
       }
       if (removedCard) {
@@ -206,9 +205,9 @@ export default function NexusGame() {
       })
       .catch((err) => console.error('Failed to load cards:', err));
 
-    socket.on('gameStart', ({ chatHistory }) => {
-      console.log('Game started, socketId:', socket.id, 'chatHistory:', chatHistory);
-      setPlayerId(1); // Simplifier pour le moment
+    socket.on('gameStart', ({ chatHistory, playerId }) => {
+      console.log('Game started, socketId:', socket.id, 'playerId:', playerId, 'chatHistory:', chatHistory);
+      setPlayerId(playerId);
       setChatMessages(chatHistory || []);
     });
 
