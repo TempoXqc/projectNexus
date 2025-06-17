@@ -9,7 +9,15 @@ interface Card {
   image: string;
 }
 
-const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000');
+const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+console.log('Socket.IO URL:', socketUrl);
+
+const socket = io(socketUrl, {
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000,
+});
 
 function getRandomHand(deck: Card[], count: number): Card[] {
   const shuffled = [...deck].sort(() => 0.5 - Math.random());
@@ -24,7 +32,7 @@ export function OpponentField({ opponentField }: { opponentField: (Card | null)[
         position: 'absolute',
         top: '35%',
         left: '30%',
-        transform: 'translate(-25%, -50%)'
+        transform: 'translate(-25%, -50%)',
       }}
     >
       {opponentField.map((card, index) => (
@@ -57,7 +65,7 @@ export function OpponentHand({ opponentHand }: { opponentHand: number[] }) {
         top: '0%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        transition: 'top 0.3s ease-in-out'
+        transition: 'top 0.3s ease-in-out',
       }}
     >
       {opponentHand.map((_, index) => (
@@ -95,11 +103,120 @@ export default function NexusGame() {
   const [mustDiscard, setMustDiscard] = useState(false);
   const [gameId, setGameId] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<number | null>(null);
-  const [chatMessages, setChatMessages] = useState<{ playerId: number, message: string }[]>([]);
+  const [chatMessages, setChatMessages] = useState<{ playerId: number; message: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [gameIdInput, setGameIdInput] = useState('');
+  const [isConnected, setIsConnected] = useState(false); // Suivre l'état de la connexion
   const graveyardModalRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Initialisation des cartes (une seule fois)
+  useEffect(() => {
+    fetch('/cards.json')
+      .then((res) => res.json())
+      .then((allCards: Card[]) => {
+        const drawn = getRandomHand(allCards, 5);
+        setHand(drawn);
+        setDeck(allCards.filter((card) => !drawn.some((d) => d.id === card.id)));
+      })
+      .catch((err) => console.error('Failed to load cards:', err));
+  }, []);
+
+  // Gestion des événements Socket.IO
+  useEffect(() => {
+    console.log('Initialisation des événements Socket.IO');
+
+    socket.on('connect', () => {
+      console.log('Connecté au serveur Socket.IO, socketId:', socket.id);
+      setIsConnected(true);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Déconnecté du serveur Socket.IO');
+      setIsConnected(false);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('Erreur de connexion Socket.IO:', err.message);
+      setIsConnected(false);
+    });
+
+    socket.on('gameStart', ({ chatHistory, playerId }) => {
+      console.log('Game started, playerId:', playerId, 'chatHistory:', chatHistory);
+      setPlayerId(playerId);
+      setChatMessages(chatHistory || []);
+    });
+
+    socket.on('updateGameState', (state) => {
+      console.log('Game state updated:', state);
+      if (playerId) {
+        const playerKey = playerId === 1 ? 'player1' : 'player2';
+        const opponentKey = playerId === 1 ? 'player2' : 'player1';
+        setHand(state[playerKey].hand || []);
+        setField(state[playerKey].field || Array(8).fill(null));
+        setGraveyard(state[playerKey].graveyard || []);
+        setDeck(state[playerKey].deck || []);
+        setOpponentHand(state[opponentKey].hand?.length || 0);
+        setOpponentField(state[opponentKey].field || Array(8).fill(null));
+        setTurn(state.turn || 1);
+        setHasPlayedCard(state.activePlayer !== socket.id);
+        setMustDiscard(!!state[playerKey].mustDiscard);
+      }
+    });
+
+    socket.on('chatMessage', (chatMessage) => {
+      console.log('Chat message received:', chatMessage);
+      setChatMessages((prev) => [...prev, chatMessage]);
+    });
+
+    socket.on('opponentDisconnected', () => {
+      console.log('opponentDisconnected received');
+      alert("Votre adversaire s'est déconnecté.");
+      setGameId(null);
+      setPlayerId(null);
+    });
+
+    socket.on('error', (message) => {
+      console.log('Erreur reçue:', message);
+      alert(message);
+    });
+
+    // Nettoyage des écouteurs
+    return () => {
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('connect_error');
+      socket.off('gameStart');
+      socket.off('updateGameState');
+      socket.off('chatMessage');
+      socket.off('opponentDisconnected');
+      socket.off('error');
+    };
+  }, []); // Pas de dépendances, exécuté une seule fois
+
+  // Gestion du défilement du chat
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  // Gestion du modal du cimetière
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (graveyardModalRef.current && !graveyardModalRef.current.contains(event.target as Node)) {
+        setIsGraveyardOpen(false);
+      }
+    };
+    if (isGraveyardOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isGraveyardOpen]);
 
   const joinGame = () => {
     if (gameIdInput.trim()) {
@@ -119,8 +236,14 @@ export default function NexusGame() {
       if (prevDeck.length < 5) return prevDeck;
       const drawn = getRandomHand(prevDeck, 5);
       setHand(drawn);
-      socket.emit('updateGameState', { gameId, state: { hand: drawn, deck: prevDeck.filter((card) => !drawn.some((d) => d.id === card.id)) } });
-      return prevDeck.filter((card) => !drawn.some((d) => d.id === card.id));
+      const newDeck = prevDeck.filter((card) => !drawn.some((d) => d.id === card.id));
+      if (gameId && isConnected) {
+        socket.emit('updateGameState', {
+          gameId,
+          state: { hand: drawn, deck: newDeck },
+        });
+      }
+      return newDeck;
     });
   };
 
@@ -136,13 +259,16 @@ export default function NexusGame() {
       if (removedCard) {
         setGraveyard((prev) => {
           if (!prev.some((c) => c.id === removedCard.id)) {
-            return [...prev, removedCard];
+            const newGraveyard = [...prev, removedCard];
+            if (gameId && isConnected) {
+              socket.emit('updateGameState', {
+                gameId,
+                state: { field: compacted, graveyard: newGraveyard },
+              });
+            }
+            return newGraveyard;
           }
           return prev;
-        });
-        socket.emit('updateGameState', {
-          gameId,
-          state: { field: compacted, graveyard: [...graveyard, removedCard] },
         });
       }
       return compacted;
@@ -150,7 +276,7 @@ export default function NexusGame() {
   };
 
   const playCardToField = (card: Card) => {
-    if (hasPlayedCard || mustDiscard) return;
+    if (hasPlayedCard || mustDiscard || !isConnected) return;
     const updatedField = [...field];
     const emptyIndex = updatedField.findIndex((slot) => slot === null);
     if (emptyIndex !== -1) {
@@ -158,123 +284,77 @@ export default function NexusGame() {
       setField(updatedField);
       setHand((prevHand) => prevHand.filter((c) => c.id !== card.id));
       setHasPlayedCard(true);
-      socket.emit('playCard', { gameId, card, fieldIndex: emptyIndex });
+      if (gameId) {
+        socket.emit('playCard', { gameId, card, fieldIndex: emptyIndex });
+      }
     }
   };
 
   const discardCardFromHand = (card: Card) => {
-    if (!mustDiscard) return;
-    setHand((prev) => prev.filter((c) => c.id !== card.id));
-    setGraveyard((prev) => [...prev, card]);
+    if (!mustDiscard || !isConnected) return;
+    const newHand = hand.filter((c) => c.id !== card.id);
+    const newGraveyard = [...graveyard, card];
+    setHand(newHand);
+    setGraveyard(newGraveyard);
     setMustDiscard(false);
-    socket.emit('updateGameState', { gameId, state: { hand, graveyard: [...graveyard, card], mustDiscard: false } });
+    if (gameId) {
+      socket.emit('updateGameState', {
+        gameId,
+        state: { hand: newHand, graveyard: newGraveyard, mustDiscard: false },
+      });
+    }
   };
 
   const passTurn = () => {
-    if (mustDiscard) return;
-    if (deck.length > 0) {
-      const [newCard, ...rest] = deck;
-      if (hand.length >= 10) {
-        setHand((prev) => [...prev, newCard]);
-        setMustDiscard(true);
-      } else {
-        setHand((prev) => [...prev, newCard]);
-      }
-      setDeck(rest);
-      socket.emit('updateGameState', { gameId, state: { hand, deck: rest, mustDiscard } });
-    }
+    if (mustDiscard || !isConnected) return;
+
     setHasPlayedCard(false);
     setTurn((prev) => prev + 1);
-    socket.emit('passTurn', { gameId });
+
+    if (deck.length > 0) {
+      const [newCard, ...rest] = deck;
+      const updatedHand = [...hand, newCard];
+      const updatedDeck = rest;
+      const updatedMustDiscard = updatedHand.length > 10;
+
+      setHand(updatedHand);
+      setDeck(updatedDeck);
+      setMustDiscard(updatedMustDiscard);
+
+      if (gameId) {
+        socket.emit('updateGameState', {
+          gameId,
+          state: { hand: updatedHand, deck: updatedDeck, mustDiscard: updatedMustDiscard },
+        });
+        socket.emit('passTurn', { gameId });
+      }
+    } else if (gameId) {
+      socket.emit('updateGameState', {
+        gameId,
+        state: { hand, deck, mustDiscard },
+      });
+      socket.emit('passTurn', { gameId });
+    }
   };
 
   const sendChatMessage = () => {
-    if (chatInput.trim() && gameId) {
-      socket.emit('sendMessage', { gameId, message: chatInput });
+    if (chatInput.trim() && gameId && isConnected) {
+      console.log('Envoi du message:', { gameId, message: chatInput }); // Ajout pour débogage
+      socket.emit('sendMessage', { gameId, message: chatInput }, (response: any) => {
+        console.log('Réponse du serveur:', response); // Callback pour vérifier la réception
+      });
       setChatInput('');
+    } else {
+      console.log('Échec de l\'envoi:', { chatInput, gameId, isConnected }); // Débogage
     }
   };
-
-  useEffect(() => {
-    fetch('/cards.json')
-      .then((res) => res.json())
-      .then((allCards: Card[]) => {
-        const drawn = getRandomHand(allCards, 5);
-        setHand(drawn);
-        setDeck(allCards.filter((card) => !drawn.some((d) => d.id === card.id)));
-      })
-      .catch((err) => console.error('Failed to load cards:', err));
-
-    socket.on('gameStart', ({ chatHistory, playerId }) => {
-      console.log('Game started, socketId:', socket.id, 'playerId:', playerId, 'chatHistory:', chatHistory);
-      setPlayerId(playerId);
-      setChatMessages(chatHistory || []);
-    });
-
-    socket.on('updateGameState', (state) => {
-      console.log('Game state updated:', state);
-      setHand(state[playerId === 1 ? 'player1' : 'player2'].hand);
-      setField(state[playerId === 1 ? 'player1' : 'player2'].field);
-      setGraveyard(state[playerId === 1 ? 'player1' : 'player2'].graveyard);
-      setDeck(state[playerId === 1 ? 'player1' : 'player2'].deck);
-      setOpponentHand(state[playerId === 1 ? 'player2' : 'player1'].hand.length);
-      setOpponentField(state[playerId === 1 ? 'player2' : 'player1'].field);
-      setTurn(state.turn);
-      setHasPlayedCard(state.activePlayer !== socket.id);
-    });
-
-    socket.on('chatMessage', (chatMessage) => {
-      console.log('Chat message received:', chatMessage);
-      setChatMessages((prev) => [...prev, chatMessage]);
-    });
-
-    socket.on('opponentDisconnected', () => {
-      alert('Votre adversaire s\'est déconnecté.');
-      setGameId(null);
-      setPlayerId(null);
-    });
-
-    socket.on('error', (message) => {
-      alert(message);
-    });
-
-    return () => {
-      socket.off('gameStart');
-      socket.off('updateGameState');
-      socket.off('yourTurn');
-      socket.off('chatMessage');
-      socket.off('opponentDisconnected');
-      socket.off('error');
-    };
-  }, [playerId]);
-
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [chatMessages]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (graveyardModalRef.current && !graveyardModalRef.current.contains(event.target as Node)) {
-        setIsGraveyardOpen(false);
-      }
-    };
-    if (isGraveyardOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    } else {
-      document.removeEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isGraveyardOpen]);
 
   if (!gameId) {
     return (
       <div className="w-full min-h-screen flex flex-col items-center justify-center" style={{ backgroundColor: 'black' }}>
         <div className="bg-gray-800 p-6 rounded-lg shadow-2xl">
           <h2 className="text-white text-2xl mb-4">Rejoindre ou créer une partie</h2>
+          <p className="text-white">Connexion : {isConnected ? 'Connecté' : 'Déconnecté'}</p>
           <div className="flex gap-2 mb-4">
             <input
               type="text"
@@ -282,10 +362,12 @@ export default function NexusGame() {
               onChange={(e) => setGameIdInput(e.target.value)}
               className="p-2 rounded bg-gray-700 text-white"
               placeholder="Entrez l'ID de la partie"
+              disabled={!isConnected}
             />
             <button
               onClick={joinGame}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              disabled={!isConnected}
             >
               Rejoindre
             </button>
@@ -293,6 +375,7 @@ export default function NexusGame() {
           <button
             onClick={createGame}
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            disabled={!isConnected}
           >
             Créer une nouvelle partie
           </button>
@@ -310,7 +393,7 @@ export default function NexusGame() {
         style={{
           backgroundImage: 'url(/addons/background.jpg)',
           backgroundSize: 'cover',
-          backgroundPosition: 'center'
+          backgroundPosition: 'center',
         }}
       >
         <OpponentField opponentField={opponentField} />
@@ -324,7 +407,7 @@ export default function NexusGame() {
             top: '70%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            height: '190px'
+            height: '190px',
           }}
         >
           {field
@@ -339,9 +422,9 @@ export default function NexusGame() {
                 onClick={() => removeCardFromField(field.indexOf(card))}
                 className="absolute w-[140px] h-[190px] bg-white shadow rounded"
                 style={{
-                  left: `calc(50% + ${visibleIndex * 160 - ((field.filter(c => c !== null).length - 1) * 160) / 2}px)`,
+                  left: `calc(50% + ${visibleIndex * 160 - ((field.filter((c) => c !== null).length - 1) * 160) / 2}px)`,
                   transform: 'translateX(-50%)',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
                 }}
                 onMouseEnter={() => setHoveredCardId(card!.id)}
                 onMouseLeave={() => setHoveredCardId(null)}
@@ -415,13 +498,13 @@ export default function NexusGame() {
               top: isHandHovered ? '88%' : '100%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              transition: 'top 0.3s ease-in-out'
+              transition: 'top 0.3s ease-in-out',
             }}
           >
             {hand.map((card) => (
               <div
                 key={card.id}
-                onClick={() => mustDiscard ? discardCardFromHand(card) : playCardToField(card)}
+                onClick={() => (mustDiscard ? discardCardFromHand(card) : playCardToField(card))}
                 onMouseEnter={() => setHoveredCardId(card.id)}
                 onMouseLeave={() => setHoveredCardId(null)}
                 className="relative rounded border shadow p-2 bg-white cursor-pointer transition-transform hover:scale-105"
@@ -451,13 +534,17 @@ export default function NexusGame() {
       </div>
 
       {/* Right Section (Game Controls and Chat) */}
-      <div className="w-[30%] min-h-screen flex flex-col items-center justify-start pt-8 gap-4" style={{ backgroundColor: 'black' }}>
+      <div
+        className="w-[30%] min-h-screen flex flex-col items-center justify-start pt-8 gap-4"
+        style={{ backgroundColor: 'black' }}
+      >
         <p className="text-white font-bold">ID de la partie : {gameId}</p>
         <p className="text-white">Joueur {playerId || 'en attente'}</p>
         {hand.length === 0 && deck.length >= 5 && (
           <button
             onClick={drawNewHand}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            disabled={!isConnected}
           >
             <RefreshCcw className="w-5 h-5" /> Nouvelle main
           </button>
@@ -467,23 +554,21 @@ export default function NexusGame() {
 
         <button
           onClick={passTurn}
-          disabled={mustDiscard || hasPlayedCard}
+          disabled={mustDiscard || hasPlayedCard || !isConnected}
           className={`flex items-center gap-2 px-4 py-2 rounded text-white w-[90%] ${
-            mustDiscard ? 'bg-red-600' :
-              hasPlayedCard ? 'bg-gray-500 cursor-not-allowed' :
-                'bg-green-600'
+            mustDiscard
+              ? 'bg-red-600'
+              : hasPlayedCard || !isConnected
+                ? 'bg-gray-500 cursor-not-allowed'
+                : 'bg-green-600'
           }`}
         >
           {mustDiscard ? 'Défaussez une carte' : 'Passer mon tour'}
         </button>
 
-
         {/* Chat Section */}
         <div className="w-[90%] flex flex-col gap-2">
-          <div
-            ref={chatContainerRef}
-            className="h-64 bg-gray-800 rounded-lg p-4 overflow-y-auto"
-          >
+          <div ref={chatContainerRef} className="h-64 bg-gray-800 rounded-lg p-4 overflow-y-auto">
             {chatMessages.map((msg, index) => (
               <div
                 key={index}
@@ -501,11 +586,13 @@ export default function NexusGame() {
               onChange={(e) => setChatInput(e.target.value)}
               className="flex-1 p-2 rounded bg-gray-700 text-white placeholder-white placeholder-opacity-50"
               placeholder="Écrivez un message..."
+              disabled={!isConnected}
               onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
             />
             <button
               onClick={sendChatMessage}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              disabled={!isConnected}
             >
               <Send className="w-5 h-5 text-white" />
             </button>
