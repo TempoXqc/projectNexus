@@ -10,76 +10,99 @@ const io = new Server(server, {
     origin: [
       'http://localhost:5173',
       'https://projectnexus-nynw.onrender.com',
+      'https://projectnexus-staging.up.railway.app',
     ],
     methods: ['GET', 'POST'],
+    credentials: true,
   },
+  transports: ['websocket', 'polling'],
 });
 
 app.use(cors());
-app.use(express.static('public')); // Servir les fichiers statiques (cards.json, images)
+app.use(express.static('public'));
 
-const games = {}; // Stocke l'état des parties (par ID de partie)
-const players = {}; // Associe les sockets aux joueurs
+const games = {};
+const players = {};
 
 io.on('connection', (socket) => {
   console.log('Nouveau joueur connecté:', socket.id);
 
-  // Rejoindre une partie
   socket.on('joinGame', (gameId) => {
+    console.log(`Joueur ${socket.id} rejoint la partie ${gameId}`);
+    socket.join(gameId);
+
     if (!games[gameId]) {
       games[gameId] = {
         players: [socket.id],
-        chatHistory: [],
+        chatHistory: [], // Assuré d'être un tableau vide
         state: {
-          player1: { hand: [], field: Array(8).fill(null), deck: [], graveyard: [] },
-          player2: { hand: [], field: Array(8).fill(null), deck: [], graveyard: [] },
+          player1: { hand: [], field: Array(8).fill(null), deck: [], graveyard: [], mustDiscard: false },
+          player2: { hand: [], field: Array(8).fill(null), deck: [], graveyard: [], mustDiscard: false },
           turn: 1,
           activePlayer: socket.id,
         },
       };
       players[socket.id] = { gameId, playerId: 1 };
-      socket.emit('gameStart', { playerId: 1, chatHistory: games[gameId].chatHistory });
+      socket.emit('gameStart', { playerId: 1, chatHistory: games[gameId].chatHistory || [] });
     } else if (games[gameId].players.length < 2) {
       games[gameId].players.push(socket.id);
       players[socket.id] = { gameId, playerId: 2 };
-      io.to(socket.id).emit('gameStart', { playerId: 2, chatHistory: games[gameId].chatHistory });
-      io.to(games[gameId].players[0]).emit('gameStart', { playerId: 1, chatHistory: games[gameId].chatHistory });
+      socket.emit('gameStart', { playerId: 2, chatHistory: games[gameId].chatHistory || [] });
+      io.to(gameId).emit('playerJoined', { playerId: 2 });
     } else {
       socket.emit('error', 'La partie est pleine');
       return;
     }
+    console.log(`Joueurs dans la partie ${gameId}: ${games[gameId].players}`);
   });
 
-  // Jouer une carte
   socket.on('playCard', ({ gameId, card, fieldIndex }) => {
     const game = games[gameId];
     if (!game || game.state.activePlayer !== socket.id) return;
     const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
     game.state[playerKey].field[fieldIndex] = card;
-    game.state[playerKey].hand = game.state[playerKey].hand.filter(c => c.id !== card.id);
-    io.to(game.players[0]).emit('updateGameState', game.state);
-    io.to(game.players[1]).emit('updateGameState', game.state);
-    game.state.activePlayer = game.players.find(id => id !== socket.id);
+    game.state[playerKey].hand = game.state[playerKey].hand.filter((c) => c.id !== card.id);
+    game.state.activePlayer = game.players.find((id) => id !== socket.id);
     game.state.turn += 1;
+    io.to(gameId).emit('updateGameState', game.state);
     io.to(game.state.activePlayer).emit('yourTurn');
   });
 
-  // Envoyer un message de chat
   socket.on('sendMessage', ({ gameId, message }) => {
+    console.log(`Message reçu pour la partie ${gameId}:`, { playerId: players[socket.id].playerId, message });
     const playerId = players[socket.id].playerId;
     const chatMessage = { playerId, message };
-    games[gameId].chatHistory.push(chatMessage); // Ajouter à l'historique
-    io.to(games[gameId].players[0]).emit('chatMessage', chatMessage);
-    io.to(games[gameId].players[1]).emit('chatMessage', chatMessage);
+    if (games[gameId]) {
+      games[gameId].chatHistory.push(chatMessage);
+      io.to(gameId).emit('chatMessage', chatMessage);
+    } else {
+      console.log(`Partie ${gameId} non trouvée pour le message`);
+    }
   });
 
-  // Déconnexion
+  socket.on('updateGameState', ({ gameId, state }) => {
+    const game = games[gameId];
+    if (!game) return;
+    const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
+    Object.assign(game.state[playerKey], state);
+    io.to(gameId).emit('updateGameState', game.state);
+  });
+
+  socket.on('passTurn', ({ gameId }) => {
+    const game = games[gameId];
+    if (!game) return;
+    game.state.activePlayer = game.players.find((id) => id !== socket.id);
+    game.state.turn += 1;
+    io.to(gameId).emit('updateGameState', game.state);
+    io.to(game.state.activePlayer).emit('yourTurn');
+  });
+
   socket.on('disconnect', () => {
     const gameId = players[socket.id]?.gameId;
     if (gameId && games[gameId]) {
-      const opponentId = games[gameId].players.find(id => id !== socket.id);
+      const opponentId = games[gameId].players.find((id) => id !== socket.id);
       if (opponentId) {
-        io.to(opponentId).emit('opponentDisconnected');
+        io.to(gameId).emit('opponentDisconnected');
       }
       delete games[gameId];
       delete players[socket.id];
