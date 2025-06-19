@@ -1,52 +1,51 @@
-// src/components/PlayerHand.tsx
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
 
-interface PlayerHandProps {
-  hand: Card[];
+interface PlayerFieldProps {
+  field: (Card | null)[];
   hoveredCardId: string | null;
   setHoveredCardId: (id: string | null) => void;
-  isHandHovered: boolean;
-  setIsHandHovered: (hovered: boolean) => void;
-  mustDiscard: boolean;
-  discardCardFromHand: (card: Card) => void;
-  playCardToField: (card: Card) => void;
+  removeCardFromField: (index: number) => void;
 }
 
-export default function PlayerHand({
-  hand,
+export default function PlayerField({
+  field,
   hoveredCardId,
   setHoveredCardId,
-  isHandHovered,
-  setIsHandHovered,
-  mustDiscard,
-  discardCardFromHand,
-  playCardToField,
-}: PlayerHandProps) {
+  removeCardFromField,
+}: PlayerFieldProps) {
+  const visibleCards = field
+    .map((card, index) => ({ card, index }))
+    .filter(({ card }) => card !== null) as { card: Card; index: number }[];
+
   return (
     <div
-      className="flex justify-center items-center gap-4 flex-1 z-2"
-      onMouseEnter={() => setIsHandHovered(true)}
-      onMouseLeave={() => setIsHandHovered(false)}
+      className="relative z-40"
       style={{
         position: 'absolute',
-        top: isHandHovered ? '88%' : '100%',
+        top: '70%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        transition: 'top 0.3s ease-in-out',
+        height: '190px',
         overflow: 'visible',
       }}
     >
-      {hand.map((card) => (
-        <div
+      {visibleCards.map(({ card, index }, visibleIndex) => (
+        <motion.div
           key={card.id}
-          onClick={() =>
-            mustDiscard ? discardCardFromHand(card) : playCardToField(card)
-          }
+          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          onClick={() => removeCardFromField(index)}
+          className="absolute w-[140px] h-[190px] bg-white shadow rounded"
+          style={{
+            left: `calc(50% + ${visibleIndex * 160 - ((visibleCards.length - 1) * 160) / 2}px)`,
+            transform: 'translateX(-50%)',
+            cursor: 'pointer',
+          }}
           onMouseEnter={() => setHoveredCardId(card.id)}
           onMouseLeave={() => setHoveredCardId(null)}
-          className="relative rounded  shadow p-1 bg-black cursor-pointer transition-transform hover:scale-105"
-          style={{ width: '140px', height: '190px' }}
         >
           <img
             src={card.image}
@@ -55,11 +54,11 @@ export default function PlayerHand({
           />
           {hoveredCardId === card.id && (
             <div className="absolute top-[-450px] left-1/2 transform -translate-x-1/2 z-50">
-              <div className="border-4 border-black rounded-lg shadow-2xl">
+              <div className="border-4 border-white rounded-lg shadow-2xl">
                 <img
                   src={card.image}
                   alt={card.name}
-                  className="rounded shadow-2xl border-2 border-black"
+                  className="rounded shadow-2xl border-2 border-white"
                   style={{
                     maxWidth: '300px',
                     height: 'auto',
@@ -71,7 +70,7 @@ export default function PlayerHand({
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
       ))}
     </div>
   );
