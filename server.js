@@ -34,25 +34,28 @@ io.on('connection', (socket) => {
     if (!games[gameId]) {
       games[gameId] = {
         players: [socket.id],
-        chatHistory: [], // Assuré d'être un tableau vide
+        chatHistory: [],
         state: {
           player1: { hand: [], field: Array(8).fill(null), deck: [], graveyard: [], mustDiscard: false },
           player2: { hand: [], field: Array(8).fill(null), deck: [], graveyard: [], mustDiscard: false },
           turn: 1,
           activePlayer: socket.id,
         },
+        deckChoices: { 1: null, 2: [] },
       };
       players[socket.id] = { gameId, playerId: 1 };
-      socket.emit('gameStart', { playerId: 1, chatHistory: games[gameId].chatHistory || [] });
+      socket.emit('gameStart', { playerId: 1, chatHistory: [] });
     } else if (games[gameId].players.length < 2) {
       games[gameId].players.push(socket.id);
       players[socket.id] = { gameId, playerId: 2 };
-      socket.emit('gameStart', { playerId: 2, chatHistory: games[gameId].chatHistory || [] });
+      socket.emit('gameStart', { playerId: 2, chatHistory: games[gameId].chatHistory });
       io.to(gameId).emit('playerJoined', { playerId: 2 });
     } else {
       socket.emit('error', 'La partie est pleine');
       return;
     }
+
+    io.to(gameId).emit('deckSelectionUpdate', games[gameId].deckChoices);
     console.log(`Joueurs dans la partie ${gameId}: ${games[gameId].players}`);
   });
 
@@ -69,14 +72,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('sendMessage', ({ gameId, message }) => {
-    console.log(`Message reçu pour la partie ${gameId}:`, { playerId: players[socket.id].playerId, message });
-    const playerId = players[socket.id].playerId;
+    const playerId = players[socket.id]?.playerId;
     const chatMessage = { playerId, message };
     if (games[gameId]) {
       games[gameId].chatHistory.push(chatMessage);
       io.to(gameId).emit('chatMessage', chatMessage);
-    } else {
-      console.log(`Partie ${gameId} non trouvée pour le message`);
     }
   });
 
@@ -97,16 +97,48 @@ io.on('connection', (socket) => {
     io.to(game.state.activePlayer).emit('yourTurn');
   });
 
+  socket.on('chooseDeck', ({ gameId, playerId, deckId }) => {
+    const game = games[gameId];
+    if (!game) return;
+
+    if (!game.deckChoices) game.deckChoices = { 1: null, 2: [] };
+
+    if (playerId === 1 && !game.deckChoices[1]) {
+      game.deckChoices[1] = deckId;
+    } else if (playerId === 2 && game.deckChoices[2].length < 2) {
+      if (!game.deckChoices[2].includes(deckId) && deckId !== game.deckChoices[1]) {
+        game.deckChoices[2].push(deckId);
+      }
+    }
+
+    io.to(gameId).emit('deckSelectionUpdate', game.deckChoices);
+
+    const totalDecks = [game.deckChoices[1], ...game.deckChoices[2]].filter(Boolean);
+
+    if (totalDecks.length === 3) {
+      const allDeckIds = ['assassin', 'celestial', 'dragon', 'slime'];
+      const remaining = allDeckIds.find(id => !totalDecks.includes(id));
+      const finalPlayer1Deck = game.deckChoices[1] || remaining;
+      const finalPlayer2Decks = game.deckChoices[2];
+
+      io.to(gameId).emit('deckSelectionDone', {
+        player1DeckId: finalPlayer1Deck,
+        player2DeckIds: finalPlayer2Decks,
+        selectedDecks: [...totalDecks, remaining],
+      });
+    }
+  });
+
   socket.on('disconnect', () => {
     const gameId = players[socket.id]?.gameId;
     if (gameId && games[gameId]) {
       const opponentId = games[gameId].players.find((id) => id !== socket.id);
       if (opponentId) {
-        io.to(gameId).emit('opponentDisconnected');
+        io.to(opponentId).emit('opponentDisconnected');
       }
       delete games[gameId];
-      delete players[socket.id];
     }
+    delete players[socket.id];
     console.log('Joueur déconnecté:', socket.id);
   });
 });

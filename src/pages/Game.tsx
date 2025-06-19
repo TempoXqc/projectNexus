@@ -1,6 +1,5 @@
-import React, { JSX, useEffect, useState } from 'react';
+import React, { JSX, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import io from 'socket.io-client';
 import OpponentField from '../components/OpponentField';
 import OpponentHand from '../components/OpponentHand';
 import PlayerField from '../components/PlayerField.tsx';
@@ -13,13 +12,10 @@ import OpponentGraveyard from '../components/OpponentGraveyard';
 import { BadgeCheck, RefreshCcw, X } from 'lucide-react';
 import { Card } from '../types/Card';
 import randomizers from '../../public/Randomizers.json';
+import { Socket } from 'socket.io-client';
+import { getSocket } from '../socket.ts';
 
-const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000', {
-  transports: ['websocket', 'polling'],
-  reconnection: true,
-  reconnectionAttempts: 5,
-  reconnectionDelay: 1000,
-});
+let socket: Socket;
 
 const getRandomHand = <T,>(deck: T[], count: number): T[] =>
   [...deck].sort(() => 0.5 - Math.random()).slice(0, count);
@@ -79,6 +75,13 @@ export default function Game() {
     mulliganDone: false,
   });
 
+
+  useEffect(() => {
+    socket = getSocket();
+  }, []);
+
+
+
   const set = (updates: Partial<typeof state>) =>
     setState((prev) => ({ ...prev, ...updates }));
 
@@ -86,11 +89,45 @@ export default function Game() {
     if (!gameId) navigate('/');
   }, [gameId, navigate]);
 
-  useEffect(() => {
-    set({ playerId: Math.random() < 0.5 ? 1 : 2 });
-  }, []);
+  const hasJoinedRef = useRef(false);
 
   useEffect(() => {
+    if (!gameId || hasJoinedRef.current) return;
+
+    const tryJoin = () => {
+      console.log('[CLIENT] Emitting joinGame for', gameId);
+      socket.emit('joinGame', gameId);
+      hasJoinedRef.current = true;
+    };
+
+    if (socket?.connected) {
+      tryJoin();
+    } else {
+      socket?.once('connect', tryJoin);
+    }
+
+    return () => {
+      socket?.off('connect', tryJoin);
+    };
+  }, [gameId]);
+
+
+
+  useEffect(() => {
+    socket.on('gameStart', ({ playerId, chatHistory }) => {
+      console.log('Vous êtes joueur', playerId);
+      set({ playerId, chatMessages: chatHistory });
+    });
+
+    socket.on('deckSelectionUpdate', (deckChoices) => {
+      const allSelected = [deckChoices[1], ...deckChoices[2] ?? []].filter(Boolean);
+      set({
+        selectedDecks: allSelected,
+        player1DeckId: deckChoices[1],
+      });
+    });
+
+
     socket.on('connect', () => set({ isConnected: true }));
     socket.on('disconnect', () => set({ isConnected: false }));
     socket.on('connect_error', () => set({ isConnected: false }));
@@ -99,25 +136,28 @@ export default function Game() {
     );
     socket.on('opponentDisconnected', () => {
       alert("Votre adversaire s'est déconnecté.");
-      set({ playerId: null });
+      navigate('/');
     });
+
+
     return () => {
       socket.removeAllListeners();
     };
   }, [state.chatMessages]);
 
+
   const handleDeckChoice = (deckId: string) => {
-    if (state.hasChosenDeck || state.player1DeckId) return;
-    const remaining = randomizers
-      .map((d) => d.id)
-      .filter((id) => id !== deckId);
-    const random2 = getRandomHand(remaining, 2);
-    set({
-      player1DeckId: deckId,
-      selectedDecks: [deckId, ...random2],
-      hasChosenDeck: true,
+    if (state.hasChosenDeck || !state.playerId || !state.isConnected || !gameId) return;
+
+    socket.emit('chooseDeck', {
+      gameId,
+      playerId: state.playerId,
+      deckId,
     });
+    set({ hasChosenDeck: true });
+
   };
+
 
   const finalizeDeckSelection = async () => {
     if (!state.player1DeckId) return;
@@ -356,6 +396,12 @@ export default function Game() {
   return (
     <div className="w-full min-h-screen flex flex-row relative">
       {renderInitialDraw()}
+      {state.playerId === 2 && state.hasChosenDeck && !state.deckSelectionDone && (
+        <p className="text-white text-lg font-semibold">
+          En attente de la confirmation du joueur 1...
+        </p>
+      )}
+
       {!state.deckSelectionDone && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-black/90 z-50">
           <h2 className="text-white text-3xl font-bold mb-4">
@@ -398,7 +444,7 @@ export default function Game() {
               );
             })}
           </div>
-          {state.hasChosenDeck && (
+          {state.hasChosenDeck && state.playerId === 1 && (
             <button
               onClick={finalizeDeckSelection}
               className="mt-8 flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-3 rounded-full shadow-lg hover:scale-105 hover:shadow-xl transition transform duration-200"
