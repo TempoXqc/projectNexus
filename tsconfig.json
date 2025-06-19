@@ -19,7 +19,8 @@
     "paths": {
       "@/*": ["*"]
     },
-    "jsx": "react"
+    "jsx": "react",
+    "types": ["vite/client"],
   },
   "include": ["src"]
 }

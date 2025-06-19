@@ -1,32 +1,302 @@
 [
-  { "id": "assassin_01", "name": "Shadow Dancer", "image": "/cards/assassin_001.jpg" },
-  { "id": "assassin_02", "name": "Silent Blade", "image": "/cards/assassin_002.jpg" },
-  { "id": "assassin_03", "name": "Hidden Fang", "image": "/cards/assassin_003.jpg" },
-  { "id": "assassin_04", "name": "Nightrunner", "image": "/cards/assassin_004.jpg" },
-  { "id": "assassin_05", "name": "Veiled Strike", "image": "/cards/assassin_005.jpg" },
-  { "id": "assassin_06", "name": "Obsidian Knife", "image": "/cards/assassin_006.jpg" },
-  { "id": "assassin_07", "name": "Smoke Lurker", "image": "/cards/assassin_007.jpg" },
-  { "id": "assassin_08", "name": "Nightcaller", "image": "/cards/assassin_008.jpg" },
-  { "id": "assassin_09", "name": "Backstabber", "image": "/cards/assassin_009.jpg" },
-  { "id": "assassin_10", "name": "Shuriken Rain", "image": "/cards/assassin_010.jpg" },
-  { "id": "assassin_11", "name": "Wraithblade", "image": "/cards/assassin_011.jpg" },
-  { "id": "assassin_12", "name": "Silent Watcher", "image": "/cards/assassin_012.jpg" },
-  { "id": "assassin_13", "name": "Gutter Whisper", "image": "/cards/assassin_013.jpg" },
-  { "id": "assassin_14", "name": "Blood Mist", "image": "/cards/assassin_014.jpg" },
-  { "id": "assassin_15", "name": "Final Blow", "image": "/cards/assassin_015.jpg" },
-  { "id": "dragon_01", "name": "Flame Hatchling", "image": "/cards/dragon_001.jpg" },
-  { "id": "dragon_02", "name": "Molten Roar", "image": "/cards/dragon_002.jpg" },
-  { "id": "dragon_03", "name": "Ember Scales", "image": "/cards/dragon_003.jpg" },
-  { "id": "dragon_04", "name": "Cinderwing", "image": "/cards/dragon_004.jpg" },
-  { "id": "dragon_05", "name": "Smokebreath", "image": "/cards/dragon_005.jpg" },
-  { "id": "dragon_06", "name": "Ash Tyrant", "image": "/cards/dragon_006.jpg" },
-  { "id": "dragon_07", "name": "Scorchbite", "image": "/cards/dragon_007.jpg" },
-  { "id": "dragon_08", "name": "Volcanic Drake", "image": "/cards/dragon_008.jpg" },
-  { "id": "dragon_09", "name": "Infernal Wyrm", "image": "/cards/dragon_009.jpg" },
-  { "id": "dragon_10", "name": "Pyroscale", "image": "/cards/dragon_010.jpg" },
-  { "id": "dragon_11", "name": "Lava Maw", "image": "/cards/dragon_011.jpg" },
-  { "id": "dragon_12", "name": "Magma Roost", "image": "/cards/dragon_012.jpg" },
-  { "id": "dragon_13", "name": "Furnace Glider", "image": "/cards/dragon_013.jpg" },
-  { "id": "dragon_14", "name": "Blazetail", "image": "/cards/dragon_014.jpg" },
-  { "id": "dragon_15", "name": "Crimson Apex", "image": "/cards/dragon_015.jpg" }
+  {
+    "id": "assassin_01",
+    "name": "Shadow Dancer",
+    "image": "/cards/assassin_001.jpg"
+  },
+  {
+    "id": "assassin_02",
+    "name": "Silent Blade",
+    "image": "/cards/assassin_002.jpg"
+  },
+  {
+    "id": "assassin_03",
+    "name": "Hidden Fang",
+    "image": "/cards/assassin_003.jpg"
+  },
+  {
+    "id": "assassin_04",
+    "name": "Nightrunner",
+    "image": "/cards/assassin_004.jpg"
+  },
+  {
+    "id": "assassin_05",
+    "name": "Veiled Strike",
+    "image": "/cards/assassin_005.jpg"
+  },
+  {
+    "id": "assassin_06",
+    "name": "Obsidian Knife",
+    "image": "/cards/assassin_006.jpg"
+  },
+  {
+    "id": "assassin_07",
+    "name": "Smoke Lurker",
+    "image": "/cards/assassin_007.jpg"
+  },
+  {
+    "id": "assassin_08",
+    "name": "Nightcaller",
+    "image": "/cards/assassin_008.jpg"
+  },
+  {
+    "id": "assassin_09",
+    "name": "Backstabber",
+    "image": "/cards/assassin_009.jpg"
+  },
+  {
+    "id": "assassin_10",
+    "name": "Shuriken Rain",
+    "image": "/cards/assassin_010.jpg"
+  },
+  {
+    "id": "assassin_11",
+    "name": "Wraithblade",
+    "image": "/cards/assassin_011.jpg"
+  },
+  {
+    "id": "assassin_12",
+    "name": "Silent Watcher",
+    "image": "/cards/assassin_012.jpg"
+  },
+  {
+    "id": "assassin_13",
+    "name": "Gutter Whisper",
+    "image": "/cards/assassin_013.jpg"
+  },
+  {
+    "id": "assassin_14",
+    "name": "Blood Mist",
+    "image": "/cards/assassin_014.jpg"
+  },
+  {
+    "id": "assassin_15",
+    "name": "Final Blow",
+    "image": "/cards/assassin_015.jpg"
+  },
+  {
+    "id": "dragon_01",
+    "name": "Flame Hatchling",
+    "image": "/cards/dragon_001.jpg"
+  },
+  {
+    "id": "dragon_02",
+    "name": "Molten Roar",
+    "image": "/cards/dragon_002.jpg"
+  },
+  {
+    "id": "dragon_03",
+    "name": "Ember Scales",
+    "image": "/cards/dragon_003.jpg"
+  },
+  {
+    "id": "dragon_04",
+    "name": "Cinderwing",
+    "image": "/cards/dragon_004.jpg"
+  },
+  {
+    "id": "dragon_05",
+    "name": "Smokebreath",
+    "image": "/cards/dragon_005.jpg"
+  },
+  {
+    "id": "dragon_06",
+    "name": "Ash Tyrant",
+    "image": "/cards/dragon_006.jpg"
+  },
+  {
+    "id": "dragon_07",
+    "name": "Scorchbite",
+    "image": "/cards/dragon_007.jpg"
+  },
+  {
+    "id": "dragon_08",
+    "name": "Volcanic Drake",
+    "image": "/cards/dragon_008.jpg"
+  },
+  {
+    "id": "dragon_09",
+    "name": "Infernal Wyrm",
+    "image": "/cards/dragon_009.jpg"
+  },
+  {
+    "id": "dragon_10",
+    "name": "Pyroscale",
+    "image": "/cards/dragon_010.jpg"
+  },
+  {
+    "id": "dragon_11",
+    "name": "Lava Maw",
+    "image": "/cards/dragon_011.jpg"
+  },
+  {
+    "id": "dragon_12",
+    "name": "Magma Roost",
+    "image": "/cards/dragon_012.jpg"
+  },
+  {
+    "id": "dragon_13",
+    "name": "Furnace Glider",
+    "image": "/cards/dragon_013.jpg"
+  },
+  {
+    "id": "dragon_14",
+    "name": "Blazetail",
+    "image": "/cards/dragon_014.jpg"
+  },
+  {
+    "id": "dragon_15",
+    "name": "Crimson Apex",
+    "image": "/cards/dragon_015.jpg"
+  },
+  {
+    "id": "celestial_01",
+    "name": "Radiant Avenger",
+    "image": "/cards/celestial_001.jpg"
+  },
+  {
+    "id": "celestial_02",
+    "name": "Radiant Avenger",
+    "image": "/cards/celestial_002.jpg"
+  },
+  {
+    "id": "celestial_03",
+    "name": "Radiant Avenger",
+    "image": "/cards/celestial_003.jpg"
+  },
+  {
+    "id": "celestial_04",
+    "name": "Celestial Warrior",
+    "image": "/cards/celestial_004.jpg"
+  },
+  {
+    "id": "celestial_05",
+    "name": "Celestial Warrior",
+    "image": "/cards/celestial_005.jpg"
+  },
+  {
+    "id": "celestial_06",
+    "name": "Sentinels of Light",
+    "image": "/cards/celestial_006.jpg"
+  },
+  {
+    "id": "celestial_07",
+    "name": "Sentinels of Light",
+    "image": "/cards/celestial_007.jpg"
+  },
+  {
+    "id": "celestial_08",
+    "name": "Redeemers",
+    "image": "/cards/celestial_008.jpg"
+  },
+  {
+    "id": "celestial_09",
+    "name": "Redeemers",
+    "image": "/cards/celestial_009.jpg"
+  },
+  {
+    "id": "celestial_10",
+    "name": "Celestial Gryphon",
+    "image": "/cards/celestial_010.jpg"
+  },
+  {
+    "id": "celestial_11",
+    "name": "Radiant Herald",
+    "image": "/cards/celestial_011.jpg"
+  },
+  {
+    "id": "celestial_12",
+    "name": "Heavenly Gates",
+    "image": "/cards/celestial_012.jpg"
+  },
+  {
+    "id": "celestial_13",
+    "name": "Archangel",
+    "image": "/cards/celestial_013.jpg"
+  },
+  {
+    "id": "celestial_14",
+    "name": "Divine Ascension",
+    "image": "/cards/celestial_014.jpg"
+  },
+  {
+    "id": "celestial_15",
+    "name": "Purification",
+    "image": "/cards/celestial_015.jpg"
+  },
+  {
+    "id": "wizard_01",
+    "name": "Arcane Mage",
+    "image": "/cards/wizard_001.jpg"
+  },
+  {
+    "id": "wizard_02",
+    "name": "Arcane Mage",
+    "image": "/cards/wizard_002.jpg"
+  },
+  {
+    "id": "wizard_03",
+    "name": "Electromancer",
+    "image": "/cards/wizard_003.jpg"
+  },
+  {
+    "id": "wizard_04",
+    "name": "Electromancer",
+    "image": "/cards/wizard_004.jpg"
+  },
+  {
+    "id": "wizard_05",
+    "name": "Aeromancercer",
+    "image": "/cards/wizard_005.jpg"
+  },
+  {
+    "id": "wizard_06",
+    "name": "Aeromancercer",
+    "image": "/cards/wizard_006.jpg"
+  },
+  {
+    "id": "wizard_07",
+    "name": "Archmage",
+    "image": "/cards/wizard_007.jpg"
+  },
+  {
+    "id": "wizard_08",
+    "name": "Pyromancer",
+    "image": "/cards/wizard_008.jpg"
+  },
+  {
+    "id": "wizard_09",
+    "name": "Pyromancer",
+    "image": "/cards/wizard_009.jpg"
+  },
+  {
+    "id": "wizard_10",
+    "name": "Arcane Library",
+    "image": "/cards/wizard_010.jpg"
+  },
+  {
+    "id": "wizard_11",
+    "name": "Fireball",
+    "image": "/cards/wizard_011.jpg"
+  },
+  {
+    "id": "wizard_12",
+    "name": "Fireball",
+    "image": "/cards/wizard_012.jpg"
+  },
+  {
+    "id": "wizard_13",
+    "name": "Chain Lightning",
+    "image": "/cards/wizard_013.jpg"
+  },
+  {
+    "id": "wizard_14",
+    "name": "Arcane Blast",
+    "image": "/cards/wizard_014.jpg"
+  },
+  {
+    "id": "wizard_15",
+    "name": "Arcane Blast",
+    "image": "/cards/wizard_015.jpg"
+  }
 ]
