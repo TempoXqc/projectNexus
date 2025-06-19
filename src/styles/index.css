@@ -1,4 +1,5 @@
 @import "tailwindcss";
+
 html,
 body,
 #root {
@@ -7,4 +8,5 @@ body,
     padding: 0;
     overflow: hidden;
     box-sizing: border-box;
+    user-select: none;
 }
