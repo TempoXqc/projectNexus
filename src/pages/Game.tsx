@@ -101,7 +101,9 @@ export default function Game() {
       alert("Votre adversaire s'est déconnecté.");
       set({ playerId: null });
     });
-    return () => socket.removeAllListeners();
+    return () => {
+      socket.removeAllListeners();
+    };
   }, [state.chatMessages]);
 
   const handleDeckChoice = (deckId: string) => {
