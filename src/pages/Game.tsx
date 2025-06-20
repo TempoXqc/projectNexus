@@ -222,6 +222,7 @@ export default function Game() {
           }
 
           const currentDeckCardIds = currentDeckKeys
+            .filter(deckId => deckId !== undefined && deckId !== null)
             .flatMap(deckId => deckLists[deckId] || [])
             .filter(Boolean);
 
@@ -510,7 +511,6 @@ export default function Game() {
     isGraveyardOpen,
     isOpponentGraveyardOpen,
     mustDiscard,
-    hasPlayedCard,
     isMyTurn,
   } = state;
 
