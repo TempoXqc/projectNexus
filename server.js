@@ -27,9 +27,21 @@ const players = {};
 const playerReadiness = {};
 
 function loadCards() {
-  const deckLists = JSON.parse(fs.readFileSync('DeckLists.json', 'utf8'));
-  const allCards = JSON.parse(fs.readFileSync('cards.json', 'utf8'));
+  let deckLists = {};
+  let allCards = [];
+  try {
+    deckLists = JSON.parse(fs.readFileSync('public/deckLists.json', 'utf8'));
+    allCards = JSON.parse(fs.readFileSync('public/cards.json', 'utf8'));
+  } catch (error) {
+    console.error('[ERROR] Impossible de charger deckLists.json ou cards.json:', error.message);
+  }
   return { deckLists, allCards };
+}
+
+function getRandomDecks() {
+  const allDecks = ['assassin', 'celestial', 'dragon', 'wizard', 'vampire', 'viking', 'engine', 'samurai'];
+  const shuffledDecks = [...allDecks].sort(() => 0.5 - Math.random());
+  return shuffledDecks.slice(0, 4); // Sélectionne 4 decks aléatoires
 }
 
 io.on('connection', (socket) => {
@@ -67,14 +79,17 @@ io.on('connection', (socket) => {
           cardsPlayed: 0
         },
         deckChoices: { 1: null, 2: [] },
+        availableDecks: getRandomDecks(), // 4 decks aléatoires pour la partie
       };
       players[socket.id] = { gameId, playerId: 1 };
       socket.emit('gameStart', { playerId: 1, chatHistory: [] });
+      io.to(gameId).emit('initialDeckList', games[gameId].availableDecks);
     } else if (games[gameId].players.length < 2) {
       games[gameId].players.push(socket.id);
       players[socket.id] = { gameId, playerId: 2 };
       socket.emit('gameStart', { playerId: 2, chatHistory: games[gameId].chatHistory });
       io.to(gameId).emit('playerJoined', { playerId: 2 });
+      io.to(gameId).emit('initialDeckList', games[gameId].availableDecks);
     } else {
       socket.emit('error', 'La partie est pleine');
       return;
@@ -164,8 +179,7 @@ io.on('connection', (socket) => {
     console.log(`[SERVER] Total decks choisis:`, totalDecks);
 
     if (totalDecks.length === 3) {
-      const allDeckIds = ['assassin', 'celestial', 'dragon', 'wizard'];
-      const remaining = allDeckIds.find(id => !totalDecks.includes(id));
+      const remaining = game.availableDecks.find(id => !totalDecks.includes(id));
       console.log(`[SERVER] Deck restant: ${remaining}`);
 
       game.finalDecks = {
@@ -177,16 +191,26 @@ io.on('connection', (socket) => {
       console.log(`[SERVER] Decks finaux:`, game.finalDecks);
 
       const { deckLists, allCards } = loadCards();
-      const player1DeckIds = [game.finalDecks.player1DeckId, remaining];
-      const player2DeckIds = game.finalDecks.player2DeckIds;
+      if (!deckLists || !allCards || allCards.length === 0) {
+        console.error('[ERROR] Échec du chargement des cartes ou des listes de decks');
+        return;
+      }
 
-      const getDeckCards = (deckIds) => {
-        const cardIds = deckIds.flatMap(deckId => deckLists[deckId] || []).filter(Boolean);
+      const getDeckCards = (deckId) => {
+        const cardIds = deckLists[deckId] || [];
         return allCards.filter(card => cardIds.includes(card.id)).sort(() => Math.random() - 0.5);
       };
 
-      const player1Cards = getDeckCards(player1DeckIds);
-      const player2Cards = getDeckCards(player2DeckIds);
+      const player1DeckIds = [game.finalDecks.player1DeckId, remaining];
+      const player2DeckIds = game.finalDecks.player2DeckIds;
+
+      const player1Cards = player1DeckIds.flatMap(deckId => getDeckCards(deckId)).slice(0, 30);
+      const player2Cards = player2DeckIds.flatMap(deckId => getDeckCards(deckId)).slice(0, 30);
+
+      if (player1Cards.length === 0 || player2Cards.length === 0) {
+        console.error('[ERROR] Aucune carte trouvée pour les decks sélectionnés');
+        return;
+      }
 
       const initialDraw = (cards) => {
         const drawn = cards.slice(0, 5);
@@ -194,20 +218,24 @@ io.on('connection', (socket) => {
         return { hand: drawn, deck: rest };
       };
 
-      const player1Initial = initialDraw(player1Cards);
-      const player2Initial = initialDraw(player2Cards);
+      if (game.state.player1 && game.state.player2) {
+        const player1Initial = initialDraw(player1Cards);
+        const player2Initial = initialDraw(player2Cards);
 
-      game.state.player1.hand = player1Initial.hand;
-      game.state.player1.deck = player1Initial.deck;
-      game.state.player2.hand = player2Initial.hand;
-      game.state.player2.deck = player2Initial.deck;
+        game.state.player1.hand = player1Initial.hand;
+        game.state.player1.deck = player1Initial.deck;
+        game.state.player2.hand = player2Initial.hand;
+        game.state.player2.deck = player2Initial.deck;
 
-      const isBothReady = playerReadiness[gameId]?.[1] && playerReadiness[gameId]?.[2];
-      if (isBothReady) {
-        console.log(`[SERVER] Émission de deckSelectionDone pour ${gameId}`);
-        io.to(gameId).emit('deckSelectionDone', game.finalDecks);
-        io.to(gameId).emit('updateGameState', game.state);
-        io.to(gameId).emit('bothPlayersReady');
+        const isBothReady = playerReadiness[gameId]?.[1] && playerReadiness[gameId]?.[2];
+        if (isBothReady) {
+          console.log(`[SERVER] Émission de deckSelectionDone pour ${gameId}`);
+          io.to(gameId).emit('deckSelectionDone', game.finalDecks);
+          io.to(gameId).emit('updateGameState', game.state);
+          io.to(gameId).emit('bothPlayersReady');
+        }
+      } else {
+        console.error('[ERROR] game.state.player1 ou game.state.player2 non défini');
       }
     }
   });
@@ -241,9 +269,9 @@ io.on('connection', (socket) => {
     const isBothReady = playerReadiness[gameId][1] && playerReadiness[gameId][2];
     const finalDecks = games[gameId]?.finalDecks;
 
-    if (isBothReady && finalDecks) {
+    if (isBothReady && finalDecks && games[gameId]) {
       io.to(gameId).emit('deckSelectionDone', finalDecks);
-      io.to(gameId).emit('updateGameState', game.state);
+      io.to(gameId).emit('updateGameState', games[gameId].state);
       io.to(gameId).emit('bothPlayersReady');
     } else if (isBothReady) {
       console.log('[SERVER] Les deux joueurs sont prêts mais les decks ne sont pas encore valides.');

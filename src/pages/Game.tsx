@@ -63,6 +63,7 @@ export default function Game() {
       selectedDecks: string[];
     } | null,
     canInitializeDraw: false,
+    randomizers: [] as { id: string; name: string; image: string }[],
   });
 
   const set = (updates: Partial<typeof state>) =>
@@ -169,6 +170,26 @@ export default function Game() {
       set({ isMyTurn: true, hasPlayedCard: false });
     });
 
+    socket.on('initialDeckList', (availableDecks: string[]) => {
+      console.log('[DEBUG] initialDeckList reçu:', availableDecks);
+      const deckImages: Record<string, string> = {
+        'assassin': '/cards/randomizers/Assassin.jpg',
+        'celestial': '/cards/randomizers/Celestial.jpg',
+        'dragon': '/cards/randomizers/Dragon.jpg',
+        'wizard': '/cards/randomizers/Wizard.jpg',
+        'vampire': '/cards/randomizers/Vampire.jpg',
+        'viking': '/cards/randomizers/Viking.jpg',
+        'engine': '/cards/randomizers/Engine.jpg',
+        'samurai': '/cards/randomizers/Samurai.jpg',
+      };
+      const randomDeckList = availableDecks.map((id: string) => ({
+        id,
+        name: id.charAt(0).toUpperCase() + id.slice(1),
+        image: deckImages[id], // TypeScript sait maintenant que id est une clé valide
+      }));
+      set({ randomizers: randomDeckList });
+    });
+
     return () => {
       console.log('[DEBUG] Nettoyage du useEffect Socket.IO');
       socket.off('connect', tryJoin);
@@ -184,6 +205,7 @@ export default function Game() {
       socket.off('opponentDisconnected');
       socket.off('updateGameState');
       socket.off('yourTurn');
+      socket.off('initialDeckList');
     };
   }, [gameId, navigate, state.playerId, state.chatMessages]);
 
@@ -194,66 +216,38 @@ export default function Game() {
   useEffect(() => {
     if (state.deckSelectionData && state.bothReady && !state.deckSelectionDone && state.playerId !== null) {
       console.log('[TRIGGER] INIT DRAW PHASE');
-      console.log('[DEBUG] deckSelectionData:', state.deckSelectionData);
 
       const { player1DeckId, player2DeckIds, selectedDecks } = state.deckSelectionData;
+      const remainingDeckId = selectedDecks.find((id: string) => id !== player1DeckId && !player2DeckIds.includes(id));
 
       Promise.all([
-        fetch('/DeckLists.json').then((res) => res.json()),
+        fetch('/deckLists.json').then((res) => res.json()),
         fetch('/cards.json').then((res) => res.json()),
       ])
         .then(([deckLists, allCards]: [Record<string, string[]>, Card[]]) => {
           console.log('[DEBUG] DeckLists:', deckLists);
           console.log('[DEBUG] allCards:', allCards.map(c => c.id));
 
-          const allDeckIds = ['assassin', 'celestial', 'dragon', 'wizard'];
-          const remainingDeckId = allDeckIds.find(id => !selectedDecks.includes(id));
+          const getDeckCards = (deckId: string) => { // Typé deckId comme string
+            const cardIds = deckLists[deckId] || [];
+            return allCards.filter(card => cardIds.includes(card.id));
+          };
 
-          const currentDeckKeys =
-            state.playerId === 1
-              ? [player1DeckId, remainingDeckId || allDeckIds.find(id => id !== player1DeckId && !player2DeckIds.includes(id))]
-              : player2DeckIds;
-
-          console.log('[DEBUG] currentDeckKeys:', currentDeckKeys);
-
-          if (!currentDeckKeys || currentDeckKeys.length === 0) {
-            console.error('[ERROR] Aucune clé de deck valide pour le joueur', state.playerId);
-            return;
-          }
-
-          const currentDeckCardIds = currentDeckKeys
-            .filter(deckId => deckId !== undefined && deckId !== null)
-            .flatMap(deckId => deckLists[deckId] || [])
-            .filter(Boolean);
-
-          console.log('[DEBUG] currentDeckCardIds:', currentDeckCardIds);
-
-          if (currentDeckCardIds.length === 0) {
-            console.error('[ERROR] Aucun ID de carte trouvé pour les decks', currentDeckKeys);
-            return;
-          }
-
-          let currentPlayerCards = allCards.filter(card =>
-            currentDeckCardIds.includes(card.id)
-          );
-
-          console.log('[DEBUG] currentPlayerCards (avant filtre):', currentPlayerCards.map(c => c.id));
-
-          if (currentPlayerCards.length !== 30) {
-            console.warn('[WARNING] Le nombre de cartes n\'est pas 30, correction appliquée');
-            const deck1Cards = allCards.filter(card => deckLists[player1DeckId].includes(card.id));
-            const deck2Cards = remainingDeckId && deckLists[remainingDeckId]
-              ? allCards.filter(card => deckLists[remainingDeckId].includes(card.id))
-              : allCards.filter(card => deckLists[allDeckIds.find(id => id !== player1DeckId && !player2DeckIds.includes(id)) || ''].includes(card.id));
-            currentPlayerCards = [...deck1Cards, ...deck2Cards].slice(0, 30); // Combinaison explicite
+          let currentPlayerCards;
+          if (state.playerId === 1) {
+            const player1Cards = getDeckCards(player1DeckId);
+            const remainingCards = remainingDeckId ? getDeckCards(remainingDeckId) : [];
+            currentPlayerCards = [...player1Cards, ...remainingCards].sort(() => Math.random() - 0.5).slice(0, 30);
+          } else {
+            currentPlayerCards = player2DeckIds.flatMap((deckId: string) => getDeckCards(deckId)).sort(() => Math.random() - 0.5).slice(0, 30);
           }
 
           if (currentPlayerCards.length === 0) {
-            console.error('[ERROR] Aucune carte après correction, vérifiez deckSelectionData');
+            console.error('[ERROR] Aucune carte trouvée pour le deck du joueur', state.playerId);
             return;
           }
 
-          const shuffledDeck = [...currentPlayerCards].sort(() => Math.random() - 0.5);
+          const shuffledDeck = [...currentPlayerCards];
           const drawn = getRandomHand(shuffledDeck, 5);
           const rest = shuffledDeck.filter(c => !drawn.some(d => d.id === c.id));
 
@@ -262,8 +256,6 @@ export default function Game() {
           console.log('[DEBUG] Longueur du deck restant:', rest.length);
 
           set({
-            player1Deck: state.playerId === 1 ? currentPlayerCards : state.player1Deck,
-            player2Deck: state.playerId === 2 ? currentPlayerCards : state.player2Deck,
             deck: rest,
             initialDraw: drawn,
             deckSelectionDone: true,
@@ -279,14 +271,6 @@ export default function Game() {
         .catch(err => console.error('[ERREUR INIT DRAW]', err));
     }
   }, [state.deckSelectionData, state.bothReady, state.deckSelectionDone, state.playerId]);
-
-  const [randomizers, setRandomizers] = useState<any[]>([]);
-  useEffect(() => {
-    fetch('/Randomizers.json')
-      .then(res => res.json())
-      .then(setRandomizers)
-      .catch(console.error);
-  }, []);
 
   const handleDeckChoice = (deckId: string) => {
     if (!state.playerId || !state.isConnected || !gameId) return;
@@ -512,6 +496,7 @@ export default function Game() {
     isOpponentGraveyardOpen,
     mustDiscard,
     isMyTurn,
+    randomizers,
   } = state;
 
   return (
@@ -538,11 +523,7 @@ export default function Game() {
                   className="w-[180px] h-[250px] relative cursor-pointer transition-transform hover:scale-105 rounded shadow-lg"
                 >
                   <div
-                    className={`w-full h-full border-4 ${borderColor} rounded ${
-                      borderColor !== 'border-transparent'
-                        ? 'shadow-lg shadow-black/50'
-                        : ''
-                    }`}
+                    className={`w-full h-full border-4 ${borderColor} rounded ${borderColor !== 'border-transparent' ? 'shadow-lg shadow-black/50' : ''}`}
                   >
                     <img
                       src={deckObj.image}
@@ -583,7 +564,7 @@ export default function Game() {
       <div
         className="absolute top-0 left-0 w-full h-full z-2"
         style={{
-          backgroundImage: 'url(/output-bg.gif)',
+          backgroundImage: 'url(/addons/output-bg.gif)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           opacity: 1,
