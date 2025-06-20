@@ -27,9 +27,15 @@ const players = {};
 const playerReadiness = {};
 
 function loadCards() {
-  const deckLists = JSON.parse(fs.readFileSync('DeckLists.json', 'utf8'));
+  const deckLists = JSON.parse(fs.readFileSync('deckLists.json', 'utf8'));
   const allCards = JSON.parse(fs.readFileSync('cards.json', 'utf8'));
   return { deckLists, allCards };
+}
+
+function getRandomDecks() {
+  const allDecks = ['assassin', 'celestial', 'dragon', 'wizard', 'vampire', 'viking', 'engine', 'samurai'];
+  const shuffledDecks = [...allDecks].sort(() => 0.5 - Math.random());
+  return shuffledDecks.slice(0, 4);
 }
 
 io.on('connection', (socket) => {
@@ -67,14 +73,17 @@ io.on('connection', (socket) => {
           cardsPlayed: 0
         },
         deckChoices: { 1: null, 2: [] },
+        availableDecks: getRandomDecks(), // Liste fixe de 4 decks pour la partie
       };
       players[socket.id] = { gameId, playerId: 1 };
       socket.emit('gameStart', { playerId: 1, chatHistory: [] });
+      io.to(gameId).emit('initialDeckList', games[gameId].availableDecks); // Envoi de la liste aux deux joueurs
     } else if (games[gameId].players.length < 2) {
       games[gameId].players.push(socket.id);
       players[socket.id] = { gameId, playerId: 2 };
       socket.emit('gameStart', { playerId: 2, chatHistory: games[gameId].chatHistory });
       io.to(gameId).emit('playerJoined', { playerId: 2 });
+      io.to(gameId).emit('initialDeckList', games[gameId].availableDecks); // Envoi de la même liste au joueur 2
     } else {
       socket.emit('error', 'La partie est pleine');
       return;
@@ -164,8 +173,8 @@ io.on('connection', (socket) => {
     console.log(`[SERVER] Total decks choisis:`, totalDecks);
 
     if (totalDecks.length === 3) {
-      const allDeckIds = ['assassin', 'celestial', 'dragon', 'wizard'];
-      const remaining = allDeckIds.find(id => !totalDecks.includes(id));
+      const allDeckIds = ['assassin', 'celestial', 'dragon', 'wizard', 'vampire', 'viking', 'engine', 'samurai'];
+      const remaining = allDeckIds.find(id => !totalDecks.includes(id) && game.availableDecks.includes(id));
       console.log(`[SERVER] Deck restant: ${remaining}`);
 
       game.finalDecks = {

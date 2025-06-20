@@ -169,6 +169,26 @@ export default function Game() {
       set({ isMyTurn: true, hasPlayedCard: false });
     });
 
+    socket.on('initialDeckList', (availableDecks) => {
+      console.log('[DEBUG] initialDeckList reçu:', availableDecks);
+      const deckImages = {
+        'assassin': '/cards/randomizers/Assassin.jpg',
+        'celestial': '/cards/randomizers/Celestial.jpg',
+        'dragon': '/cards/randomizers/Dragon.jpg',
+        'wizard': '/cards/randomizers/Wizard.jpg',
+        'vampire': '/cards/randomizers/Vampire.jpg',
+        'viking': '/cards/randomizers/Viking.jpg',
+        'engine': '/cards/randomizers/Engine.jpg',
+        'samurai': '/cards/randomizers/Samurai.jpg',
+      };
+      const randomDeckList = availableDecks.map(id => ({
+        id,
+        name: id.charAt(0).toUpperCase() + id.slice(1),
+        image: deckImages[id],
+      }));
+      setRandomizers(randomDeckList);
+    });
+
     return () => {
       console.log('[DEBUG] Nettoyage du useEffect Socket.IO');
       socket.off('connect', tryJoin);
@@ -184,6 +204,7 @@ export default function Game() {
       socket.off('opponentDisconnected');
       socket.off('updateGameState');
       socket.off('yourTurn');
+      socket.off('initialDeckList');
     };
   }, [gameId, navigate, state.playerId, state.chatMessages]);
 
@@ -194,19 +215,18 @@ export default function Game() {
   useEffect(() => {
     if (state.deckSelectionData && state.bothReady && !state.deckSelectionDone && state.playerId !== null) {
       console.log('[TRIGGER] INIT DRAW PHASE');
-      console.log('[DEBUG] deckSelectionData:', state.deckSelectionData);
 
       const { player1DeckId, player2DeckIds, selectedDecks } = state.deckSelectionData;
 
       Promise.all([
-        fetch('/DeckLists.json').then((res) => res.json()),
+        fetch('/deckLists.json').then((res) => res.json()),
         fetch('/cards.json').then((res) => res.json()),
       ])
         .then(([deckLists, allCards]: [Record<string, string[]>, Card[]]) => {
           console.log('[DEBUG] DeckLists:', deckLists);
           console.log('[DEBUG] allCards:', allCards.map(c => c.id));
 
-          const allDeckIds = ['assassin', 'celestial', 'dragon', 'wizard'];
+          const allDeckIds = ['assassin', 'celestial', 'dragon', 'wizard', 'vampire', 'viking', 'engine', 'samurai'];
           const remainingDeckId = allDeckIds.find(id => !selectedDecks.includes(id));
 
           const currentDeckKeys =
@@ -281,12 +301,7 @@ export default function Game() {
   }, [state.deckSelectionData, state.bothReady, state.deckSelectionDone, state.playerId]);
 
   const [randomizers, setRandomizers] = useState<any[]>([]);
-  useEffect(() => {
-    fetch('/Randomizers.json')
-      .then(res => res.json())
-      .then(setRandomizers)
-      .catch(console.error);
-  }, []);
+  // La sélection aléatoire est maintenant gérée par le serveur, donc pas besoin de générer ici
 
   const handleDeckChoice = (deckId: string) => {
     if (!state.playerId || !state.isConnected || !gameId) return;
@@ -583,7 +598,7 @@ export default function Game() {
       <div
         className="absolute top-0 left-0 w-full h-full z-2"
         style={{
-          backgroundImage: 'url(/output-bg.gif)',
+          backgroundImage: 'url(/addons/output-bg.gif)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           opacity: 1,
