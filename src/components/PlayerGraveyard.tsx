@@ -8,15 +8,19 @@ interface GraveyardProps {
   isOpen: boolean;
   onClose: () => void;
   graveyard: Card[];
+  hoveredCardId: string | null;
+  setHoveredCardId: (id: string | null) => void;
 }
 
 export default function PlayerGraveyard({
-                                    count,
-                                    onClick,
-                                    isOpen,
-                                    onClose,
-                                    graveyard,
-                                  }: GraveyardProps) {
+                                          count,
+                                          onClick,
+                                          isOpen,
+                                          onClose,
+                                          graveyard,
+                                          hoveredCardId,
+                                          setHoveredCardId,
+                                        }: GraveyardProps) {
   return (
     <>
       <div
@@ -43,18 +47,42 @@ export default function PlayerGraveyard({
       </div>
 
       <Modal isOpen={isOpen} onClose={onClose} title="Cimetière" width="720px">
-        <div className="flex flex-wrap gap-4 justify-center">
+        <div className="flex flex-wrap gap-4 justify-center relative">
           {graveyard.length > 0 ? (
             graveyard
               .slice()
               .reverse()
               .map((card) => (
-                <img
+                <div
                   key={card.id}
-                  src={card.image}
-                  alt={card.name}
-                  className="w-[100px] h-[140px] object-cover rounded shadow"
-                />
+                  onMouseEnter={() => setHoveredCardId(card.id)}
+                  onMouseLeave={() => setHoveredCardId(null)}
+                  className="relative w-[100px] h-[140px] rounded"
+                >
+                  <img
+                    src={card.image}
+                    alt={card.name}
+                    className="w-full h-full object-cover rounded shadow"
+                  />
+                  {hoveredCardId === card.id && (
+                    <div className="absolute top-[-450px] left-1/2 transform -translate-x-1/2 z-50">
+                      <div className="border-4 border-black rounded-lg shadow-2xl">
+                        <img
+                          src={card.image}
+                          alt={card.name}
+                          className="rounded shadow-2xl border-2 border-black"
+                          style={{
+                            maxWidth: '300px',
+                            height: 'auto',
+                            aspectRatio: '5 / 7',
+                            objectFit: 'contain',
+                            display: 'block',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))
           ) : (
             <p className="text-center text-gray-500">Le cimetière est vide.</p>

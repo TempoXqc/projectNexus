@@ -2,6 +2,7 @@
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import fs from 'fs';
 
 const app = express();
 const server = createServer(app);
@@ -25,9 +26,13 @@ const games = {};
 const players = {};
 const playerReadiness = {};
 
-io.on('connection', (socket) => {
-  console.log('Nouveau joueur connecté:', socket.id);
+function loadCards() {
+  const deckLists = JSON.parse(fs.readFileSync('DeckLists.json', 'utf8'));
+  const allCards = JSON.parse(fs.readFileSync('cards.json', 'utf8'));
+  return { deckLists, allCards };
+}
 
+io.on('connection', (socket) => {
   socket.on('joinGame', (gameId) => {
     console.log(`Joueur ${socket.id} rejoint la partie ${gameId}`);
     socket.join(gameId);
@@ -43,8 +48,9 @@ io.on('connection', (socket) => {
             opponentField: Array(8).fill(null),
             deck: [],
             graveyard: [],
+            opponentGraveyard: [],
             mustDiscard: false,
-            hasPlayedCard: false // Ajout pour suivre si le joueur a joué
+            hasPlayedCard: false
           },
           player2: {
             hand: [],
@@ -52,12 +58,13 @@ io.on('connection', (socket) => {
             opponentField: Array(8).fill(null),
             deck: [],
             graveyard: [],
+            opponentGraveyard: [],
             mustDiscard: false,
-            hasPlayedCard: false // Ajout pour suivre si le joueur a joué
+            hasPlayedCard: false
           },
           turn: 1,
           activePlayer: socket.id,
-          cardsPlayed: 0 // Compteur pour suivre les cartes jouées dans un tour
+          cardsPlayed: 0
         },
         deckChoices: { 1: null, 2: [] },
       };
@@ -83,40 +90,27 @@ io.on('connection', (socket) => {
     const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
     const opponentKey = players[socket.id].playerId === 1 ? 'player2' : 'player1';
 
-    // Vérifier si le joueur a déjà joué une carte
     if (game.state[playerKey].hasPlayedCard) {
       console.log(`[SERVER] ${playerKey} a déjà joué une carte ce tour`);
       return;
     }
 
-    // Mettre à jour le terrain et la main du joueur
     game.state[playerKey].field[fieldIndex] = card;
     game.state[playerKey].hand = game.state[playerKey].hand.filter((c) => c.id !== card.id);
     game.state[playerKey].hasPlayedCard = true;
-
-    // Mettre à jour le terrain de l'adversaire
     game.state[opponentKey].opponentField = game.state[playerKey].field;
 
-    // Incrémenter le compteur de cartes jouées
     game.state.cardsPlayed += 1;
 
-    // Vérifier si les deux joueurs ont joué
     if (game.state.cardsPlayed === 2) {
-      // Réinitialiser pour le prochain tour
       game.state.cardsPlayed = 0;
       game.state.player1.hasPlayedCard = false;
       game.state.player2.hasPlayedCard = false;
       game.state.turn += 1;
-      // Le joueur 1 commence le prochain tour
-      game.state.activePlayer = game.players[0]; // Joueur 1
+      game.state.activePlayer = game.players[0];
     } else {
-      // Passer au joueur suivant
       game.state.activePlayer = game.players.find((id) => id !== socket.id);
     }
-
-    console.log(`[SERVER] Carte jouée par ${playerKey} à l'index ${fieldIndex}:`, card);
-    console.log(`[SERVER] Main de ${playerKey} après jeu:`, game.state[playerKey].hand);
-    console.log(`[SERVER] État du jeu mis à jour:`, game.state);
 
     io.to(gameId).emit('updateGameState', game.state);
     io.to(game.state.activePlayer).emit('yourTurn');
@@ -135,7 +129,11 @@ io.on('connection', (socket) => {
     const game = games[gameId];
     if (!game) return;
     const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
+    const opponentKey = players[socket.id].playerId === 1 ? 'player2' : 'player1';
     game.state[playerKey] = { ...game.state[playerKey], ...state };
+    game.state[opponentKey].opponentGraveyard = game.state[playerKey].graveyard;
+    game.state[opponentKey].hand = game.state[opponentKey].hand || [];
+    game.state[opponentKey].deck = game.state[opponentKey].deck || [];
     console.log(`[SERVER] État mis à jour pour ${playerKey}:`, game.state[playerKey]);
     io.to(gameId).emit('updateGameState', game.state);
   });
@@ -178,10 +176,37 @@ io.on('connection', (socket) => {
 
       console.log(`[SERVER] Decks finaux:`, game.finalDecks);
 
+      const { deckLists, allCards } = loadCards();
+      const player1DeckIds = [game.finalDecks.player1DeckId, remaining];
+      const player2DeckIds = game.finalDecks.player2DeckIds;
+
+      const getDeckCards = (deckIds) => {
+        const cardIds = deckIds.flatMap(deckId => deckLists[deckId] || []).filter(Boolean);
+        return allCards.filter(card => cardIds.includes(card.id)).sort(() => Math.random() - 0.5);
+      };
+
+      const player1Cards = getDeckCards(player1DeckIds);
+      const player2Cards = getDeckCards(player2DeckIds);
+
+      const initialDraw = (cards) => {
+        const drawn = cards.slice(0, 5);
+        const rest = cards.slice(5);
+        return { hand: drawn, deck: rest };
+      };
+
+      const player1Initial = initialDraw(player1Cards);
+      const player2Initial = initialDraw(player2Cards);
+
+      game.state.player1.hand = player1Initial.hand;
+      game.state.player1.deck = player1Initial.deck;
+      game.state.player2.hand = player2Initial.hand;
+      game.state.player2.deck = player2Initial.deck;
+
       const isBothReady = playerReadiness[gameId]?.[1] && playerReadiness[gameId]?.[2];
       if (isBothReady) {
         console.log(`[SERVER] Émission de deckSelectionDone pour ${gameId}`);
         io.to(gameId).emit('deckSelectionDone', game.finalDecks);
+        io.to(gameId).emit('updateGameState', game.state);
         io.to(gameId).emit('bothPlayersReady');
       }
     }
@@ -218,6 +243,7 @@ io.on('connection', (socket) => {
 
     if (isBothReady && finalDecks) {
       io.to(gameId).emit('deckSelectionDone', finalDecks);
+      io.to(gameId).emit('updateGameState', game.state);
       io.to(gameId).emit('bothPlayersReady');
     } else if (isBothReady) {
       console.log('[SERVER] Les deux joueurs sont prêts mais les decks ne sont pas encore valides.');

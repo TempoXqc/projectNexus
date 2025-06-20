@@ -28,20 +28,23 @@ export default function Game() {
     hand: [] as Card[],
     deck: [] as Card[],
     graveyard: [] as Card[],
+    opponentGraveyard: [] as Card[],
     field: Array(8).fill(null) as (Card | null)[],
     opponentField: Array(8).fill(null) as (Card | null)[],
-    opponentHand: Array(5).fill(0),
+    opponentHand: [] as Card[],
+    opponentDeck: [] as Card[],
     chatMessages: [] as { playerId: number; message: string }[],
     chatInput: '',
     playerId: null as number | null,
     turn: 1,
     isConnected: false,
     hoveredCardId: null as string | null,
-    isHandHovered: false,
+    isCardHovered: false,
     isGraveyardOpen: false,
+    isOpponentGraveyardOpen: false,
     mustDiscard: false,
     hasPlayedCard: false,
-    isMyTurn: false, // Ajout pour suivre si c'est le tour du joueur
+    isMyTurn: false,
     selectedDecks: [] as string[],
     player1DeckId: null as string | null,
     player1Deck: [] as Card[],
@@ -149,9 +152,13 @@ export default function Game() {
         field: gameState[playerKey].field || state.field,
         hand: gameState[playerKey].hand || state.hand,
         graveyard: gameState[playerKey].graveyard || state.graveyard,
+        opponentGraveyard: gameState[opponentKey].graveyard || state.opponentGraveyard,
         mustDiscard: gameState[playerKey].mustDiscard || false,
         hasPlayedCard: gameState[playerKey].hasPlayedCard || false,
         opponentField: gameState[opponentKey].field || state.opponentField,
+        opponentHand: gameState[opponentKey].hand || state.opponentHand,
+        deck: gameState[playerKey].deck || state.deck,
+        opponentDeck: gameState[opponentKey].deck || state.opponentDeck,
         turn: gameState.turn || state.turn,
         isMyTurn: gameState.activePlayer === socket.id,
       });
@@ -185,16 +192,11 @@ export default function Game() {
   }, [gameId, navigate]);
 
   useEffect(() => {
-    if (
-      state.deckSelectionData &&
-      state.bothReady &&
-      !state.deckSelectionDone &&
-      state.playerId !== null
-    ) {
+    if (state.deckSelectionData && state.bothReady && !state.deckSelectionDone && state.playerId !== null) {
       console.log('[TRIGGER] INIT DRAW PHASE');
       console.log('[DEBUG] deckSelectionData:', state.deckSelectionData);
 
-      const { player1DeckId, player2DeckIds } = state.deckSelectionData;
+      const { player1DeckId, player2DeckIds, selectedDecks } = state.deckSelectionData;
 
       Promise.all([
         fetch('/DeckLists.json').then((res) => res.json()),
@@ -204,8 +206,13 @@ export default function Game() {
           console.log('[DEBUG] DeckLists:', deckLists);
           console.log('[DEBUG] allCards:', allCards.map(c => c.id));
 
+          const allDeckIds = ['assassin', 'celestial', 'dragon', 'wizard'];
+          const remainingDeckId = allDeckIds.find(id => !selectedDecks.includes(id));
+
           const currentDeckKeys =
-            state.playerId === 1 ? [player1DeckId] : player2DeckIds;
+            state.playerId === 1
+              ? [player1DeckId, remainingDeckId || allDeckIds.find(id => id !== player1DeckId && !player2DeckIds.includes(id))]
+              : player2DeckIds;
 
           console.log('[DEBUG] currentDeckKeys:', currentDeckKeys);
 
@@ -215,6 +222,7 @@ export default function Game() {
           }
 
           const currentDeckCardIds = currentDeckKeys
+            .filter(deckId => deckId !== undefined && deckId !== null)
             .flatMap(deckId => deckLists[deckId] || [])
             .filter(Boolean);
 
@@ -225,26 +233,37 @@ export default function Game() {
             return;
           }
 
-          const currentPlayerCards = allCards.filter(card =>
+          let currentPlayerCards = allCards.filter(card =>
             currentDeckCardIds.includes(card.id)
           );
 
-          console.log('[DEBUG] currentPlayerCards:', currentPlayerCards.map(c => c.id));
+          console.log('[DEBUG] currentPlayerCards (avant filtre):', currentPlayerCards.map(c => c.id));
+
+          if (currentPlayerCards.length !== 30) {
+            console.warn('[WARNING] Le nombre de cartes n\'est pas 30, correction appliquée');
+            const deck1Cards = allCards.filter(card => deckLists[player1DeckId].includes(card.id));
+            const deck2Cards = remainingDeckId && deckLists[remainingDeckId]
+              ? allCards.filter(card => deckLists[remainingDeckId].includes(card.id))
+              : allCards.filter(card => deckLists[allDeckIds.find(id => id !== player1DeckId && !player2DeckIds.includes(id)) || ''].includes(card.id));
+            currentPlayerCards = [...deck1Cards, ...deck2Cards].slice(0, 30); // Combinaison explicite
+          }
 
           if (currentPlayerCards.length === 0) {
-            console.error('[ERROR] Aucune carte correspondante trouvée pour', currentDeckCardIds);
+            console.error('[ERROR] Aucune carte après correction, vérifiez deckSelectionData');
             return;
           }
 
-          const drawn = getRandomHand(currentPlayerCards, 5);
-          const rest = currentPlayerCards.filter(c => !drawn.some(d => d.id === c.id));
+          const shuffledDeck = [...currentPlayerCards].sort(() => Math.random() - 0.5);
+          const drawn = getRandomHand(shuffledDeck, 5);
+          const rest = shuffledDeck.filter(c => !drawn.some(d => d.id === c.id));
 
           console.log('[DEBUG] Main initiale:', drawn.map(c => c.id));
           console.log('[DEBUG] Deck restant:', rest.map(c => c.id));
+          console.log('[DEBUG] Longueur du deck restant:', rest.length);
 
           set({
-            player1Deck: state.playerId === 1 ? currentPlayerCards : [],
-            player2Deck: state.playerId === 2 ? currentPlayerCards : [],
+            player1Deck: state.playerId === 1 ? currentPlayerCards : state.player1Deck,
+            player2Deck: state.playerId === 2 ? currentPlayerCards : state.player2Deck,
             deck: rest,
             initialDraw: drawn,
             deckSelectionDone: true,
@@ -272,7 +291,7 @@ export default function Game() {
   const handleDeckChoice = (deckId: string) => {
     if (!state.playerId || !state.isConnected || !gameId) return;
     if (state.playerId === 1 && state.hasChosenDeck) return;
-    if (state.playerId === 2 && state.selectedDecks.filter(d => d !== state.player1DeckId).length >= 2) return;
+    if (state.playerId === 2 && (!state.player1DeckId || state.selectedDecks.filter(d => d !== state.player1DeckId).length >= 2)) return;
 
     socket.emit('chooseDeck', {
       gameId,
@@ -459,13 +478,15 @@ export default function Game() {
           >
             <BadgeCheck className="w-4 h-4" /> Je garde ma main
           </button>
-          <button
-            onClick={doMulligan}
-            className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 shadow-md hover:scale-105 transition"
-          >
-            <X className="w-4 h-4" /> Mulligan (
-            {state.selectedForMulligan.length})
-          </button>
+          {state.selectedForMulligan.length > 0 && (
+            <button
+              onClick={doMulligan}
+              className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 shadow-md hover:scale-105 transition"
+            >
+              <X className="w-4 h-4" /> Mulligan (
+              {state.selectedForMulligan.length})
+            </button>
+          )}
         </div>
       </div>
     );
@@ -475,17 +496,20 @@ export default function Game() {
     hand,
     deck,
     graveyard,
+    opponentGraveyard,
     field,
     opponentField,
     opponentHand,
+    opponentDeck,
     chatMessages,
     chatInput,
     playerId,
     turn,
     isConnected,
     hoveredCardId,
-    isHandHovered,
+    isCardHovered,
     isGraveyardOpen,
+    isOpponentGraveyardOpen,
     mustDiscard,
     isMyTurn,
   } = state;
@@ -557,6 +581,15 @@ export default function Game() {
       )}
 
       <div
+        className="absolute top-0 left-0 w-full h-full z-2"
+        style={{
+          backgroundImage: 'url(/output-bg.gif)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          opacity: 1,
+        }}
+      />
+      <div
         className="w-[85%] min-h-screen flex flex-col justify-end items-center p-4 relative"
         style={{
           backgroundImage: 'url(/addons/background.jpg)',
@@ -564,24 +597,32 @@ export default function Game() {
           backgroundPosition: 'center',
         }}
       >
-        <PlayerField
-          field={field}
-          hoveredCardId={hoveredCardId}
-          setHoveredCardId={(id) => set({ hoveredCardId: id })}
-          removeCardFromField={(index) => removeCardFromField(index)}
-        />
-        <PlayerHand
-          hand={hand}
-          hoveredCardId={hoveredCardId}
-          setHoveredCardId={(id) => set({ hoveredCardId: id })}
-          isHandHovered={isHandHovered}
-          setIsHandHovered={(val) => set({ isHandHovered: val })}
-          mustDiscard={mustDiscard}
-          discardCardFromHand={(card) => discardCardFromHand(card)}
-          playCardToField={(card) => playCardToField(card)}
-        />
+        <div className="z-3">
+          <PlayerField
+            field={field}
+            hoveredCardId={hoveredCardId}
+            setHoveredCardId={(id) => set({ hoveredCardId: id })}
+            removeCardFromField={(index) => removeCardFromField(index)}
+          />
+          <PlayerHand
+            hand={hand}
+            hoveredCardId={hoveredCardId}
+            setHoveredCardId={(id) => set({ hoveredCardId: id })}
+            isHandHovered={isCardHovered}
+            setIsHandHovered={(val) => set({ isCardHovered: val })}
+            mustDiscard={mustDiscard}
+            discardCardFromHand={(card) => discardCardFromHand(card)}
+            playCardToField={(card) => playCardToField(card)}
+          />
+          <OpponentField
+            opponentField={opponentField}
+            hoveredCardId={hoveredCardId}
+            setHoveredCardId={(id) => set({ hoveredCardId: id })}
+          />
+          <OpponentHand opponentHand={opponentHand} />
+        </div>
 
-        <div className="absolute left-4 bottom-4 flex gap-4">
+        <div className="z-3 absolute left-4 bottom-4 flex gap-4">
           <PlayerDeck count={deck.length} />
           <PlayerGraveyard
             count={graveyard.length}
@@ -589,16 +630,23 @@ export default function Game() {
             isOpen={isGraveyardOpen}
             onClose={() => set({ isGraveyardOpen: false })}
             graveyard={graveyard}
+            hoveredCardId={hoveredCardId}
+            setHoveredCardId={(id) => set({ hoveredCardId: id })}
           />
         </div>
 
-        <div className="absolute left-4 top-4 flex gap-4">
-          <OpponentDeck count={opponentHand.length} />
-          <OpponentGraveyard count={0} />
+        <div className="z-3 absolute left-4 top-4 flex gap-4">
+          <OpponentDeck count={opponentDeck.length} />
+          <OpponentGraveyard
+            count={opponentGraveyard.length}
+            onClick={() => set({ isOpponentGraveyardOpen: true })}
+            isOpen={isOpponentGraveyardOpen}
+            onClose={() => set({ isOpponentGraveyardOpen: false })}
+            graveyard={opponentGraveyard}
+            hoveredCardId={hoveredCardId}
+            setHoveredCardId={(id) => set({ hoveredCardId: id })}
+          />
         </div>
-
-        <OpponentField opponentField={opponentField} />
-        <OpponentHand opponentHand={opponentHand} />
       </div>
 
       <div className="w-[15%] min-h-screen flex flex-col items-center justify-start pt-8 gap-4 bg-black">
