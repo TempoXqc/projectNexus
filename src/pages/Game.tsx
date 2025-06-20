@@ -1,3 +1,4 @@
+// src/components/Game.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import OpponentField from '../components/OpponentField';
@@ -14,6 +15,7 @@ import { Card } from '../types/Card';
 import { Socket } from 'socket.io-client';
 import { getSocket } from '../socket.ts';
 import getDeckBadge from '../components/GetDeckBadge.tsx';
+import CardPreview from '../components/CardPreview';
 
 let socket: Socket;
 
@@ -185,7 +187,7 @@ export default function Game() {
       const randomDeckList = availableDecks.map((id: string) => ({
         id,
         name: id.charAt(0).toUpperCase() + id.slice(1),
-        image: deckImages[id], // TypeScript sait maintenant que id est une clé valide
+        image: deckImages[id],
       }));
       set({ randomizers: randomDeckList });
     });
@@ -228,7 +230,7 @@ export default function Game() {
           console.log('[DEBUG] DeckLists:', deckLists);
           console.log('[DEBUG] allCards:', allCards.map(c => c.id));
 
-          const getDeckCards = (deckId: string) => { // Typé deckId comme string
+          const getDeckCards = (deckId: string) => {
             const cardIds = deckLists[deckId] || [];
             return allCards.filter(card => cardIds.includes(card.id));
           };
@@ -320,11 +322,10 @@ export default function Game() {
   };
 
   const discardCardFromHand = (card: Card) => {
-    if (!state.mustDiscard || !state.isConnected) return;
-
+    if (!state.isConnected) return;
     const newHand = state.hand.filter((c) => c.id !== card.id);
     const newGraveyard = [...state.graveyard, card];
-    set({ hand: newHand, graveyard: newGraveyard, mustDiscard: false });
+    set({ hand: newHand, graveyard: newGraveyard });
 
     if (gameId) {
       socket.emit('updateGameState', {
@@ -332,7 +333,6 @@ export default function Game() {
         state: {
           hand: newHand,
           graveyard: newGraveyard,
-          mustDiscard: false,
         },
       });
     }
@@ -354,6 +354,44 @@ export default function Game() {
         gameId,
         card,
         fieldIndex: emptyIndex,
+      });
+    }
+  };
+
+  const addToDeck = (card: Card) => {
+    const newHand = hand.filter(c => c.id !== card.id);
+    const newDeck = [...deck, card];
+    set({ hand: newHand, deck: newDeck });
+    if (gameId && state.isConnected) {
+      socket.emit('updateGameState', {
+        gameId,
+        state: { hand: newHand, deck: newDeck },
+      });
+    }
+  };
+
+  const drawCard = () => {
+    if (state.deck.length === 0 || !state.isMyTurn || !state.isConnected) return;
+    const [drawnCard] = state.deck.slice(0, 1);
+    const newDeck = state.deck.slice(1);
+    const newHand = [...state.hand, drawnCard];
+    set({ hand: newHand, deck: newDeck });
+    if (gameId) {
+      socket.emit('updateGameState', {
+        gameId,
+        state: { hand: newHand, deck: newDeck },
+      });
+    }
+  };
+
+  const shuffleDeck = () => {
+    if (!state.isConnected) return;
+    const shuffledDeck = [...state.deck].sort(() => Math.random() - 0.5);
+    set({ deck: shuffledDeck });
+    if (gameId) {
+      socket.emit('updateGameState', {
+        gameId,
+        state: { deck: shuffledDeck },
       });
     }
   };
@@ -594,6 +632,7 @@ export default function Game() {
             mustDiscard={mustDiscard}
             discardCardFromHand={(card) => discardCardFromHand(card)}
             playCardToField={(card) => playCardToField(card)}
+            addToDeck={(card) => addToDeck(card)}
           />
           <OpponentField
             opponentField={opponentField}
@@ -604,7 +643,11 @@ export default function Game() {
         </div>
 
         <div className="z-3 absolute left-4 bottom-4 flex gap-4">
-          <PlayerDeck count={deck.length} />
+          <PlayerDeck
+            count={deck.length}
+            drawCard={drawCard}
+            shuffleDeck={shuffleDeck}
+          />
           <PlayerGraveyard
             count={graveyard.length}
             onClick={() => set({ isGraveyardOpen: true })}
@@ -628,6 +671,12 @@ export default function Game() {
             setHoveredCardId={(id) => set({ hoveredCardId: id })}
           />
         </div>
+        <CardPreview
+          hoveredCardId={hoveredCardId}
+          field={field}
+          hand={hand}
+          opponentField={opponentField} // Ajout de opponentField comme prop
+        />
       </div>
 
       <div className="w-[15%] min-h-screen flex flex-col items-center justify-start pt-8 gap-4 bg-black">
