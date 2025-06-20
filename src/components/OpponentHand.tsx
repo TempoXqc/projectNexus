@@ -1,8 +1,9 @@
 ﻿// src/components/OpponentHand.tsx
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Card } from '@/types';
 
-export default function OpponentHand({ opponentHand }: { opponentHand: number[] }) {
+export default function OpponentHand({ opponentHand }: { opponentHand: Card[] }) {
   return (
     <div
       className="flex justify-center gap-4"
