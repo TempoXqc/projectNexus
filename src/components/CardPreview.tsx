@@ -1,5 +1,6 @@
 // src/components/CardPreview.tsx
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
 
 interface CardPreviewProps {
@@ -18,12 +19,16 @@ export default function CardPreview({ hoveredCardId, field, hand, opponentField 
   if (!card) return null;
 
   return (
-    <div
-      className="fixed top-4 right-4 z-50"
+    <motion.div
+      className="fixed top-58 left-5 z-50"
       style={{
-        width: '14%',
-        height: '18%',
+        width: '18%',
+        height: '22%',
       }}
+      initial={{ x: '-100%', opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: '-100%', opacity: 0 }}
+      transition={{ duration: 0.3, ease: 'easeInOut' }}
     >
       <div className="border-4 border-white rounded-lg shadow-2xl">
         <img
@@ -32,6 +37,6 @@ export default function CardPreview({ hoveredCardId, field, hand, opponentField 
           className="rounded shadow-2xl border-2 border-white w-full h-full object-cover"
         />
       </div>
-    </div>
+    </motion.div>
   );
 }
