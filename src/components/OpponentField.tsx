@@ -20,7 +20,7 @@ export default function OpponentField({
       className="relative z-40"
       style={{
         position: 'absolute',
-        top: '35%',
+        top: '38%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
         height: '190px',

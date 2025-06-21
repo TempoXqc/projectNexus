@@ -7,11 +7,13 @@ interface PlayerFieldProps {
   field: (Card | null)[];
   hoveredCardId: string | null;
   setHoveredCardId: (id: string | null) => void;
+  removeCardFromField: (index: number) => void;
 }
 
 export default function PlayerField({
                                       field,
                                       setHoveredCardId,
+                                      removeCardFromField,
                                     }: PlayerFieldProps) {
   const visibleCards = field
     .map((card, index) => ({ card, index }))
@@ -22,22 +24,23 @@ export default function PlayerField({
       className="relative z-40"
       style={{
         position: 'absolute',
-        top: '70%',
+        top: '62%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
         height: '190px',
         overflow: 'visible',
       }}
     >
-      {visibleCards.map(({ card }, visibleIndex) => (
+      {visibleCards.map(({ card, index }, visibleIndex) => (
         <motion.div
           key={card.id}
           initial={{ opacity: 0, scale: 0.8, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.3 }}
+          onClick={() => removeCardFromField(index)}
           className="absolute w-[140px] h-[190px] bg-white shadow rounded"
           style={{
-            left: `calc(50% + ${visibleIndex * 160 - ((visibleCards.length - 1) * 160) / 2}px)`,
+            left: `calc(50% + ${visibleIndex * 160 - ((visibleCards.length - 1) * 160) / 2}px`,
             transform: 'translateX(-50%)',
             cursor: 'pointer',
           }}

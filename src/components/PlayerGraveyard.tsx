@@ -25,7 +25,7 @@ export default function PlayerGraveyard({
     <>
       <div
         className="flex flex-col items-center justify-center relative cursor-pointer border-4 border-gray-600 rounded-lg p-1 bg-black/40"
-        style={{ width: '120px', height: '180px' }}
+        style={{ width: '150px', height: '210px' }}
         onClick={onClick}
       >
         {count > 0 ? (

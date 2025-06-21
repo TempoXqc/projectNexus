@@ -11,6 +11,7 @@ import PlayerDeck from '../components/PlayerDeck.tsx';
 import OpponentDeck from '../components/OpponentDeck';
 import OpponentGraveyard from '../components/OpponentGraveyard';
 import { BadgeCheck, RefreshCcw, X } from 'lucide-react';
+import { motion } from 'framer-motion'; // Importer framer-motion pour l'animation
 import { Card } from '../types/Card';
 import { Socket } from 'socket.io-client';
 import { getSocket } from '../socket.ts';
@@ -66,6 +67,7 @@ export default function Game() {
     } | null,
     canInitializeDraw: false,
     randomizers: [] as { id: string; name: string; image: string }[],
+    isRightPanelOpen: true, // Nouvel état pour contrôler la visibilité de la partie droite
   });
 
   const set = (updates: Partial<typeof state>) =>
@@ -371,7 +373,7 @@ export default function Game() {
   };
 
   const drawCard = () => {
-    if (state.deck.length === 0 || !state.isMyTurn || !state.isConnected) return;
+    if (state.deck.length === 0 || !state.isMyTurn || !state.isConnected || state.hand.length >= 10) return;
     const [drawnCard] = state.deck.slice(0, 1);
     const newDeck = state.deck.slice(1);
     const newHand = [...state.hand, drawnCard];
@@ -535,10 +537,16 @@ export default function Game() {
     mustDiscard,
     isMyTurn,
     randomizers,
+    isRightPanelOpen,
   } = state;
 
+  const toggleRightPanel = () => {
+    console.log('Toggling right panel, current state:', isRightPanelOpen, 'new state:', !isRightPanelOpen); // Débogage détaillé
+    set({ isRightPanelOpen: !isRightPanelOpen });
+  };
+
   return (
-    <div className="w-full min-h-screen flex flex-row relative">
+    <div className="w-full min-h-screen flex flex-row relative overflow-hidden">
       {renderInitialDraw()}
       {!state.deckSelectionDone && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-black/90 z-50">
@@ -608,101 +616,120 @@ export default function Game() {
           opacity: 1,
         }}
       />
-      <div
-        className="w-[85%] min-h-screen flex flex-col justify-end items-center p-4 relative"
-        style={{
-          backgroundImage: 'url(/addons/background.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
-        <div className="z-3">
-          <PlayerField
+      <div className="w-full min-h-screen flex flex-row overflow-hidden">
+        <div
+          className={`flex-grow min-h-screen flex flex-col justify-end items-center p-4 relative z-10 ${!isRightPanelOpen ? 'w-full' : 'w-[85%]'}`}
+          style={{
+            backgroundImage: 'url(/addons/background.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            transition: 'width 0.3s ease-in-out', // Transition pour la largeur
+          }}
+        >
+          <div className="z-30">
+            <PlayerField
+              field={field}
+              hoveredCardId={hoveredCardId}
+              setHoveredCardId={(id) => set({ hoveredCardId: id })}
+              removeCardFromField={(index) => removeCardFromField(index)}
+            />
+            <PlayerHand
+              hand={hand}
+              hoveredCardId={hoveredCardId}
+              setHoveredCardId={(id) => set({ hoveredCardId: id })}
+              isHandHovered={isCardHovered}
+              setIsHandHovered={(val) => set({ isCardHovered: val })}
+              mustDiscard={mustDiscard}
+              discardCardFromHand={(card) => discardCardFromHand(card)}
+              playCardToField={(card) => playCardToField(card)}
+              addToDeck={(card) => addToDeck(card)}
+            />
+            <OpponentField
+              opponentField={opponentField}
+              hoveredCardId={hoveredCardId}
+              setHoveredCardId={(id) => set({ hoveredCardId: id })}
+            />
+            <OpponentHand opponentHand={opponentHand} />
+          </div>
+
+          <div className="z-30 absolute left-4 bottom-2 flex gap-4">
+            <PlayerDeck
+              count={deck.length}
+              handCount={hand.length}
+              drawCard={drawCard}
+              shuffleDeck={shuffleDeck}
+            />
+            <PlayerGraveyard
+              count={graveyard.length}
+              onClick={() => set({ isGraveyardOpen: true })}
+              isOpen={isGraveyardOpen}
+              onClose={() => set({ isGraveyardOpen: false })}
+              graveyard={graveyard}
+              hoveredCardId={hoveredCardId}
+              setHoveredCardId={(id) => set({ hoveredCardId: id })}
+            />
+          </div>
+
+          <div className="z-30 absolute left-4 top-2 flex gap-4">
+            <OpponentDeck count={opponentDeck.length} />
+            <OpponentGraveyard
+              count={opponentGraveyard.length}
+              onClick={() => set({ isOpponentGraveyardOpen: true })}
+              isOpen={isOpponentGraveyardOpen}
+              onClose={() => set({ isOpponentGraveyardOpen: false })}
+              graveyard={opponentGraveyard}
+              hoveredCardId={hoveredCardId}
+              setHoveredCardId={(id) => set({ hoveredCardId: id })}
+            />
+          </div>
+          <CardPreview
+            hoveredCardId={hoveredCardId}
             field={field}
-            hoveredCardId={hoveredCardId}
-            setHoveredCardId={(id) => set({ hoveredCardId: id })}
-            removeCardFromField={(index) => removeCardFromField(index)}
-          />
-          <PlayerHand
             hand={hand}
-            hoveredCardId={hoveredCardId}
-            setHoveredCardId={(id) => set({ hoveredCardId: id })}
-            isHandHovered={isCardHovered}
-            setIsHandHovered={(val) => set({ isCardHovered: val })}
-            mustDiscard={mustDiscard}
-            discardCardFromHand={(card) => discardCardFromHand(card)}
-            playCardToField={(card) => playCardToField(card)}
-            addToDeck={(card) => addToDeck(card)}
-          />
-          <OpponentField
             opponentField={opponentField}
-            hoveredCardId={hoveredCardId}
-            setHoveredCardId={(id) => set({ hoveredCardId: id })}
-          />
-          <OpponentHand opponentHand={opponentHand} />
-        </div>
-
-        <div className="z-3 absolute left-4 bottom-4 flex gap-4">
-          <PlayerDeck
-            count={deck.length}
-            drawCard={drawCard}
-            shuffleDeck={shuffleDeck}
-          />
-          <PlayerGraveyard
-            count={graveyard.length}
-            onClick={() => set({ isGraveyardOpen: true })}
-            isOpen={isGraveyardOpen}
-            onClose={() => set({ isGraveyardOpen: false })}
-            graveyard={graveyard}
-            hoveredCardId={hoveredCardId}
-            setHoveredCardId={(id) => set({ hoveredCardId: id })}
           />
         </div>
 
-        <div className="z-3 absolute left-4 top-4 flex gap-4">
-          <OpponentDeck count={opponentDeck.length} />
-          <OpponentGraveyard
-            count={opponentGraveyard.length}
-            onClick={() => set({ isOpponentGraveyardOpen: true })}
-            isOpen={isOpponentGraveyardOpen}
-            onClose={() => set({ isOpponentGraveyardOpen: false })}
-            graveyard={opponentGraveyard}
-            hoveredCardId={hoveredCardId}
-            setHoveredCardId={(id) => set({ hoveredCardId: id })}
-          />
-        </div>
-        <CardPreview
-          hoveredCardId={hoveredCardId}
-          field={field}
-          hand={hand}
-          opponentField={opponentField} // Ajout de opponentField comme prop
-        />
-      </div>
-
-      <div className="w-[15%] min-h-screen flex flex-col items-center justify-start pt-8 gap-4 bg-black">
-        <p className="text-white font-bold">ID de la partie : {gameId}</p>
-        <p className="text-white">Joueur {playerId || '...'}</p>
-        {hand.length === 0 && deck.length >= 5 && (
+        <motion.div
+          key={isRightPanelOpen ? 'open' : 'closed'} // Force un re-rendu
+          className="min-h-screen flex flex-col items-center justify-start pt-8 gap-4 bg-black"
+          initial={{ x: 0 }} // Position initiale (visible)
+          animate={{ x: isRightPanelOpen ? 0 : '100%' }} // Glisse vers la droite pour fermer
+          transition={{ duration: 0.3, ease: 'easeInOut' }} // Animation fluide
+          style={{ position: 'absolute', width: '15%', right: 0, top: 0, zIndex: 20 }} // Position absolue
+        >
           <button
-            onClick={drawNewHand}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            disabled={!isConnected}
+            onClick={toggleRightPanel}
+            className="absolute top-1/2 left-[-30px] transform -translate-y-1/2 bg-gray-800 text-white p-2 rounded-full shadow-lg hover:bg-gray-700 focus:outline-none z-50"
+            aria-label={isRightPanelOpen ? 'Close right panel' : 'Open right panel'}
+            style={{ zIndex: 50, pointerEvents: 'auto' }} // Assure l'interactivité
           >
-            <RefreshCcw className="w-5 h-5" /> Nouvelle main
+            <X size={20} />
           </button>
-        )}
-        <p className="text-white font-bold">Tour {turn}</p>
-        <p className="text-white">
-          {isMyTurn ? 'À votre tour !' : 'Tour de l\'adversaire'}
-        </p>
-        <ChatBox
-          chatMessages={chatMessages}
-          chatInput={chatInput}
-          setChatInput={(input) => set({ chatInput: input })}
-          sendChatMessage={sendChatMessage}
-          playerId={playerId}
-          isConnected={isConnected}
-        />
+          <p className="text-white font-bold">ID de la partie : {gameId}</p>
+          <p className="text-white">Joueur {playerId || '...'}</p>
+          {hand.length === 0 && deck.length >= 5 && (
+            <button
+              onClick={drawNewHand}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              disabled={!isConnected}
+            >
+              <RefreshCcw className="w-5 h-5" /> Nouvelle main
+            </button>
+          )}
+          <p className="text-white font-bold">Tour {turn}</p>
+          <p className="text-white">
+            {isMyTurn ? 'À votre tour !' : 'Tour de l\'adversaire'}
+          </p>
+          <ChatBox
+            chatMessages={chatMessages}
+            chatInput={chatInput}
+            setChatInput={(input) => set({ chatInput: input })}
+            sendChatMessage={sendChatMessage}
+            playerId={playerId}
+            isConnected={isConnected}
+          />
+        </motion.div>
       </div>
     </div>
   );

@@ -6,17 +6,18 @@ interface PlayerDeckProps {
   count: number;
   drawCard: () => void;
   shuffleDeck: () => void;
+  handCount: number;
 }
 
 export default function PlayerDeck({ count, drawCard, shuffleDeck }: PlayerDeckProps) {
   return (
     <div
       className="flex flex-col items-center justify-center relative"
-      style={{ width: '120px', height: '180px' }}
+      style={{ width: '150px', height: '210px' }}
     >
       <div
         className="absolute top-0 left-1/2 transform -translate-x-1/2 flex gap-2 mt-2"
-        style={{ top: '-40px' }} // Position au-dessus du deck
+        style={{ top: '-40px' }}
       >
         <button
           onClick={drawCard}
