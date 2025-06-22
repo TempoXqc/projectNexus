@@ -9,7 +9,13 @@ import PlayerHand from '../components/PlayerHand';
 import PlayerDeck from '../components/PlayerDeck.tsx';
 import OpponentDeck from '../components/OpponentDeck';
 import OpponentGraveyard from '../components/OpponentGraveyard';
-import { BadgeCheck, RefreshCcw, X, ExternalLink, FileText } from 'lucide-react';
+import {
+  BadgeCheck,
+  ExternalLink,
+  FileText,
+  RefreshCcw,
+  X,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
 import { Socket } from 'socket.io-client';
@@ -68,10 +74,10 @@ export default function Game() {
     canInitializeDraw: false,
     randomizers: [] as { id: string; name: string; image: string }[],
     isRightPanelOpen: true,
-    currentPhase: null as string | null, // Pas d'initialisation statique
+    currentPhase: 'Main' as string,
   });
 
-  const set = (updates) =>
+  const set = (updates: Partial<typeof state>) =>
     setState((prev) => ({ ...prev, ...updates }));
 
   const hasJoinedRef = useRef(false);
@@ -92,92 +98,105 @@ export default function Game() {
     }
 
     socket.on('connect', () => {
-      console.log('[DEBUG] Socket connecté');
       set({ isConnected: true });
     });
 
     socket.on('disconnect', () => {
-      console.log('[DEBUG] Socket déconnecté');
       set({ isConnected: false });
     });
 
     socket.on('connect_error', () => {
-      console.log('[DEBUG] Erreur de connexion Socket');
       set({ isConnected: false });
     });
 
-    socket.on('gameStart', ({ playerId, chatHistory }) => {
-      console.log('[DEBUG] gameStart reçu, playerId:', playerId);
-      set({ playerId, chatMessages: chatHistory, isMyTurn: playerId === 1 });
-    });
+    socket.on(
+      'gameStart',
+      ({
+        playerId,
+        chatHistory,
+      }: {
+        playerId: number;
+        chatHistory: { playerId: number; message: string }[];
+      }) => {
+        set({ playerId, chatMessages: chatHistory, isMyTurn: playerId === 1 });
+      },
+    );
 
-    socket.on('deckSelectionUpdate', (deckChoices) => {
-      console.log('[DEBUG] deckSelectionUpdate reçu:', deckChoices);
-      const allSelected = [deckChoices[1], ...(deckChoices[2] || [])].filter(Boolean);
-      set({
-        selectedDecks: allSelected,
-        player1DeckId: deckChoices[1],
-      });
-    });
+    socket.on(
+      'deckSelectionUpdate',
+      (deckChoices: { 1: string | null; 2: string[] }) => {
+        const allSelected = [deckChoices[1], ...(deckChoices[2] || [])].filter(
+          Boolean,
+        ) as string[];
+        set({
+          selectedDecks: allSelected,
+          player1DeckId: deckChoices[1],
+        });
+      },
+    );
 
-    socket.on('deckSelectionDone', (data) => {
-      console.log('[DEBUG] deckSelectionDone reçu:', data);
-      set({ deckSelectionData: data });
-    });
+    socket.on(
+      'deckSelectionDone',
+      (data: {
+        player1DeckId: string;
+        player2DeckIds: string[];
+        selectedDecks: string[];
+      }) => {
+        set({ deckSelectionData: data });
+      },
+    );
 
-    socket.on('playerReady', ({ playerId }) => {
-      console.log(`[DEBUG] playerReady reçu pour player ${playerId}`);
+    socket.on('playerReady', ({ playerId }: { playerId: number }) => {
       if (state.playerId && playerId !== state.playerId) {
         set({ opponentReady: true });
       }
     });
 
     socket.on('bothPlayersReady', () => {
-      console.log('[DEBUG] bothPlayersReady reçu');
       set({ bothReady: true });
     });
 
-    socket.on('chatMessage', (msg) => {
-      console.log('[DEBUG] chatMessage reçu:', msg);
+    socket.on('chatMessage', (msg: { playerId: number; message: string }) => {
       set({ chatMessages: [...state.chatMessages, msg] });
     });
 
     socket.on('opponentDisconnected', () => {
-      console.log('[DEBUG] opponentDisconnected reçu');
       alert("Votre adversaire s'est déconnecté.");
       navigate('/');
     });
 
-    socket.on('updateGameState', (gameState) => {
-      console.log('[DEBUG] updateGameState reçu:', {
-        activePlayer: gameState.activePlayer,
-        socketId: socket.id,
-        isMyTurnAvant: state.isMyTurn,
-        playerId: state.playerId,
-        player1HandLength: gameState.player1?.hand?.length || 0,
-        player2HandLength: gameState.player2?.hand?.length || 0,
-        player1Field: (gameState.player1?.field || []).map(c => c ? { id: c.id, exhausted: c.exhausted } : null),
-        player2Field: (gameState.player2?.field || []).map(c => c ? { id: c.id, exhausted: c.exhausted } : null),
-        player1OpponentHandLength: gameState.player1?.opponentHand?.length || 0,
-        player2OpponentHandLength: gameState.player2?.opponentHand?.length || 0,
-        phase: gameState.phase,
-        turn: gameState.turn,
-      });
+    socket.on('updateGameState', (gameState: any) => {
       const playerKey = state.playerId === 1 ? 'player1' : 'player2';
       const opponentKey = state.playerId === 1 ? 'player2' : 'player1';
       const opponentHandLength =
-        gameState[opponentKey]?.opponentHand?.length ||
         gameState[opponentKey]?.hand?.length ||
-        state.opponentHand.length ||
+        gameState[opponentKey]?.opponentHand?.length ||
         0;
+
       const newState = {
-        field: (gameState[playerKey]?.field || []).map(c => c ? { ...c, exhausted: c.exhausted !== undefined ? c.exhausted : false } : null),
+        field: (gameState[playerKey]?.field || []).map((c: Card | null) =>
+          c
+            ? {
+                ...c,
+                exhausted: c.exhausted !== undefined ? c.exhausted : false,
+              }
+            : null,
+        ),
         hand: gameState[playerKey]?.hand || state.hand,
         graveyard: gameState[playerKey]?.graveyard || state.graveyard,
-        opponentGraveyard: gameState[opponentKey]?.graveyard || state.opponentGraveyard,
+        opponentGraveyard:
+          gameState[opponentKey]?.graveyard || state.opponentGraveyard,
         mustDiscard: gameState[playerKey]?.mustDiscard || false,
         hasPlayedCard: gameState[playerKey]?.hasPlayedCard || false,
-        opponentField: (gameState[opponentKey]?.field || []).map(c => c ? { ...c, exhausted: c.exhausted !== undefined ? c.exhausted : false } : null),
+        opponentField: (gameState[opponentKey]?.field || []).map(
+          (c: Card | null) =>
+            c
+              ? {
+                  ...c,
+                  exhausted: c.exhausted !== undefined ? c.exhausted : false,
+                }
+              : null,
+        ),
         opponentHand: Array(opponentHandLength).fill({}),
         deck: gameState[playerKey]?.deck || state.deck,
         opponentDeck: gameState[opponentKey]?.deck || state.opponentDeck,
@@ -186,23 +205,13 @@ export default function Game() {
         isMyTurn: gameState.activePlayer === socket.id,
       };
       set(newState);
-      console.log('[DEBUG] updateGameState - Après set:', {
-        isMyTurn: newState.isMyTurn,
-        currentPhase: newState.currentPhase,
-        turn: newState.turn,
-        opponentHandLength: newState.opponentHand.length,
-        field: newState.field.map(c => c ? { id: c.id, exhausted: c.exhausted } : null),
-        opponentField: newState.opponentField.map(c => c ? { id: c.id, exhausted: c.exhausted } : null),
-      });
     });
 
     socket.on('yourTurn', () => {
-      console.log('[DEBUG] yourTurn reçu - playerId:', state.playerId, 'socket.id:', socket.id, 'isMyTurn avant:', state.isMyTurn);
       set({ isMyTurn: true, hasPlayedCard: false });
     });
 
     socket.on('endTurn', () => {
-      console.log('[DEBUG] endTurn reçu');
       set({ isMyTurn: false, hasPlayedCard: false });
       if (gameId && state.isConnected) {
         socket.emit('updateGameState', {
@@ -212,19 +221,18 @@ export default function Game() {
       }
     });
 
-    socket.on('initialDeckList', (availableDecks) => {
-      console.log('[DEBUG] initialDeckList reçu:', availableDecks);
-      const deckImages = {
-        'assassin': '/cards/randomizers/Assassin.jpg',
-        'celestial': '/cards/randomizers/Celestial.jpg',
-        'dragon': '/cards/randomizers/Dragon.jpg',
-        'wizard': '/cards/randomizers/Wizard.jpg',
-        'vampire': '/cards/randomizers/Vampire.jpg',
-        'viking': '/cards/randomizers/Viking.jpg',
-        'engine': '/cards/randomizers/Engine.jpg',
-        'samurai': '/cards/randomizers/Samurai.jpg',
+    socket.on('initialDeckList', (availableDecks: string[]) => {
+      const deckImages: { [key: string]: string } = {
+        assassin: '/cards/randomizers/Assassin.jpg',
+        celestial: '/cards/randomizers/Celestial.jpg',
+        dragon: '/cards/randomizers/Dragon.jpg',
+        wizard: '/cards/randomizers/Wizard.jpg',
+        vampire: '/cards/randomizers/Vampire.jpg',
+        viking: '/cards/randomizers/Viking.jpg',
+        engine: '/cards/randomizers/Engine.jpg',
+        samurai: '/cards/randomizers/Samurai.jpg',
       };
-      const randomDeckList = availableDecks.map((id) => ({
+      const randomDeckList = availableDecks.map((id: string) => ({
         id,
         name: id.charAt(0).toUpperCase() + id.slice(1),
         image: deckImages[id],
@@ -232,12 +240,10 @@ export default function Game() {
       set({ randomizers: randomDeckList });
     });
 
-    socket.on('updatePhase', (phaseData) => {
+    socket.on('updatePhase', (phaseData: { phase: string; turn: number }) => {
       if (!phaseData || !phaseData.phase || phaseData.turn === undefined) {
-        console.log('[DEBUG] updatePhase reçu avec données invalides:', phaseData);
         return;
       }
-      console.log('[DEBUG] updatePhase reçu:', phaseData);
       set({ currentPhase: phaseData.phase, turn: phaseData.turn });
     });
 
@@ -246,7 +252,6 @@ export default function Game() {
     });
 
     return () => {
-      console.log('[DEBUG] Nettoyage du useEffect Socket.IO');
       socket.off('connect', tryJoin);
       socket.off('connect');
       socket.off('disconnect');
@@ -272,39 +277,57 @@ export default function Game() {
   }, [gameId, navigate]);
 
   useEffect(() => {
-    if (state.deckSelectionData && state.bothReady && !state.deckSelectionDone && state.playerId !== null) {
-      console.log('[TRIGGER] INIT DRAW PHASE');
-
-      const { player1DeckId, player2DeckIds, selectedDecks } = state.deckSelectionData;
-      const remainingDeckId = selectedDecks.find((id) => id !== player1DeckId && !player2DeckIds.includes(id));
+    if (
+      state.deckSelectionData &&
+      state.bothReady &&
+      !state.deckSelectionDone &&
+      state.playerId !== null
+    ) {
+      const { player1DeckId, player2DeckIds, selectedDecks } =
+        state.deckSelectionData;
+      const remainingDeckId = selectedDecks.find(
+        (id: string) => id !== player1DeckId && !player2DeckIds.includes(id),
+      );
 
       Promise.all([
         fetch('/deckLists.json').then((res) => res.json()),
         fetch('/cards.json').then((res) => res.json()),
       ])
         .then(([deckLists, allCards]) => {
-          const getDeckCards = (deckId) => {
+          const getDeckCards = (deckId: string) => {
             const cardIds = deckLists[deckId] || [];
-            return allCards.filter(card => cardIds.includes(card.id));
+            return allCards.filter((card: Card) => cardIds.includes(card.id));
           };
 
-          let currentPlayerCards;
+          let currentPlayerCards: Card[];
           if (state.playerId === 1) {
             const player1Cards = getDeckCards(player1DeckId);
-            const remainingCards = remainingDeckId ? getDeckCards(remainingDeckId) : [];
-            currentPlayerCards = [...player1Cards, ...remainingCards].sort(() => Math.random() - 0.5).slice(0, 30);
+            const remainingCards = remainingDeckId
+              ? getDeckCards(remainingDeckId)
+              : [];
+            currentPlayerCards = [...player1Cards, ...remainingCards]
+              .sort(() => Math.random() - 0.5)
+              .slice(0, 30);
           } else {
-            currentPlayerCards = player2DeckIds.flatMap((deckId) => getDeckCards(deckId)).sort(() => Math.random() - 0.5).slice(0, 30);
+            currentPlayerCards = player2DeckIds
+              .flatMap((deckId: string) => getDeckCards(deckId))
+              .sort(() => Math.random() - 0.5)
+              .slice(0, 30);
           }
 
           if (currentPlayerCards.length === 0) {
-            console.error('[ERROR] Aucune carte trouvée pour le deck du joueur', state.playerId);
+            console.error(
+              '[ERROR] Aucune carte trouvée pour le deck du joueur',
+              state.playerId,
+            );
             return;
           }
 
           const shuffledDeck = [...currentPlayerCards];
           const drawn = getRandomHand(shuffledDeck, 5);
-          const rest = shuffledDeck.filter(c => !drawn.some(d => d.id === c.id));
+          const rest = shuffledDeck.filter(
+            (c: Card) => !drawn.some((d: Card) => d.id === c.id),
+          );
 
           set({
             deck: rest,
@@ -319,14 +342,25 @@ export default function Game() {
             });
           }
         })
-        .catch(err => console.error('[ERREUR INIT DRAW]', err));
+        .catch((err: Error) => console.error('[ERREUR INIT DRAW]', err));
     }
-  }, [state.deckSelectionData, state.bothReady, state.deckSelectionDone, state.playerId]);
+  }, [
+    state.deckSelectionData,
+    state.bothReady,
+    state.deckSelectionDone,
+    state.playerId,
+  ]);
 
-  const handleDeckChoice = (deckId) => {
+  const handleDeckChoice = (deckId: string) => {
     if (!state.playerId || !state.isConnected || !gameId) return;
     if (state.playerId === 1 && state.hasChosenDeck) return;
-    if (state.playerId === 2 && (!state.player1DeckId || state.selectedDecks.filter(d => d !== state.player1DeckId).length >= 2)) return;
+    if (
+      state.playerId === 2 &&
+      (!state.player1DeckId ||
+        state.selectedDecks.filter((d: string) => d !== state.player1DeckId)
+          .length >= 2)
+    )
+      return;
 
     socket.emit('chooseDeck', {
       gameId,
@@ -341,18 +375,18 @@ export default function Game() {
     if (state.deck.length < 5) return;
     const drawn = getRandomHand(state.deck, 5);
     const newDeck = state.deck.filter(
-      (card) => !drawn.some((d) => d.id === card.id),
+      (card: Card) => !drawn.some((d: Card) => d.id === card.id),
     );
     set({ hand: drawn, deck: newDeck });
-    gameId &&
-    state.isConnected &&
-    socket.emit('updateGameState', {
-      gameId,
-      state: { hand: drawn, deck: newDeck },
-    });
+    if (gameId && state.isConnected) {
+      socket.emit('updateGameState', {
+        gameId,
+        state: { hand: drawn, deck: newDeck },
+      });
+    }
   };
 
-  const removeCardFromField = (index) => {
+  const removeCardFromField = (index: number) => {
     const newField = [...state.field];
     const removedCard = newField[index];
     newField[index] = null;
@@ -370,9 +404,9 @@ export default function Game() {
     }
   };
 
-  const discardCardFromHand = (card) => {
+  const discardCardFromHand = (card: Card) => {
     if (!state.isConnected) return;
-    const newHand = state.hand.filter((c) => c.id !== card.id);
+    const newHand = state.hand.filter((c: Card) => c.id !== card.id);
     const newGraveyard = [...state.graveyard, card];
     set({ hand: newHand, graveyard: newGraveyard });
 
@@ -387,23 +421,24 @@ export default function Game() {
     }
   };
 
-  const playCardToField = (card) => {
-    if (!state.isMyTurn || state.mustDiscard || !state.isConnected || state.currentPhase !== 'Main') {
-      console.log('[DEBUG] playCardToField bloqué - isMyTurn:', state.isMyTurn, 'mustDiscard:', state.mustDiscard, 'currentPhase:', state.currentPhase, 'playerId:', state.playerId);
+  const playCardToField = (card: Card) => {
+    if (
+      !state.isMyTurn ||
+      state.mustDiscard ||
+      !state.isConnected ||
+      state.currentPhase !== 'Main'
+    ) {
       return;
     }
 
     const newField = [...state.field];
-    const emptyIndex = newField.findIndex((slot) => slot === null);
+    const emptyIndex = newField.findIndex((slot: Card | null) => slot === null);
     if (emptyIndex === -1) return;
 
     newField[emptyIndex] = card;
-    const newHand = state.hand.filter((c) => c.id !== card.id);
-    console.log('[DEBUG] playCardToField - Avant set:', { isMyTurn: state.isMyTurn, hasPlayedCard: state.hasPlayedCard, playerId: state.playerId });
+    const newHand = state.hand.filter((c: Card) => c.id !== card.id);
     setState((prev) => {
-      const newState = { ...prev, field: newField, hand: newHand };
-      console.log('[DEBUG] playCardToField - Après set (réel):', { isMyTurn: newState.isMyTurn, hasPlayedCard: newState.hasPlayedCard, playerId: newState.playerId });
-      return newState;
+      return { ...prev, field: newField, hand: newHand };
     });
 
     if (gameId) {
@@ -415,9 +450,13 @@ export default function Game() {
     }
   };
 
-  const exhaustCard = (index) => {
-    if (!state.isMyTurn || !state.isConnected || !gameId || state.currentPhase !== 'Main') {
-      console.log('[DEBUG] exhaustCard bloqué - isMyTurn:', state.isMyTurn, 'isConnected:', state.isConnected, 'gameId:', gameId, 'currentPhase:', state.currentPhase);
+  const exhaustCard = (index: number) => {
+    if (
+      !state.isMyTurn ||
+      !state.isConnected ||
+      !gameId ||
+      state.currentPhase !== 'Main'
+    ) {
       return;
     }
 
@@ -437,8 +476,14 @@ export default function Game() {
     });
   };
 
-  const attackCard = (index) => {
-    if (!state.isMyTurn || !state.isConnected || !gameId || state.currentPhase !== 'Battle') return;
+  const attackCard = (index: number) => {
+    if (
+      !state.isMyTurn ||
+      !state.isConnected ||
+      !gameId ||
+      state.currentPhase !== 'Battle'
+    )
+      return;
     const card = state.field[index];
     if (card) {
       removeCardFromField(index);
@@ -446,8 +491,8 @@ export default function Game() {
     }
   };
 
-  const addToDeck = (card) => {
-    const newHand = state.hand.filter(c => c.id !== card.id);
+  const addToDeck = (card: Card) => {
+    const newHand = state.hand.filter((c: Card) => c.id !== card.id);
     const newDeck = [...state.deck, card];
     set({ hand: newHand, deck: newDeck });
     if (gameId && state.isConnected) {
@@ -459,7 +504,13 @@ export default function Game() {
   };
 
   const drawCard = () => {
-    if (state.deck.length === 0 || !state.isMyTurn || !state.isConnected || state.hand.length >= 10) return;
+    if (
+      state.deck.length === 0 ||
+      !state.isMyTurn ||
+      !state.isConnected ||
+      state.hand.length >= 10
+    )
+      return;
     const [drawnCard] = state.deck.slice(0, 1);
     const newDeck = state.deck.slice(1);
     const newHand = [...state.hand, drawnCard];
@@ -491,20 +542,20 @@ export default function Game() {
     }
   };
 
-  const toggleCardMulligan = (cardId) => {
+  const toggleCardMulligan = (cardId: string) => {
     set({
       selectedForMulligan: state.selectedForMulligan.includes(cardId)
-        ? state.selectedForMulligan.filter((id) => id !== cardId)
+        ? state.selectedForMulligan.filter((id: string) => id !== cardId)
         : [...state.selectedForMulligan, cardId],
     });
   };
 
   const doMulligan = () => {
-    const toMulligan = state.initialDraw.filter((card) =>
+    const toMulligan = state.initialDraw.filter((card: Card) =>
       state.selectedForMulligan.includes(card.id),
     );
     const toKeep = state.initialDraw.filter(
-      (card) => !state.selectedForMulligan.includes(card.id),
+      (card: Card) => !state.selectedForMulligan.includes(card.id),
     );
     const reshuffledDeck = [...state.deck, ...toMulligan].sort(
       () => Math.random() - 0.5,
@@ -512,7 +563,7 @@ export default function Game() {
     const newDraw = getRandomHand(reshuffledDeck, 5 - toKeep.length);
     const finalHand = [...toKeep, ...newDraw];
     const newDeck = reshuffledDeck.filter(
-      (c) => !newDraw.some((d) => d.id === c.id),
+      (c: Card) => !newDraw.some((d: Card) => d.id === c.id),
     );
     set({
       hand: finalHand,
@@ -553,12 +604,17 @@ export default function Game() {
   };
 
   const renderInitialDraw = () => {
-    if (state.initialDraw.length === 0 || state.mulliganDone || !state.bothReady) return null;
+    if (
+      state.initialDraw.length === 0 ||
+      state.mulliganDone ||
+      !state.bothReady
+    )
+      return null;
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-50">
         <h2 className="text-white text-2xl font-bold mb-6">Main de départ</h2>
         <div className="flex gap-4">
-          {state.initialDraw.map((card) => {
+          {state.initialDraw.map((card: Card) => {
             const isSelected = state.selectedForMulligan.includes(card.id);
             return (
               <div
@@ -601,7 +657,7 @@ export default function Game() {
     );
   };
 
-  const handlePhaseChange = (newPhase) => {
+  const handlePhaseChange = (newPhase: string) => {
     set({ currentPhase: newPhase });
   };
 
@@ -627,6 +683,7 @@ export default function Game() {
     isMyTurn,
     randomizers,
     isRightPanelOpen,
+    currentPhase,
   } = state;
 
   const toggleRightPanel = () => {
@@ -669,7 +726,7 @@ export default function Game() {
                     deckObj.id,
                     state.player1DeckId,
                     state.selectedDecks,
-                    randomizers
+                    randomizers,
                   )}
                 </div>
               );
@@ -686,8 +743,12 @@ export default function Game() {
                 </span>
               </button>
               {state.isReady && (
-                <p className={`text-sm font-medium ${state.opponentReady ? 'text-green-400' : 'text-yellow-300'}`}>
-                  {state.opponentReady ? 'L’autre joueur est prêt !' : 'L’autre joueur n’est pas encore prêt.'}
+                <p
+                  className={`text-sm font-medium ${state.opponentReady ? 'text-green-400' : 'text-yellow-300'}`}
+                >
+                  {state.opponentReady
+                    ? 'L’autre joueur est prêt !'
+                    : 'L’autre joueur n’est pas encore prêt.'}
                 </p>
               )}
             </div>
@@ -717,13 +778,14 @@ export default function Game() {
           <div className="z-30">
             <PhaseIndicator
               socket={socket}
-              isMyTurn={state.isMyTurn}
-              playerId={state.playerId}
+              isMyTurn={isMyTurn}
+              playerId={playerId}
               gameId={gameId}
               onPhaseChange={handlePhaseChange}
+              currentPhase={currentPhase}
             />
             <PlayerField
-              key={state.field.map(c => c?.exhausted).join('-')}
+              key={state.field.map((c) => c?.exhausted).join('-')}
               field={field}
               hoveredCardId={hoveredCardId}
               setHoveredCardId={(id) => set({ hoveredCardId: id })}
@@ -795,12 +857,20 @@ export default function Game() {
           initial={{ x: 0 }}
           animate={{ x: isRightPanelOpen ? 0 : '100%' }}
           transition={{ duration: 0.3, ease: 'easeInOut' }}
-          style={{ position: 'absolute', width: '15%', right: 0, top: 0, zIndex: 20 }}
+          style={{
+            position: 'absolute',
+            width: '15%',
+            right: 0,
+            top: 0,
+            zIndex: 20,
+          }}
         >
           <button
             onClick={toggleRightPanel}
             className="absolute top-1/2 left-[-30px] transform -translate-y-1/2 bg-gray-800 text-white p-2 rounded-full shadow-lg hover:bg-gray-700 focus:outline-none z-50"
-            aria-label={isRightPanelOpen ? 'Close right panel' : 'Open right panel'}
+            aria-label={
+              isRightPanelOpen ? 'Close right panel' : 'Open right panel'
+            }
             style={{ zIndex: 50, pointerEvents: 'auto' }}
           >
             <X size={20} />
@@ -818,7 +888,7 @@ export default function Game() {
           )}
           <p className="text-white font-bold">Tour {turn}</p>
           <p className="text-white">
-            {isMyTurn ? 'À votre tour !' : 'Tour de l\'adversaire'}
+            {isMyTurn ? 'À votre tour !' : "Tour de l'adversaire"}
           </p>
           <ChatBox
             chatMessages={chatMessages}
