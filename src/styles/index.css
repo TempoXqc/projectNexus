@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 html,
 body,
@@ -10,4 +8,5 @@ body,
     padding: 0;
     overflow: hidden;
     box-sizing: border-box;
+    user-select: none;
 }
