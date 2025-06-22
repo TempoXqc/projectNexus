@@ -13,6 +13,7 @@ interface PlayerHandProps {
   discardCardFromHand: (card: Card) => void;
   playCardToField: (card: Card) => void;
   addToDeck: (card: Card) => void;
+  playerId: number | null;
 }
 
 export default function PlayerHand({
@@ -24,6 +25,7 @@ export default function PlayerHand({
                                      discardCardFromHand,
                                      playCardToField,
                                      addToDeck,
+                                     playerId,
                                    }: PlayerHandProps) {
   return (
     <div
@@ -64,7 +66,10 @@ export default function PlayerHand({
             >
               <div className="flex gap-2 bg-gray-800 bg-opacity-90 p-1 rounded-lg shadow-lg">
                 <button
-                  onClick={() => playCardToField(card)}
+                  onClick={() => {
+                    console.log('[DEBUG] PlayerHand - Bouton Play cliqué pour carte:', card.id, 'playerId:', playerId);
+                    playCardToField(card);
+                  }}
                   className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 focus:outline-none"
                   title=""
                   aria-label="Play card to field"

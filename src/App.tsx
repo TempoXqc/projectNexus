@@ -5,7 +5,6 @@ import React, { useEffect } from 'react';
 
 function App() {
   useEffect(() => {
-    console.log('Home page loaded');
   }, []);
   return (
     <BrowserRouter>

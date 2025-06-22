@@ -1,4 +1,3 @@
-// src/components/OpponentField.tsx
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
@@ -13,8 +12,7 @@ export default function OpponentField({
                                         opponentField,
                                         setHoveredCardId,
                                       }: OpponentFieldProps) {
-  const visibleCards = opponentField.filter((card) => card !== null) as Card[];
-
+  const visibleCards = opponentField.filter((card): card is Card => card !== null) as Card[];
   return (
     <div
       className="relative z-40"
@@ -31,14 +29,14 @@ export default function OpponentField({
         <motion.div
           key={card.id}
           initial={{ opacity: 0, scale: 0.8, x: 20 }}
-          animate={{ opacity: 1, scale: 1, x: 0 }}
+          animate={{ opacity: 1, scale: 1, x: 0, rotate: card.exhausted ? 90 : 0 }} // Utiliser animate pour la rotation
           transition={{ duration: 0.3 }}
           className="absolute w-[140px] h-[190px] bg-white shadow rounded"
-          onMouseEnter={() => setHoveredCardId(card.id)} // Déclenche l'affichage dans CardPreview
-          onMouseLeave={() => setHoveredCardId(null)} // Réinitialise l'affichage
+          onMouseEnter={() => setHoveredCardId(card.id)}
+          onMouseLeave={() => setHoveredCardId(null)}
           style={{
             left: `calc(50% + ${visibleIndex * 160 - ((visibleCards.length - 1) * 160) / 2}px`,
-            transform: 'translateX(-50%)',
+            transformOrigin: 'center center',
             cursor: 'pointer',
           }}
         >
