@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Play, Sword, Hourglass, Check } from 'lucide-react';
 import { Socket } from 'socket.io-client';
 
@@ -8,23 +8,24 @@ interface PhaseIndicatorProps {
   playerId: number | null;
   gameId: string | undefined;
   onPhaseChange: (newPhase: string) => void;
+  currentPhase: string;
 }
 
-export default function PhaseIndicator({ socket, isMyTurn, playerId, gameId, onPhaseChange }: PhaseIndicatorProps) {
-  const [currentPhase, setCurrentPhase] = useState(null); // Pas d'initialisation statique
-  const [turnCount, setTurnCount] = useState(1);
-
+export default function PhaseIndicator({
+                                         socket,
+                                         isMyTurn,
+                                         playerId,
+                                         gameId,
+                                         onPhaseChange,
+                                         currentPhase,
+                                       }: PhaseIndicatorProps) {
   useEffect(() => {
     if (!socket || !gameId || !playerId) return;
 
-    const handlePhaseUpdate = (phaseData) => {
+    const handlePhaseUpdate = (phaseData: { phase: string; turn: number }) => {
       if (!phaseData || !phaseData.phase || phaseData.turn === undefined) {
-        console.log('[DEBUG] updatePhase reçu avec données invalides:', phaseData);
         return;
       }
-      console.log('[DEBUG] updatePhase reçu:', phaseData);
-      setCurrentPhase(phaseData.phase);
-      setTurnCount(phaseData.turn);
       onPhaseChange(phaseData.phase);
     };
 
@@ -37,12 +38,10 @@ export default function PhaseIndicator({ socket, isMyTurn, playerId, gameId, onP
 
   const nextPhase = () => {
     if (!isMyTurn || !gameId || !playerId) {
-      console.log('[DEBUG] nextPhase bloqué - isMyTurn:', isMyTurn, 'gameId:', gameId, 'playerId:', playerId);
       return;
     }
 
     let newPhase = currentPhase;
-    let newTurn = turnCount;
     switch (currentPhase) {
       case 'Standby':
         newPhase = 'Main';
@@ -54,31 +53,30 @@ export default function PhaseIndicator({ socket, isMyTurn, playerId, gameId, onP
         newPhase = 'End';
         break;
       case 'End':
-        console.log('[DEBUG] nextPhase - Émission de endTurn pour nextPlayerId:', playerId === 1 ? 2 : 1, 'currentTurn:', turnCount, 'currentPhase:', currentPhase);
         socket.emit('endTurn', { gameId, nextPlayerId: playerId === 1 ? 2 : 1 });
-        return; // Pas de mise à jour locale, attendre updateGameState
+        return;
     }
 
     if (newPhase !== currentPhase) {
-      console.log('[DEBUG] nextPhase - Changement de phase:', currentPhase, '->', newPhase);
-      setCurrentPhase(newPhase);
-      setTurnCount(newTurn);
-      socket.emit('updatePhase', { gameId, phase: newPhase, turn: newTurn });
+      socket.emit('updatePhase', { gameId, phase: newPhase, turn: 1 });
       onPhaseChange(newPhase);
     }
   };
 
   const getPhaseIcon = () => {
     switch (currentPhase) {
-      case 'Standby': return <Hourglass className="w-6 h-6" />;
-      case 'Main': return <Play className="w-6 h-6" />;
-      case 'Battle': return <Sword className="w-6 h-6" />;
-      case 'End': return <Check className="w-6 h-6" />;
-      default: return null;
+      case 'Standby':
+        return <Hourglass className="w-6 h-6" />;
+      case 'Main':
+        return <Play className="w-6 h-6" />;
+      case 'Battle':
+        return <Sword className="w-6 h-6" />;
+      case 'End':
+        return <Check className="w-6 h-6" />;
+      default:
+        return null;
     }
   };
-
-  if (!currentPhase) return null; // Ne rien afficher tant que la phase n'est pas synchronisée
 
   return (
     <div className="absolute bottom-10 right-75 z-50">

@@ -5,8 +5,8 @@ import { RotateCcw, Sword, Trash2 } from 'lucide-react';
 
 interface PlayerFieldProps {
   field: (Card | null)[];
-  hoveredCardId: string | null; // Prop pour l'ID de la carte survolée
-  setHoveredCardId: (id: string | null) => void; // Prop pour mettre à jour l'ID
+  hoveredCardId: string | null;
+  setHoveredCardId: (id: string | null) => void;
   removeCardFromField: (index: number) => void;
   exhaustCard: (index: number) => void;
   attackCard: (index: number) => void;
@@ -39,13 +39,13 @@ export default function PlayerField({
     >
       {visibleCards.map(({ card, index }, visibleIndex) => (
         <motion.div
-          key={`${card.id}-${card.exhausted}`} // Forcer un ré-rendu basé sur exhausted
+          key={`${card.id}-${card.exhausted}`}
           initial={{ opacity: 0, scale: 0.8, y: 20 }}
           animate={{
             opacity: 1,
             scale: 1,
             y: 0,
-            rotate: card.exhausted ? 90 : 0 // Rotation contrôlée par animate
+            rotate: card.exhausted ? 90 : 0
           }}
           transition={{ duration: 0.3, ease: easeInOut }}
           className="absolute w-[140px] h-[190px] bg-white shadow rounded"

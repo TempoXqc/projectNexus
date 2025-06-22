@@ -1,4 +1,4 @@
-// src/components/PlayerHand.tsx
+
 import React from 'react';
 import { Card } from '../types/Card';
 import { Play, Trash2, Plus } from 'lucide-react';
@@ -25,7 +25,6 @@ export default function PlayerHand({
                                      discardCardFromHand,
                                      playCardToField,
                                      addToDeck,
-                                     playerId,
                                    }: PlayerHandProps) {
   return (
     <div
@@ -58,16 +57,15 @@ export default function PlayerHand({
             <div
               className="absolute top-0 left-1/2 transform -translate-x-1/2 flex flex-col items-center pt-2 transition-all duration-300"
               style={{
-                top: '10px', // Déplace les boutons plus bas (ajusté de -105% à 10px)
-                left: '75%', // Décalage à gauche (ajusté de 50% à 35%)
-                transform: 'translate(-50%, 0)', // Réinitialise le centrage horizontal
+                top: '10px',
+                left: '75%',
+                transform: 'translate(-50%, 0)',
                 pointerEvents: 'auto',
               }}
             >
               <div className="flex gap-2 bg-gray-800 bg-opacity-90 p-1 rounded-lg shadow-lg">
                 <button
                   onClick={() => {
-                    console.log('[DEBUG] PlayerHand - Bouton Play cliqué pour carte:', card.id, 'playerId:', playerId);
                     playCardToField(card);
                   }}
                   className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 focus:outline-none"

@@ -29,7 +29,7 @@ export default function OpponentField({
         <motion.div
           key={card.id}
           initial={{ opacity: 0, scale: 0.8, x: 20 }}
-          animate={{ opacity: 1, scale: 1, x: 0, rotate: card.exhausted ? 90 : 0 }} // Utiliser animate pour la rotation
+          animate={{ opacity: 1, scale: 1, x: 0, rotate: card.exhausted ? 90 : 0 }}
           transition={{ duration: 0.3 }}
           className="absolute w-[140px] h-[190px] bg-white shadow rounded"
           onMouseEnter={() => setHoveredCardId(card.id)}
