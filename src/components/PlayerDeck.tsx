@@ -35,7 +35,7 @@ export default function PlayerDeck({ count, drawCard, shuffleDeck }: PlayerDeckP
         </button>
       </div>
       <img
-        src="/addons/backcard.png"
+        src="/addons/nexus-back.jpg"
         alt="Deck"
         className="w-full h-full object-cover rounded shadow"
       />

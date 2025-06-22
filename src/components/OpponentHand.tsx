@@ -24,7 +24,7 @@ export default function OpponentHand({ opponentHand }: { opponentHand: Card[] })
           style={{ width: '175px', height: '240px', position: 'relative', margin: '-2%', }}
         >
           <img
-            src="/addons/backcard.png"
+            src="/addons/nexus-back.jpg"
             alt="Opponent card"
             className="w-full h-full object-cover rounded"
           />

@@ -31,7 +31,7 @@ export default function PlayerGraveyard({
         {count > 0 ? (
           <>
             <img
-              src="/addons/backcard.png"
+              src="/addons/nexus-back.jpg"
               alt="PlayerGraveyard"
               className="w-full h-full object-cover rounded shadow grayscale"
             />
