@@ -755,21 +755,11 @@ export default function Game() {
           )}
         </div>
       )}
-
-      <div
-        className="absolute top-0 left-0 w-full h-full z-2"
-        style={{
-          backgroundImage: 'url(/addons/output-bg.gif)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          opacity: 1,
-        }}
-      />
       <div className="w-full min-h-screen flex flex-row overflow-hidden">
         <div
           className={`flex-grow min-h-screen flex flex-col justify-end items-center p-4 relative z-10 ${!isRightPanelOpen ? 'w-full' : 'w-[85%]'}`}
           style={{
-            backgroundImage: 'url(/addons/background.jpg)',
+            backgroundImage: 'url(/addons/background-2.jpg)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             transition: 'width 0.3s ease-in-out',

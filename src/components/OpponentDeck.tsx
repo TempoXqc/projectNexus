@@ -6,7 +6,7 @@ export default function OpponentDeck({ count }: { count: number }) {
       className="w-[150px] h-[210px] flex items-center justify-center border-2 border-gray-500 bg-gray-800 rounded"
     >
       <img
-        src="/addons/backcard.png"
+        src="/addons/nexus-back.jpg"
         alt="Opponent Deck"
         className="w-full h-full object-cover rounded"
       />
