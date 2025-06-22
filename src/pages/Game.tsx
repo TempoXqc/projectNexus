@@ -1,4 +1,3 @@
-// src/components/Game.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import OpponentField from '../components/OpponentField';
@@ -10,13 +9,14 @@ import PlayerHand from '../components/PlayerHand';
 import PlayerDeck from '../components/PlayerDeck.tsx';
 import OpponentDeck from '../components/OpponentDeck';
 import OpponentGraveyard from '../components/OpponentGraveyard';
-import { BadgeCheck, RefreshCcw, X } from 'lucide-react';
-import { motion } from 'framer-motion'; // Importer framer-motion pour l'animation
+import { BadgeCheck, RefreshCcw, X, ExternalLink, FileText } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
 import { Socket } from 'socket.io-client';
 import { getSocket } from '../socket.ts';
 import getDeckBadge from '../components/GetDeckBadge.tsx';
 import CardPreview from '../components/CardPreview';
+import PhaseIndicator from '../components/PhaseIndicator';
 
 let socket: Socket;
 
@@ -67,21 +67,20 @@ export default function Game() {
     } | null,
     canInitializeDraw: false,
     randomizers: [] as { id: string; name: string; image: string }[],
-    isRightPanelOpen: true, // Nouvel état pour contrôler la visibilité de la partie droite
+    isRightPanelOpen: true,
+    currentPhase: null as string | null, // Pas d'initialisation statique
   });
 
-  const set = (updates: Partial<typeof state>) =>
+  const set = (updates) =>
     setState((prev) => ({ ...prev, ...updates }));
 
   const hasJoinedRef = useRef(false);
 
   useEffect(() => {
-    console.log('[DEBUG] Main Socket.IO useEffect');
     socket = getSocket();
 
     const tryJoin = () => {
       if (!gameId || hasJoinedRef.current) return;
-      console.log('[CLIENT] Emitting joinGame for', gameId);
       socket.emit('joinGame', gameId);
       hasJoinedRef.current = true;
     };
@@ -150,33 +149,72 @@ export default function Game() {
     });
 
     socket.on('updateGameState', (gameState) => {
-      console.log('[DEBUG] updateGameState reçu:', gameState);
+      console.log('[DEBUG] updateGameState reçu:', {
+        activePlayer: gameState.activePlayer,
+        socketId: socket.id,
+        isMyTurnAvant: state.isMyTurn,
+        playerId: state.playerId,
+        player1HandLength: gameState.player1?.hand?.length || 0,
+        player2HandLength: gameState.player2?.hand?.length || 0,
+        player1Field: (gameState.player1?.field || []).map(c => c ? { id: c.id, exhausted: c.exhausted } : null),
+        player2Field: (gameState.player2?.field || []).map(c => c ? { id: c.id, exhausted: c.exhausted } : null),
+        player1OpponentHandLength: gameState.player1?.opponentHand?.length || 0,
+        player2OpponentHandLength: gameState.player2?.opponentHand?.length || 0,
+        phase: gameState.phase,
+        turn: gameState.turn,
+      });
       const playerKey = state.playerId === 1 ? 'player1' : 'player2';
       const opponentKey = state.playerId === 1 ? 'player2' : 'player1';
-      set({
-        field: gameState[playerKey].field || state.field,
-        hand: gameState[playerKey].hand || state.hand,
-        graveyard: gameState[playerKey].graveyard || state.graveyard,
-        opponentGraveyard: gameState[opponentKey].graveyard || state.opponentGraveyard,
-        mustDiscard: gameState[playerKey].mustDiscard || false,
-        hasPlayedCard: gameState[playerKey].hasPlayedCard || false,
-        opponentField: gameState[opponentKey].field || state.opponentField,
-        opponentHand: gameState[opponentKey].hand || state.opponentHand,
-        deck: gameState[playerKey].deck || state.deck,
-        opponentDeck: gameState[opponentKey].deck || state.opponentDeck,
+      const opponentHandLength =
+        gameState[opponentKey]?.opponentHand?.length ||
+        gameState[opponentKey]?.hand?.length ||
+        state.opponentHand.length ||
+        0;
+      const newState = {
+        field: (gameState[playerKey]?.field || []).map(c => c ? { ...c, exhausted: c.exhausted !== undefined ? c.exhausted : false } : null),
+        hand: gameState[playerKey]?.hand || state.hand,
+        graveyard: gameState[playerKey]?.graveyard || state.graveyard,
+        opponentGraveyard: gameState[opponentKey]?.graveyard || state.opponentGraveyard,
+        mustDiscard: gameState[playerKey]?.mustDiscard || false,
+        hasPlayedCard: gameState[playerKey]?.hasPlayedCard || false,
+        opponentField: (gameState[opponentKey]?.field || []).map(c => c ? { ...c, exhausted: c.exhausted !== undefined ? c.exhausted : false } : null),
+        opponentHand: Array(opponentHandLength).fill({}),
+        deck: gameState[playerKey]?.deck || state.deck,
+        opponentDeck: gameState[opponentKey]?.deck || state.opponentDeck,
         turn: gameState.turn || state.turn,
+        currentPhase: gameState.phase || state.currentPhase,
         isMyTurn: gameState.activePlayer === socket.id,
+      };
+      set(newState);
+      console.log('[DEBUG] updateGameState - Après set:', {
+        isMyTurn: newState.isMyTurn,
+        currentPhase: newState.currentPhase,
+        turn: newState.turn,
+        opponentHandLength: newState.opponentHand.length,
+        field: newState.field.map(c => c ? { id: c.id, exhausted: c.exhausted } : null),
+        opponentField: newState.opponentField.map(c => c ? { id: c.id, exhausted: c.exhausted } : null),
       });
     });
 
     socket.on('yourTurn', () => {
-      console.log('[DEBUG] yourTurn reçu');
+      console.log('[DEBUG] yourTurn reçu - playerId:', state.playerId, 'socket.id:', socket.id, 'isMyTurn avant:', state.isMyTurn);
       set({ isMyTurn: true, hasPlayedCard: false });
     });
 
-    socket.on('initialDeckList', (availableDecks: string[]) => {
+    socket.on('endTurn', () => {
+      console.log('[DEBUG] endTurn reçu');
+      set({ isMyTurn: false, hasPlayedCard: false });
+      if (gameId && state.isConnected) {
+        socket.emit('updateGameState', {
+          gameId,
+          state: { hasPlayedCard: false },
+        });
+      }
+    });
+
+    socket.on('initialDeckList', (availableDecks) => {
       console.log('[DEBUG] initialDeckList reçu:', availableDecks);
-      const deckImages: Record<string, string> = {
+      const deckImages = {
         'assassin': '/cards/randomizers/Assassin.jpg',
         'celestial': '/cards/randomizers/Celestial.jpg',
         'dragon': '/cards/randomizers/Dragon.jpg',
@@ -186,12 +224,25 @@ export default function Game() {
         'engine': '/cards/randomizers/Engine.jpg',
         'samurai': '/cards/randomizers/Samurai.jpg',
       };
-      const randomDeckList = availableDecks.map((id: string) => ({
+      const randomDeckList = availableDecks.map((id) => ({
         id,
         name: id.charAt(0).toUpperCase() + id.slice(1),
         image: deckImages[id],
       }));
       set({ randomizers: randomDeckList });
+    });
+
+    socket.on('updatePhase', (phaseData) => {
+      if (!phaseData || !phaseData.phase || phaseData.turn === undefined) {
+        console.log('[DEBUG] updatePhase reçu avec données invalides:', phaseData);
+        return;
+      }
+      console.log('[DEBUG] updatePhase reçu:', phaseData);
+      set({ currentPhase: phaseData.phase, turn: phaseData.turn });
+    });
+
+    socket.on('drawCard', () => {
+      drawCard();
     });
 
     return () => {
@@ -209,7 +260,10 @@ export default function Game() {
       socket.off('opponentDisconnected');
       socket.off('updateGameState');
       socket.off('yourTurn');
+      socket.off('endTurn');
       socket.off('initialDeckList');
+      socket.off('updatePhase');
+      socket.off('drawCard');
     };
   }, [gameId, navigate, state.playerId, state.chatMessages]);
 
@@ -222,17 +276,14 @@ export default function Game() {
       console.log('[TRIGGER] INIT DRAW PHASE');
 
       const { player1DeckId, player2DeckIds, selectedDecks } = state.deckSelectionData;
-      const remainingDeckId = selectedDecks.find((id: string) => id !== player1DeckId && !player2DeckIds.includes(id));
+      const remainingDeckId = selectedDecks.find((id) => id !== player1DeckId && !player2DeckIds.includes(id));
 
       Promise.all([
         fetch('/deckLists.json').then((res) => res.json()),
         fetch('/cards.json').then((res) => res.json()),
       ])
-        .then(([deckLists, allCards]: [Record<string, string[]>, Card[]]) => {
-          console.log('[DEBUG] DeckLists:', deckLists);
-          console.log('[DEBUG] allCards:', allCards.map(c => c.id));
-
-          const getDeckCards = (deckId: string) => {
+        .then(([deckLists, allCards]) => {
+          const getDeckCards = (deckId) => {
             const cardIds = deckLists[deckId] || [];
             return allCards.filter(card => cardIds.includes(card.id));
           };
@@ -243,7 +294,7 @@ export default function Game() {
             const remainingCards = remainingDeckId ? getDeckCards(remainingDeckId) : [];
             currentPlayerCards = [...player1Cards, ...remainingCards].sort(() => Math.random() - 0.5).slice(0, 30);
           } else {
-            currentPlayerCards = player2DeckIds.flatMap((deckId: string) => getDeckCards(deckId)).sort(() => Math.random() - 0.5).slice(0, 30);
+            currentPlayerCards = player2DeckIds.flatMap((deckId) => getDeckCards(deckId)).sort(() => Math.random() - 0.5).slice(0, 30);
           }
 
           if (currentPlayerCards.length === 0) {
@@ -254,10 +305,6 @@ export default function Game() {
           const shuffledDeck = [...currentPlayerCards];
           const drawn = getRandomHand(shuffledDeck, 5);
           const rest = shuffledDeck.filter(c => !drawn.some(d => d.id === c.id));
-
-          console.log('[DEBUG] Main initiale:', drawn.map(c => c.id));
-          console.log('[DEBUG] Deck restant:', rest.map(c => c.id));
-          console.log('[DEBUG] Longueur du deck restant:', rest.length);
 
           set({
             deck: rest,
@@ -276,7 +323,7 @@ export default function Game() {
     }
   }, [state.deckSelectionData, state.bothReady, state.deckSelectionDone, state.playerId]);
 
-  const handleDeckChoice = (deckId: string) => {
+  const handleDeckChoice = (deckId) => {
     if (!state.playerId || !state.isConnected || !gameId) return;
     if (state.playerId === 1 && state.hasChosenDeck) return;
     if (state.playerId === 2 && (!state.player1DeckId || state.selectedDecks.filter(d => d !== state.player1DeckId).length >= 2)) return;
@@ -305,7 +352,7 @@ export default function Game() {
     });
   };
 
-  const removeCardFromField = (index: number) => {
+  const removeCardFromField = (index) => {
     const newField = [...state.field];
     const removedCard = newField[index];
     newField[index] = null;
@@ -323,7 +370,7 @@ export default function Game() {
     }
   };
 
-  const discardCardFromHand = (card: Card) => {
+  const discardCardFromHand = (card) => {
     if (!state.isConnected) return;
     const newHand = state.hand.filter((c) => c.id !== card.id);
     const newGraveyard = [...state.graveyard, card];
@@ -340,8 +387,11 @@ export default function Game() {
     }
   };
 
-  const playCardToField = (card: Card) => {
-    if (!state.isMyTurn || state.hasPlayedCard || state.mustDiscard || !state.isConnected) return;
+  const playCardToField = (card) => {
+    if (!state.isMyTurn || state.mustDiscard || !state.isConnected || state.currentPhase !== 'Main') {
+      console.log('[DEBUG] playCardToField bloqué - isMyTurn:', state.isMyTurn, 'mustDiscard:', state.mustDiscard, 'currentPhase:', state.currentPhase, 'playerId:', state.playerId);
+      return;
+    }
 
     const newField = [...state.field];
     const emptyIndex = newField.findIndex((slot) => slot === null);
@@ -349,7 +399,12 @@ export default function Game() {
 
     newField[emptyIndex] = card;
     const newHand = state.hand.filter((c) => c.id !== card.id);
-    set({ field: newField, hand: newHand, hasPlayedCard: true, isMyTurn: false });
+    console.log('[DEBUG] playCardToField - Avant set:', { isMyTurn: state.isMyTurn, hasPlayedCard: state.hasPlayedCard, playerId: state.playerId });
+    setState((prev) => {
+      const newState = { ...prev, field: newField, hand: newHand };
+      console.log('[DEBUG] playCardToField - Après set (réel):', { isMyTurn: newState.isMyTurn, hasPlayedCard: newState.hasPlayedCard, playerId: newState.playerId });
+      return newState;
+    });
 
     if (gameId) {
       socket.emit('playCard', {
@@ -360,9 +415,40 @@ export default function Game() {
     }
   };
 
-  const addToDeck = (card: Card) => {
-    const newHand = hand.filter(c => c.id !== card.id);
-    const newDeck = [...deck, card];
+  const exhaustCard = (index) => {
+    if (!state.isMyTurn || !state.isConnected || !gameId || state.currentPhase !== 'Main') {
+      console.log('[DEBUG] exhaustCard bloqué - isMyTurn:', state.isMyTurn, 'isConnected:', state.isConnected, 'gameId:', gameId, 'currentPhase:', state.currentPhase);
+      return;
+    }
+
+    const card = state.field[index];
+    if (!card) {
+      return;
+    }
+
+    const newField = [...state.field];
+    newField[index] = { ...card, exhausted: !card.exhausted };
+    set({ field: [...newField] });
+
+    socket.emit('exhaustCard', {
+      gameId,
+      cardId: card.id,
+      fieldIndex: index,
+    });
+  };
+
+  const attackCard = (index) => {
+    if (!state.isMyTurn || !state.isConnected || !gameId || state.currentPhase !== 'Battle') return;
+    const card = state.field[index];
+    if (card) {
+      removeCardFromField(index);
+      socket.emit('attackCard', { gameId, cardId: card.id });
+    }
+  };
+
+  const addToDeck = (card) => {
+    const newHand = state.hand.filter(c => c.id !== card.id);
+    const newDeck = [...state.deck, card];
     set({ hand: newHand, deck: newDeck });
     if (gameId && state.isConnected) {
       socket.emit('updateGameState', {
@@ -405,7 +491,7 @@ export default function Game() {
     }
   };
 
-  const toggleCardMulligan = (cardId: string) => {
+  const toggleCardMulligan = (cardId) => {
     set({
       selectedForMulligan: state.selectedForMulligan.includes(cardId)
         ? state.selectedForMulligan.filter((id) => id !== cardId)
@@ -467,7 +553,6 @@ export default function Game() {
   };
 
   const renderInitialDraw = () => {
-    console.log('[DEBUG] DRAW:', state.initialDraw);
     if (state.initialDraw.length === 0 || state.mulliganDone || !state.bothReady) return null;
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-50">
@@ -516,6 +601,10 @@ export default function Game() {
     );
   };
 
+  const handlePhaseChange = (newPhase) => {
+    set({ currentPhase: newPhase });
+  };
+
   const {
     hand,
     deck,
@@ -541,7 +630,6 @@ export default function Game() {
   } = state;
 
   const toggleRightPanel = () => {
-    console.log('Toggling right panel, current state:', isRightPanelOpen, 'new state:', !isRightPanelOpen); // Débogage détaillé
     set({ isRightPanelOpen: !isRightPanelOpen });
   };
 
@@ -623,15 +711,25 @@ export default function Game() {
             backgroundImage: 'url(/addons/background.jpg)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            transition: 'width 0.3s ease-in-out', // Transition pour la largeur
+            transition: 'width 0.3s ease-in-out',
           }}
         >
           <div className="z-30">
+            <PhaseIndicator
+              socket={socket}
+              isMyTurn={state.isMyTurn}
+              playerId={state.playerId}
+              gameId={gameId}
+              onPhaseChange={handlePhaseChange}
+            />
             <PlayerField
+              key={state.field.map(c => c?.exhausted).join('-')}
               field={field}
               hoveredCardId={hoveredCardId}
               setHoveredCardId={(id) => set({ hoveredCardId: id })}
               removeCardFromField={(index) => removeCardFromField(index)}
+              exhaustCard={(index) => exhaustCard(index)}
+              attackCard={(index) => attackCard(index)}
             />
             <PlayerHand
               hand={hand}
@@ -643,6 +741,7 @@ export default function Game() {
               discardCardFromHand={(card) => discardCardFromHand(card)}
               playCardToField={(card) => playCardToField(card)}
               addToDeck={(card) => addToDeck(card)}
+              playerId={playerId}
             />
             <OpponentField
               opponentField={opponentField}
@@ -691,18 +790,18 @@ export default function Game() {
         </div>
 
         <motion.div
-          key={isRightPanelOpen ? 'open' : 'closed'} // Force un re-rendu
+          key={isRightPanelOpen ? 'open' : 'closed'}
           className="min-h-screen flex flex-col items-center justify-start pt-8 gap-4 bg-black"
-          initial={{ x: 0 }} // Position initiale (visible)
-          animate={{ x: isRightPanelOpen ? 0 : '100%' }} // Glisse vers la droite pour fermer
-          transition={{ duration: 0.3, ease: 'easeInOut' }} // Animation fluide
-          style={{ position: 'absolute', width: '15%', right: 0, top: 0, zIndex: 20 }} // Position absolue
+          initial={{ x: 0 }}
+          animate={{ x: isRightPanelOpen ? 0 : '100%' }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
+          style={{ position: 'absolute', width: '15%', right: 0, top: 0, zIndex: 20 }}
         >
           <button
             onClick={toggleRightPanel}
             className="absolute top-1/2 left-[-30px] transform -translate-y-1/2 bg-gray-800 text-white p-2 rounded-full shadow-lg hover:bg-gray-700 focus:outline-none z-50"
             aria-label={isRightPanelOpen ? 'Close right panel' : 'Open right panel'}
-            style={{ zIndex: 50, pointerEvents: 'auto' }} // Assure l'interactivité
+            style={{ zIndex: 50, pointerEvents: 'auto' }}
           >
             <X size={20} />
           </button>
@@ -729,6 +828,24 @@ export default function Game() {
             playerId={playerId}
             isConnected={isConnected}
           />
+          <div className="flex flex-col items-center gap-2 mt-4">
+            <a
+              href="https://www.notion.so/nexus-card-game/1cd54baaf409803b8ecfe4c1fdd948ae?v=1ce54baaf4098020a27d000c66b5dc94"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              <ExternalLink className="w-5 h-5" /> Wiki
+            </a>
+            <a
+              href="/addons/rules.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              <FileText className="w-5 h-5" /> Règles
+            </a>
+          </div>
         </motion.div>
       </div>
     </div>
