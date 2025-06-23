@@ -7,15 +7,15 @@ interface PhaseIndicatorProps {
   isMyTurn: boolean;
   playerId: number | null;
   gameId: string | undefined;
-  onPhaseChange: (newPhase: string) => void;
-  currentPhase: 'Standby' | 'Main' | 'Battle' | 'End'; // Updated to include all phases
+  onPhaseChange: (newPhase: 'Standby' | 'Main' | 'Battle' | 'End') => void;
+  currentPhase: 'Standby' | 'Main' | 'Battle' | 'End';
   turn: number;
 }
 
 interface PhaseData {
   phase: string;
   turn: number;
-  nextPlayerId?: number; // Ajout facultatif pour compatibilité
+  nextPlayerId?: number;
 }
 
 export default function PhaseIndicator({
@@ -29,7 +29,7 @@ export default function PhaseIndicator({
                                        }: PhaseIndicatorProps) {
   const [showMessage, setShowMessage] = useState(false);
   const [message, setMessage] = useState('');
-  const [isAnimationActive, setIsAnimationActive] = useState(false); // État pour désactiver le bouton pendant l'animation
+  const [isAnimationActive, setIsAnimationActive] = useState(false);
 
   useEffect(() => {
     if (!socket || !gameId || !playerId) {
@@ -39,11 +39,11 @@ export default function PhaseIndicator({
 
     const handlePhaseUpdate = (phaseData: PhaseData) => {
       if (!phaseData || !phaseData.phase || phaseData.turn === undefined) {
-        console.log('[DEBUG] handlePhaseUpdate - Données invalides:', phaseData);
+        console.log('[DEBUG] PhaseUpdate - Invalid data:', phaseData);
         return;
       }
-      console.log('[DEBUG] handlePhaseUpdate - Nouvelle phase reçue:', phaseData.phase);
-      onPhaseChange(phaseData.phase);
+      console.log('[DEBUG] PhaseUpdate - Received:', phaseData.phase);
+      onPhaseChange(phaseData.phase as 'Standby' | 'Main' | 'Battle' | 'End');
     };
 
     const handlePhaseChangeMessage = (phaseData: PhaseData) => {
@@ -52,9 +52,7 @@ export default function PhaseIndicator({
         return;
       }
       console.log('[DEBUG] handlePhaseChangeMessage - Message reçu pour phase:', phaseData.phase, 'avec turn:', phaseData.turn, 'nextPlayerId:', phaseData.nextPlayerId);
-      // Utiliser nextPlayerId si disponible, sinon inverser playerId pour compatibilité
       const nextPlayerId = phaseData.nextPlayerId !== undefined ? phaseData.nextPlayerId : (playerId === 1 ? 2 : 1);
-      // Message personnalisé selon la phase
       const displayMessage = phaseData.phase === 'Main'
         ? 'MainPhase'
         : phaseData.phase === 'Battle'
@@ -65,15 +63,13 @@ export default function PhaseIndicator({
       console.log('[DEBUG] handlePhaseChangeMessage - Message à afficher:', displayMessage);
       setMessage(displayMessage);
       setShowMessage(true);
-      setIsAnimationActive(true); // Activer l'état d'animation
+      setIsAnimationActive(true);
 
-      // Masquer le message et réactiver le bouton après 3 secondes
       const timeoutId = setTimeout(() => {
         setShowMessage(false);
-        setIsAnimationActive(false); // Réinitialiser l'état d'animation
+        setIsAnimationActive(false);
       }, 3000);
 
-      // Nettoyer le timeout si le composant est démonté
       return () => clearTimeout(timeoutId);
     };
 

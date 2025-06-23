@@ -1,7 +1,4 @@
-export interface Card {
-  id: string;
-  image: string;
-}
+import { Card } from '@/types/Card.ts';
 
 export interface Player {
   id: string;
