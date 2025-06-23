@@ -165,6 +165,7 @@ export const useGameSocket = (
               mustDiscard: parsedGameState[playerKey]?.mustDiscard || false,
               hasPlayedCard: parsedGameState[playerKey]?.hasPlayedCard || false,
               deck: parsedGameState[playerKey]?.deck || [],
+              lifePoints: parsedGameState[playerKey]?.lifePoints || 30,
             },
             opponent: {
               graveyard: parsedGameState[opponentKey]?.graveyard || [],
@@ -175,11 +176,14 @@ export const useGameSocket = (
               deck: parsedGameState[opponentKey]?.deck || [],
               mustDiscard: parsedGameState[opponentKey]?.mustDiscard || false,
               hasPlayedCard: parsedGameState[opponentKey]?.hasPlayedCard || false,
+              lifePoints: parsedGameState[opponentKey]?.lifePoints || 30,
             },
             game: {
               turn: parsedGameState.turn || 1,
               currentPhase: parsedGameState.phase || 'Standby',
               isMyTurn: parsedGameState.activePlayer === socket.id,
+              gameOver: parsedGameState.gameOver || false,
+              winner: parsedGameState.winner || null,
             },
           };
           setState(newState);
@@ -189,6 +193,13 @@ export const useGameSocket = (
           });
           console.error('[ERROR] updateGameState validation failed:', error);
         }
+      });
+
+      socket.on('gameOver', ({ winner }) => {
+        const playerKey = playerId === 1 ? 'player1' : 'player2';
+        const message = winner === playerKey ? 'Vous avez gagné !' : 'Vous avez perdu !';
+        toast.info(message, { toastId: 'gameOver' });
+        setState({ game: { gameOver: true, winner } });
       });
 
       socket.on('yourTurn', () => {
@@ -299,6 +310,7 @@ export const useGameSocket = (
       socket.off('chatMessage');
       socket.off('opponentDisconnected');
       socket.off('updateGameState');
+      socket.off('gameOver');
       socket.off('yourTurn');
       socket.off('endTurn');
       socket.off('initialDeckList');
@@ -339,6 +351,9 @@ export const useGameSocket = (
           break;
         case 'joinGame':
           parsedData = EmitJoinGameSchema.parse(data);
+          break;
+        case 'updateLifePoints':
+          parsedData = data; // Add schema validation if needed
           break;
         default:
           parsedData = data;

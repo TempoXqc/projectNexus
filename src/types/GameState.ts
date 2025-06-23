@@ -1,27 +1,25 @@
 import { Card } from './Card';
 
+export interface PlayerState {
+  hand: Card[];
+  deck: Card[];
+  graveyard: Card[];
+  field: (Card | null)[];
+  mustDiscard: boolean;
+  hasPlayedCard: boolean;
+  lifePoints: number;
+}
+
 export interface GameState {
-  player: {
-    hand: Card[];
-    deck: Card[];
-    graveyard: Card[];
-    field: (Card | null)[];
-    mustDiscard: boolean;
-    hasPlayedCard: boolean;
-  };
-  opponent: {
-    hand: Card[];
-    deck: Card[];
-    graveyard: Card[];
-    field: (Card | null)[];
-    mustDiscard: boolean;
-    hasPlayedCard: boolean;
-  };
+  player: PlayerState;
+  opponent: PlayerState;
   game: {
     turn: number;
     currentPhase: 'Standby' | 'Main' | 'Battle' | 'End';
     isMyTurn: boolean;
     activePlayerId: string | null;
+    gameOver: boolean;
+    winner: string | null;
   };
   ui: {
     hoveredCardId: string | null;
@@ -48,11 +46,7 @@ export interface GameState {
     isReady: boolean;
     bothReady: boolean;
     opponentReady: boolean;
-    deckSelectionData: {
-      player1DeckId: string;
-      player2DeckIds: string[];
-      selectedDecks: string[];
-    } | null;
+    deckSelectionData: any;
     randomizers: { id: string; name: string; image: string }[];
   };
   connection: {
@@ -62,4 +56,12 @@ export interface GameState {
   };
 }
 
-export * from './PartialGameState';
+export interface PartialGameState {
+  player?: Partial<PlayerState>;
+  opponent?: Partial<PlayerState>;
+  game?: Partial<GameState['game']>;
+  ui?: Partial<GameState['ui']>;
+  chat?: Partial<GameState['chat']>;
+  deckSelection?: Partial<GameState['deckSelection']>;
+  connection?: Partial<GameState['connection']>;
+}

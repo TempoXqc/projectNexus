@@ -10,6 +10,7 @@ const initialState: GameState = {
     field: Array(8).fill(null),
     mustDiscard: false,
     hasPlayedCard: false,
+    lifePoints: 30,
   },
   opponent: {
     hand: [],
@@ -18,12 +19,15 @@ const initialState: GameState = {
     field: Array(8).fill(null),
     mustDiscard: false,
     hasPlayedCard: false,
+    lifePoints: 30,
   },
   game: {
     turn: 1,
     currentPhase: 'Standby',
     isMyTurn: false,
     activePlayerId: null,
+    gameOver: false,
+    winner: null,
   },
   ui: {
     hoveredCardId: null,
@@ -78,6 +82,12 @@ export const useGameState = () => {
       connection: { ...prev.connection, ...(updates.connection || {}) },
     }));
   }, []);
+
+  const updateLifePoints = useCallback((newValue: number) => {
+    if (newValue < 0 || newValue > 30) return null;
+    set({ player: { lifePoints: newValue } });
+    return { lifePoints: newValue };
+  }, [set]);
 
   const removeCardFromField = useCallback((index: number) => {
     const newField = [...state.player.field];
@@ -302,14 +312,14 @@ export const useGameState = () => {
         const rest = shuffledDeck.filter((c: Card) => !drawn.some((d: Card) => d.id === c.id));
 
         set({
-          player: { deck: rest },
+          player: { deck: rest, lifePoints: 30 },
           deckSelection: { initialDraw: drawn, deckSelectionDone: true },
         });
 
         if (state.connection.isConnected) {
           emit('updateGameState', {
             gameId,
-            state: { hand: drawn, deck: rest }, // Maintain server compatibility
+            state: { hand: drawn, deck: rest, lifePoints: 30 },
           });
         }
       })
@@ -335,5 +345,6 @@ export const useGameState = () => {
     handleDeckChoice,
     handleReadyClick,
     initializeDeck,
+    updateLifePoints,
   };
 };

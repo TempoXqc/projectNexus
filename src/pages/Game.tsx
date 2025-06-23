@@ -13,6 +13,8 @@ import CardPreview from '../components/CardPreview';
 import PhaseIndicator from '../components/PhaseIndicator';
 import DeckSelection from '../components/DeckSelection';
 import InitialDrawModal from '../components/InitialDrawModal';
+import CounterPlayer from '../components/CounterPlayer';
+import CounterOpponentPlayer from '../components/CounterOpponentPlayer';
 import { useGameState } from '../hooks/useGameState';
 import { useGameSocket } from '../hooks/useGameSocket';
 import { Card } from '../types/Card';
@@ -36,6 +38,7 @@ export default function Game() {
     handleDeckChoice,
     handleReadyClick,
     initializeDeck,
+    updateLifePoints,
   } = useGameState();
   const { socket, emit } = useGameSocket(
     gameId,
@@ -151,7 +154,10 @@ export default function Game() {
     (index: number) => {
       const result = attackCard(index);
       if (result && gameId && state.connection.isConnected) {
-        emit('attackCard', { gameId, cardId: result.cardId });
+        emit('attackCard', {
+          gameId,
+          cardId: result.cardId,
+        });
       }
     },
     [attackCard, gameId, state.connection.isConnected, emit],
@@ -217,6 +223,19 @@ export default function Game() {
     }
   }, [shuffleDeck, gameId, state.connection.isConnected, emit]);
 
+  const handleUpdateLifePoints = useCallback(
+    (newValue: number) => {
+      const result = updateLifePoints(newValue);
+      if (result && gameId && state.connection.isConnected) {
+        emit('updateLifePoints', {
+          gameId,
+          lifePoints: newValue,
+        });
+      }
+    },
+    [updateLifePoints, gameId, state.connection.isConnected, emit],
+  );
+
   const setGraveyardOpen = useCallback(
     (isOpen: boolean) => {
       set({ ui: { isGraveyardOpen: isOpen } });
@@ -266,6 +285,23 @@ export default function Game() {
         onKeepInitialHand={handleKeepInitialHand}
         onDoMulligan={handleDoMulligan}
       />
+      {state.game.gameOver && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50">
+          <div className="bg-gray-800 p-6 rounded-lg text-white text-center">
+            <h2 className="text-2xl font-bold mb-4">
+              {state.game.winner === (state.connection.playerId === 1 ? 'player1' : 'player2')
+                ? 'Victoire !'
+                : 'Défaite !'}
+            </h2>
+            <button
+              onClick={() => window.location.href = '/'}
+              className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"
+            >
+              Retour à l'accueil
+            </button>
+          </div>
+        </div>
+      )}
       <div className="w-full min-h-screen flex flex-row overflow-hidden">
         <div
           className={`flex-grow min-h-screen flex flex-col justify-end items-center p-4 relative z-10 ${
@@ -278,6 +314,35 @@ export default function Game() {
             transition: 'width 0.3s ease-in-out',
           }}
         >
+          <div
+            style={{
+              position: 'absolute',
+              top: '12%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+            }}
+          >
+            <CounterOpponentPlayer
+              playerId={state.connection.playerId}
+              gameId={gameId}
+              opponentCounter={state.opponent.lifePoints}
+            />
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              top: '76%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <CounterPlayer
+              playerId={state.connection.playerId}
+              gameId={gameId}
+              counter={state.player.lifePoints}
+              updateCounter={handleUpdateLifePoints}
+            />
+          </div>
           <div className="z-30">
             <PhaseIndicator
               socket={socket}
