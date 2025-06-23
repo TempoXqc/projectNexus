@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import OpponentField from '../components/OpponentField';
 import OpponentHand from '../components/OpponentHand';
 import PlayerField from '../components/PlayerField.tsx';
-import ChatBox from '../components/ChatBox';
+import ChatBox from '../components/chatbox/ChatBox.tsx';
 import PlayerGraveyard from '../components/PlayerGraveyard';
 import PlayerHand from '../components/PlayerHand';
 import PlayerDeck from '../components/PlayerDeck.tsx';
@@ -11,12 +11,8 @@ import OpponentDeck from '../components/OpponentDeck';
 import OpponentGraveyard from '../components/OpponentGraveyard';
 import {
   BadgeCheck,
-  ExternalLink,
-  FileText,
-  RefreshCcw,
   X,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
 import { Socket } from 'socket.io-client';
 import { getSocket } from '../socket.ts';
@@ -73,8 +69,9 @@ export default function Game() {
     } | null,
     canInitializeDraw: false,
     randomizers: [] as { id: string; name: string; image: string }[],
-    isRightPanelOpen: true,
+    isRightPanelOpen: false,
     currentPhase: 'Main' as string,
+    isRightPanelHovered: false,
   });
 
   const set = (updates: Partial<typeof state>) =>
@@ -371,21 +368,6 @@ export default function Game() {
     set({ hasChosenDeck: true });
   };
 
-  const drawNewHand = () => {
-    if (state.deck.length < 5) return;
-    const drawn = getRandomHand(state.deck, 5);
-    const newDeck = state.deck.filter(
-      (card: Card) => !drawn.some((d: Card) => d.id === card.id),
-    );
-    set({ hand: drawn, deck: newDeck });
-    if (gameId && state.isConnected) {
-      socket.emit('updateGameState', {
-        gameId,
-        state: { hand: drawn, deck: newDeck },
-      });
-    }
-  };
-
   const removeCardFromField = (index: number) => {
     const newField = [...state.field];
     const removedCard = newField[index];
@@ -612,7 +594,7 @@ export default function Game() {
       return null;
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-50">
-        <h2 className="text-white text-2xl font-bold mb-6">Main de départ</h2>
+        <h2 className="text-white text-10xl font-bold mb-6">Main de départ</h2>
         <div className="flex gap-4">
           {state.initialDraw.map((card: Card) => {
             const isSelected = state.selectedForMulligan.includes(card.id);
@@ -620,7 +602,7 @@ export default function Game() {
               <div
                 key={card.id}
                 onClick={() => toggleCardMulligan(card.id)}
-                className={`relative w-[150px] h-[210px] cursor-pointer rounded border-4 ${isSelected ? 'border-red-500' : 'border-transparent'} hover:scale-105 transition-transform`}
+                className={`relative w-[305px] h-[422px] cursor-pointer rounded border-4 ${isSelected ? 'border-red-500' : 'border-transparent'} hover:scale-105 transition-transform`}
               >
                 <img
                   src={card.image}
@@ -670,11 +652,8 @@ export default function Game() {
     opponentField,
     opponentHand,
     opponentDeck,
-    chatMessages,
-    chatInput,
     playerId,
     turn,
-    isConnected,
     hoveredCardId,
     isCardHovered,
     isGraveyardOpen,
@@ -686,16 +665,14 @@ export default function Game() {
     currentPhase,
   } = state;
 
-  const toggleRightPanel = () => {
-    set({ isRightPanelOpen: !isRightPanelOpen });
-  };
+
 
   return (
     <div className="w-full min-h-screen flex flex-row relative overflow-hidden">
       {renderInitialDraw()}
       {!state.deckSelectionDone && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-black/90 z-50">
-          <h2 className="text-white text-3xl font-bold mb-4">
+          <h2 className="text-white text-10xl font-bold mb-4">
             Choix des decks
           </h2>
           <div className="flex gap-6">
@@ -711,7 +688,7 @@ export default function Game() {
                 <div
                   key={deckObj.id}
                   onClick={() => handleDeckChoice(deckObj.id)}
-                  className="w-[180px] h-[250px] relative cursor-pointer transition-transform hover:scale-105 rounded shadow-lg"
+                  className="w-[398px] h-[550px] relative cursor-pointer transition-transform hover:scale-105 rounded shadow-lg"
                 >
                   <div
                     className={`w-full h-full border-4 ${borderColor} rounded ${borderColor !== 'border-transparent' ? 'shadow-lg shadow-black/50' : ''}`}
@@ -773,6 +750,7 @@ export default function Game() {
               gameId={gameId}
               onPhaseChange={handlePhaseChange}
               currentPhase={currentPhase}
+              turn={turn}
             />
             <PlayerField
               key={state.field.map((c) => c?.exhausted).join('-')}
@@ -833,6 +811,7 @@ export default function Game() {
               setHoveredCardId={(id) => set({ hoveredCardId: id })}
             />
           </div>
+
           <CardPreview
             hoveredCardId={hoveredCardId}
             field={field}
@@ -841,72 +820,19 @@ export default function Game() {
           />
         </div>
 
-        <motion.div
-          key={isRightPanelOpen ? 'open' : 'closed'}
-          className="min-h-screen flex flex-col items-center justify-start pt-8 gap-4 bg-black"
-          initial={{ x: 0 }}
-          animate={{ x: isRightPanelOpen ? 0 : '100%' }}
-          transition={{ duration: 0.3, ease: 'easeInOut' }}
-          style={{
-            position: 'absolute',
-            width: '15%',
-            right: 0,
-            top: 0,
-            zIndex: 20,
-          }}
-        >
-          <button
-            onClick={toggleRightPanel}
-            className="absolute top-1/2 left-[-30px] transform -translate-y-1/2 bg-gray-800 text-white p-2 rounded-full shadow-lg hover:bg-gray-700 focus:outline-none z-50"
-            aria-label={
-              isRightPanelOpen ? 'Close right panel' : 'Open right panel'
-            }
-            style={{ zIndex: 50, pointerEvents: 'auto' }}
-          >
-            <X size={20} />
-          </button>
-          <p className="text-white font-bold">ID de la partie : {gameId}</p>
-          <p className="text-white">Joueur {playerId || '...'}</p>
-          {hand.length === 0 && deck.length >= 5 && (
-            <button
-              onClick={drawNewHand}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              disabled={!isConnected}
-            >
-              <RefreshCcw className="w-5 h-5" /> Nouvelle main
-            </button>
-          )}
-          <p className="text-white font-bold">Tour {turn}</p>
-          <p className="text-white">
-            {isMyTurn ? 'À votre tour !' : "Tour de l'adversaire"}
-          </p>
+        <div className="chatbox-container">
           <ChatBox
-            chatMessages={chatMessages}
-            chatInput={chatInput}
-            setChatInput={(input) => set({ chatInput: input })}
+            chatMessages={state.chatMessages}
+            chatInput={state.chatInput}
+            setChatInput={(input) => setState((prev) => ({ ...prev, chatInput: input }))}
             sendChatMessage={sendChatMessage}
-            playerId={playerId}
-            isConnected={isConnected}
+            playerId={state.playerId}
+            isConnected={state.isConnected}
+            gameId={gameId}
+            turn={state.turn}
+            isMyTurn={state.isMyTurn}
           />
-          <div className="flex flex-col items-center gap-2 mt-4">
-            <a
-              href="https://www.notion.so/nexus-card-game/1cd54baaf409803b8ecfe4c1fdd948ae?v=1ce54baaf4098020a27d000c66b5dc94"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              <ExternalLink className="w-5 h-5" /> Wiki
-            </a>
-            <a
-              href="/addons/rules.pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              <FileText className="w-5 h-5" /> Règles
-            </a>
-          </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

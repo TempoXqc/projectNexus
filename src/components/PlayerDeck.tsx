@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { RefreshCcw, CreditCard as CardIcon } from 'lucide-react';
 
@@ -13,7 +12,7 @@ export default function PlayerDeck({ count, drawCard, shuffleDeck }: PlayerDeckP
   return (
     <div
       className="flex flex-col items-center justify-center relative"
-      style={{ width: '150px', height: '210px' }}
+      style={{ width: '120px', height: '160px' }}
     >
       <div
         className="absolute top-0 left-1/2 transform -translate-x-1/2 flex gap-2 mt-2"
@@ -39,7 +38,7 @@ export default function PlayerDeck({ count, drawCard, shuffleDeck }: PlayerDeckP
         alt="Deck"
         className="w-full h-full object-cover rounded shadow"
       />
-      <span className="absolute inset-0 flex items-center justify-center text-white font-bold text-[2rem]">
+      <span className="absolute inset-0 flex items-center justify-center text-white font-bold text-xl">
         {count}
       </span>
     </div>

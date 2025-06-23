@@ -322,17 +322,23 @@ io.on('connection', (socket) => {
   socket.on('updatePhase', ({ gameId, phase, turn }) => {
     const game = games[gameId];
     if (!game) {
+      console.log('[DEBUG] updatePhase - Jeu non trouvé:', gameId);
       return;
     }
     if (game.state.activePlayer !== socket.id) {
-
+      console.log('[DEBUG] updatePhase - Tentative par joueur non actif:', socket.id);
       return;
     }
     game.state.phase = phase;
     game.state.turn = turn;
+    console.log('[DEBUG] updatePhase - Phase mise à jour:', { gameId, phase, turn, activePlayer: game.state.activePlayer });
 
     emitUpdateGameState(gameId, game.state);
     io.to(gameId).emit('updatePhase', { phase, turn });
+    // Émettre phaseChangeMessage uniquement pour Main et Battle ici
+    if (phase === 'Main' || phase === 'Battle') {
+      io.to(gameId).emit('phaseChangeMessage', { phase, turn });
+    }
   });
 
   socket.on('drawCard', ({ gameId, playerId }) => {
@@ -364,13 +370,22 @@ io.on('connection', (socket) => {
         (id) => players[id].playerId === nextPlayerId,
       );
       if (nextPlayerSocketId) {
-
+        console.log('[DEBUG] endTurn - Avant changement de activePlayer:', {
+          currentPlayerId,
+          currentSocketId: socket.id,
+          nextPlayerId,
+          nextPlayerSocketId,
+        });
         game.state.activePlayer = nextPlayerSocketId;
         game.state.turn += 1;
-        game.state.phase = 'Standby';
-
+        game.state.phase = 'Standby'; // Réinitialisation de la phase
+        console.log('[DEBUG] endTurn - Après changement de phase et activePlayer:', {
+          activePlayer: game.state.activePlayer,
+          turn: game.state.turn,
+          phase: game.state.phase,
+        });
       } else {
-
+        console.log('[DEBUG] endTurn - Erreur: nextPlayerSocketId non trouvé pour playerId:', nextPlayerId);
         return;
       }
       game.state.player1.hasPlayedCard = false;
@@ -393,11 +408,17 @@ io.on('connection', (socket) => {
       game.state.player1.opponentHand = Array(game.state.player2.hand.length).fill({});
       game.state.player2.opponentHand = Array(game.state.player1.hand.length).fill({});
 
-
+      console.log('[DEBUG] endTurn - Avant émission:', {
+        gameId,
+        activePlayer: game.state.activePlayer,
+        phase: game.state.phase,
+        turn: game.state.turn,
+      });
       emitUpdateGameState(gameId, game.state);
       io.to(gameId).emit('endTurn');
       io.to(nextPlayerSocketId).emit('yourTurn');
-
+      // Émettre un seul message avec nextPlayerId pour Standby
+      io.to(gameId).emit('phaseChangeMessage', { phase: 'Standby', turn: game.state.turn, nextPlayerId });
     }
   });
 });
