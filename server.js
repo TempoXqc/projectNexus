@@ -68,15 +68,26 @@ function drawCardServer(game, playerKey) {
   }
 }
 
+function getGamesList() {
+  return Object.keys(games).map((gameId) => ({
+    gameId,
+    status: games[gameId].players.length < 2 ? 'waiting' : 'in-progress',
+    players: games[gameId].players.length,
+  }));
+}
+
 io.on('connection', (socket) => {
   socket.onAny((event, ...args) => {
     if (event === 'yourTurn') {
     }
   });
 
-  socket.on('joinGame', (gameId) => {
-    socket.join(gameId);
+  socket.on('getGamesList', () => {
+    socket.emit('gamesList', getGamesList());
+  });
 
+  socket.on('createGame', (gameId) => {
+    console.log('[DEBUG] createGame reçu pour gameId:', gameId);
     if (!games[gameId]) {
       games[gameId] = {
         players: [socket.id],
@@ -112,36 +123,101 @@ io.on('connection', (socket) => {
         availableDecks: getRandomDecks(),
       };
       players[socket.id] = { gameId, playerId: 1 };
-      socket.emit('gameStart', { playerId: 1, chatHistory: [] });
-      emitUpdateGameState(gameId, games[gameId].state);
-      io.to(gameId).emit('initialDeckList', games[gameId].availableDecks);
-    } else if (games[gameId].players.length < 2) {
-      games[gameId].players.push(socket.id);
-      players[socket.id] = { gameId, playerId: 2 };
-      socket.emit('gameStart', {
-        playerId: 2,
-        chatHistory: games[gameId].chatHistory,
-      });
-      emitUpdateGameState(gameId, games[gameId].state);
-      io.to(gameId).emit('playerJoined', { playerId: 2 });
-      io.to(gameId).emit('initialDeckList', games[gameId].availableDecks);
+      socket.join(gameId);
+      io.emit('gamesList', getGamesList());
     } else {
-      socket.emit('error', 'La partie est pleine');
+      socket.emit('error', 'ID de partie déjà utilisé');
+    }
+  });
+
+  socket.on('joinGame', (gameId) => {
+    console.log('[DEBUG] joinGame reçu pour gameId:', gameId, 'socketId:', socket.id);
+    if (!games[gameId]) {
+      console.log('[DEBUG] Partie inexistante pour gameId:', gameId);
+      socket.emit('error', 'La partie n’existe pas');
       return;
     }
 
-    io.to(gameId).emit('deckSelectionUpdate', games[gameId].deckChoices);
+    games[gameId].players = games[gameId].players.filter((id) => io.sockets.sockets.get(id));
+    console.log('[DEBUG] Joueurs après nettoyage:', games[gameId].players);
+
+    if (games[gameId].players.includes(socket.id)) {
+      console.log('[DEBUG] Socket déjà dans la partie:', socket.id);
+      return;
+    }
+
+    if (games[gameId].players.length < 2) {
+      socket.join(gameId);
+      games[gameId].players.push(socket.id);
+      players[socket.id] = { gameId, playerId: 2 };
+      io.to(gameId).emit('opponentJoined', { gameId });
+      io.emit('gamesList', getGamesList());
+      console.log('[DEBUG] Joueur ajouté à la partie:', { gameId, playerId: 2, socketId: socket.id, rooms: Array.from(socket.rooms) });
+    } else {
+      console.log('[DEBUG] Partie pleine pour gameId:', gameId);
+      socket.emit('error', 'La partie est pleine');
+      return;
+    }
+  });
+
+  socket.on('creatorReady', (gameId) => {
+    console.log('[DEBUG] creatorReady reçu pour gameId:', gameId);
+    const game = games[gameId];
+    if (game && game.players.length === 2) {
+      const [player1SocketId, player2SocketId] = game.players;
+      console.log('[DEBUG] Vérification des joueurs pour gameId:', gameId, { player1SocketId, player2SocketId });
+
+      const player1Socket = io.sockets.sockets.get(player1SocketId);
+      const player2Socket = io.sockets.sockets.get(player2SocketId);
+      if (!player1Socket || !player2Socket) {
+        console.log('[DEBUG] Un ou plusieurs sockets non actifs:', { player1Active: !!player1Socket, player2Active: !!player2Socket });
+        socket.emit('error', 'Un joueur est déconnecté');
+        return;
+      }
+
+      player1Socket.join(gameId);
+      player2Socket.join(gameId);
+
+      const sendEvents = () => {
+        console.log('[DEBUG] Envoi des événements aux joueurs:', { player1SocketId, player2SocketId });
+        io.to(player1SocketId).emit('gameStart', { playerId: 1, chatHistory: game.chatHistory });
+        io.to(player2SocketId).emit('gameStart', { playerId: 2, chatHistory: game.chatHistory });
+        io.to(player1SocketId).emit('initialDeckList', game.availableDecks);
+        io.to(player2SocketId).emit('initialDeckList', game.availableDecks);
+        io.to(gameId).emit('deckSelectionUpdate', game.deckChoices);
+        io.to(gameId).emit('startGame', { gameId });
+        emitUpdateGameState(gameId, game.state);
+        console.log('[DEBUG] Événements envoyés pour gameId:', gameId);
+      };
+
+      // Envoyer immédiatement
+      sendEvents();
+
+      // Réessayer après 2000 ms si nécessaire
+      setTimeout(() => {
+        if (game.players.length === 2) {
+          console.log('[DEBUG] Réessai d’envoi des événements pour gameId:', gameId);
+          sendEvents();
+        }
+      }, 2000);
+    } else {
+      console.log('[DEBUG] creatorReady échoué:', { gameExists: !!game, players: game?.players.length });
+      socket.emit('error', 'Partie invalide ou incomplète');
+    }
   });
 
   socket.on('playCard', ({ gameId, card, fieldIndex }) => {
+    console.log('[DEBUG] playCard reçu:', { gameId, card: card.id, fieldIndex, socketId: socket.id });
     const game = games[gameId];
     if (!game || game.state.activePlayer !== socket.id) {
+      console.log('[DEBUG] playCard bloqué:', { gameExists: !!game, isActivePlayer: game?.state.activePlayer === socket.id });
       return;
     }
     const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
     const opponentKey = players[socket.id].playerId === 1 ? 'player2' : 'player1';
 
     if (game.state.phase !== 'Main') {
+      console.log('[DEBUG] playCard bloqué: mauvaise phase:', game.state.phase);
       return;
     }
 
@@ -151,13 +227,22 @@ io.on('connection', (socket) => {
       (c) => c.id !== card.id,
     );
     game.state[playerKey].hand = newPlayerHand;
-    const newPlayerHandLength = newPlayerHand.length;
-    game.state[playerKey].opponentHand = Array(
-      game.state[opponentKey].hand.length,
-    ).fill({});
-    game.state[opponentKey].opponentHand = Array(
-      newPlayerHandLength,
-    ).fill({});
+    game.state[playerKey].hasPlayedCard = true;
+    game.state[playerKey].opponentHand = Array(game.state[opponentKey].hand?.length || 0).fill({});
+    game.state[opponentKey].opponentHand = Array(newPlayerHand.length).fill({});
+
+    console.log('[DEBUG] Émission de updateGameState après playCard:', {
+      playerKey,
+      opponentKey,
+      playerField: game.state[playerKey].field.filter(Boolean).length,
+      opponentField: game.state[opponentKey].field.filter(Boolean).length,
+      playerHand: game.state[playerKey].hand.length,
+      opponentHand: game.state[opponentKey].hand.length,
+      playerDeck: game.state[playerKey].deck?.length,
+      opponentDeck: game.state[opponentKey].deck?.length,
+      playerGraveyard: game.state[playerKey].graveyard?.length,
+      opponentGraveyard: game.state[opponentKey].graveyard?.length,
+    });
     emitUpdateGameState(gameId, game.state);
   });
 
@@ -186,26 +271,49 @@ io.on('connection', (socket) => {
   });
 
   socket.on('updateGameState', ({ gameId, state }) => {
+    console.log('[DEBUG] updateGameState reçu:', {
+      gameId,
+      state: {
+        hand: state.hand?.map(card => card.id),
+        deck: state.deck?.length,
+        field: state.field?.filter(Boolean).length,
+        graveyard: state.graveyard?.length,
+      },
+    });
     const game = games[gameId];
-    if (!game) return;
+    if (!game) {
+      console.log('[DEBUG] Partie non trouvée pour updateGameState:', gameId);
+      return;
+    }
     const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
     const opponentKey = players[socket.id].playerId === 1 ? 'player2' : 'player1';
     game.state[playerKey] = { ...game.state[playerKey], ...state };
-    game.state[opponentKey].opponentGraveyard = game.state[playerKey].graveyard;
-    game.state[opponentKey].hand = game.state[opponentKey].hand || [];
-    game.state[opponentKey].deck = game.state[opponentKey].deck || [];
-    if (state.hand) {
-      game.state[opponentKey].opponentHand = Array(state.hand.length).fill({});
-    }
-    game.state[playerKey].opponentHand = Array(
-      game.state[opponentKey].hand.length,
-    ).fill({});
+    game.state[opponentKey].opponentGraveyard = game.state[playerKey].graveyard || [];
+    game.state[opponentKey].opponentHand = Array(game.state[playerKey].hand?.length || 0).fill({});
+    game.state[opponentKey].opponentDeck = Array(game.state[playerKey].deck?.length || 0).fill({});
+    game.state[playerKey].opponentHand = Array(game.state[opponentKey].hand?.length || 0).fill({});
+    game.state[playerKey].opponentDeck = Array(game.state[opponentKey].deck?.length || 0).fill({});
+
+    console.log('[DEBUG] Émission de updateGameState:', {
+      playerKey,
+      opponentKey,
+      playerField: game.state[playerKey].field?.filter(Boolean).length,
+      opponentField: game.state[opponentKey].field?.filter(Boolean).length,
+      playerHand: game.state[playerKey].hand?.map(card => card.id),
+      opponentHand: game.state[opponentKey].hand?.length,
+      playerDeck: game.state[playerKey].deck?.length,
+      opponentDeck: game.state[opponentKey].deck?.length,
+      playerGraveyard: game.state[playerKey].graveyard?.length,
+      opponentGraveyard: game.state[opponentKey].graveyard?.length,
+    });
     emitUpdateGameState(gameId, game.state);
   });
 
   socket.on('chooseDeck', ({ gameId, playerId, deckId }) => {
+    console.log('[DEBUG] chooseDeck reçu:', { gameId, playerId, deckId });
     const game = games[gameId];
     if (!game) {
+      console.log('[DEBUG] Partie non trouvée pour chooseDeck:', gameId);
       return;
     }
 
@@ -213,18 +321,28 @@ io.on('connection', (socket) => {
 
     if (playerId === 1 && !game.deckChoices[1]) {
       game.deckChoices[1] = deckId;
+      console.log('[DEBUG] Deck choisi pour joueur 1:', deckId);
     } else if (playerId === 2 && game.deckChoices[2].length < 2) {
       if (!game.deckChoices[2].includes(deckId) && deckId !== game.deckChoices[1]) {
         game.deckChoices[2].push(deckId);
+        console.log('[DEBUG] Deck choisi pour joueur 2:', deckId);
+      } else {
+        console.log('[DEBUG] Deck invalide pour joueur 2:', { deckId, existingDecks: game.deckChoices[2], player1Deck: game.deckChoices[1] });
+        return;
       }
+    } else {
+      console.log('[DEBUG] Choix de deck bloqué:', { playerId, hasChosen: playerId === 1 ? !!game.deckChoices[1] : game.deckChoices[2].length });
+      return;
     }
 
+    console.log('[DEBUG] Émission de deckSelectionUpdate:', game.deckChoices);
     io.to(gameId).emit('deckSelectionUpdate', game.deckChoices);
 
     const totalDecks = [game.deckChoices[1], ...game.deckChoices[2]].filter(Boolean);
 
     if (totalDecks.length === 3) {
       const remaining = game.availableDecks.find(id => !totalDecks.includes(id));
+      console.log('[DEBUG] Tous les decks choisis, deck restant:', remaining);
 
       game.finalDecks = {
         player1DeckId: game.deckChoices[1],
@@ -232,9 +350,9 @@ io.on('connection', (socket) => {
         selectedDecks: [...totalDecks, remaining],
       };
 
-
       const { deckLists, allCards } = loadCards();
       if (!deckLists || !allCards || allCards.length === 0) {
+        console.log('[DEBUG] Erreur chargement des cartes:', { deckLists, allCards });
         return;
       }
 
@@ -250,6 +368,7 @@ io.on('connection', (socket) => {
       const player2Cards = player2DeckIds.flatMap(deckId => getDeckCards(deckId)).slice(0, 30);
 
       if (player1Cards.length === 0 || player2Cards.length === 0) {
+        console.log('[DEBUG] Erreur: Aucune carte pour les decks:', { player1Cards, player2Cards });
         return;
       }
 
@@ -271,15 +390,20 @@ io.on('connection', (socket) => {
         game.state.player1.opponentHand = Array(player2Initial.hand.length).fill({});
         game.state.player2.opponentHand = Array(player1Initial.hand.length).fill({});
 
+        console.log('[DEBUG] État initialisé pour les deux joueurs:', {
+          player1Hand: player1Initial.hand.map(card => card.id),
+          player2Hand: player2Initial.hand.map(card => card.id),
+          player1Deck: player1Initial.deck.length,
+          player2Deck: player2Initial.deck.length,
+        });
         emitUpdateGameState(gameId, game.state);
 
         const isBothReady = playerReadiness[gameId]?.[1] && playerReadiness[gameId]?.[2];
         if (isBothReady) {
+          console.log('[DEBUG] Émission de deckSelectionDone et bothPlayersReady');
           io.to(gameId).emit('deckSelectionDone', game.finalDecks);
-          emitUpdateGameState(gameId, game.state);
           io.to(gameId).emit('bothPlayersReady');
         }
-      } else {
       }
     }
   });
@@ -292,15 +416,21 @@ io.on('connection', (socket) => {
         io.to(opponentId).emit('opponentDisconnected');
       }
       delete games[gameId];
+      io.emit('gamesList', getGamesList());
     }
     delete players[socket.id];
   });
 
   socket.on('playerReady', ({ gameId }) => {
+    console.log('[DEBUG] playerReady reçu pour gameId:', gameId, 'socketId:', socket.id);
     const playerInfo = players[socket.id];
-    if (!playerInfo || playerInfo.gameId !== gameId) return;
+    if (!playerInfo || playerInfo.gameId !== gameId) {
+      console.log('[DEBUG] playerReady invalide:', { playerInfo, gameId });
+      return;
+    }
 
     const playerId = playerInfo.playerId;
+    console.log('[DEBUG] Joueur prêt:', { playerId, gameId });
 
     if (!playerReadiness[gameId]) {
       playerReadiness[gameId] = { 1: false, 2: false };
@@ -308,11 +438,13 @@ io.on('connection', (socket) => {
 
     playerReadiness[gameId][playerId] = true;
     io.to(gameId).emit('playerReady', { playerId });
+    console.log('[DEBUG] Émission de playerReady:', { playerId, gameId });
 
     const isBothReady = playerReadiness[gameId]?.[1] && playerReadiness[gameId]?.[2];
     const finalDecks = games[gameId]?.finalDecks;
 
     if (isBothReady && finalDecks && games[gameId]) {
+      console.log('[DEBUG] Les deux joueurs sont prêts, émission de deckSelectionDone et bothPlayersReady');
       io.to(gameId).emit('deckSelectionDone', finalDecks);
       emitUpdateGameState(gameId, games[gameId].state);
       io.to(gameId).emit('bothPlayersReady');
@@ -335,7 +467,6 @@ io.on('connection', (socket) => {
 
     emitUpdateGameState(gameId, game.state);
     io.to(gameId).emit('updatePhase', { phase, turn });
-    // Émettre phaseChangeMessage uniquement pour Main et Battle ici
     if (phase === 'Main' || phase === 'Battle') {
       io.to(gameId).emit('phaseChangeMessage', { phase, turn });
     }
@@ -347,7 +478,6 @@ io.on('connection', (socket) => {
       return;
     }
     if (game.state.activePlayer !== socket.id) {
-
       return;
     }
     const playerKey = playerId === 1 ? 'player1' : 'player2';
@@ -378,7 +508,7 @@ io.on('connection', (socket) => {
         });
         game.state.activePlayer = nextPlayerSocketId;
         game.state.turn += 1;
-        game.state.phase = 'Standby'; // Réinitialisation de la phase
+        game.state.phase = 'Standby';
         console.log('[DEBUG] endTurn - Après changement de phase et activePlayer:', {
           activePlayer: game.state.activePlayer,
           turn: game.state.turn,
@@ -417,7 +547,6 @@ io.on('connection', (socket) => {
       emitUpdateGameState(gameId, game.state);
       io.to(gameId).emit('endTurn');
       io.to(nextPlayerSocketId).emit('yourTurn');
-      // Émettre un seul message avec nextPlayerId pour Standby
       io.to(gameId).emit('phaseChangeMessage', { phase: 'Standby', turn: game.state.turn, nextPlayerId });
     }
   });

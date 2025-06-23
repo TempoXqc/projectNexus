@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import OpponentField from '../components/OpponentField';
 import OpponentHand from '../components/OpponentHand';
@@ -14,13 +14,11 @@ import {
   X,
 } from 'lucide-react';
 import { Card } from '../types/Card';
-import { Socket } from 'socket.io-client';
 import { getSocket } from '../socket.ts';
 import getDeckBadge from '../components/GetDeckBadge.tsx';
 import CardPreview from '../components/CardPreview';
 import PhaseIndicator from '../components/PhaseIndicator';
 
-let socket: Socket;
 
 const getRandomHand = <T,>(deck: T[], count: number): T[] =>
   [...deck].sort(() => 0.5 - Math.random()).slice(0, count);
@@ -28,6 +26,12 @@ const getRandomHand = <T,>(deck: T[], count: number): T[] =>
 export default function Game() {
   const { gameId } = useParams();
   const navigate = useNavigate();
+  const socket = useMemo(() => getSocket(), []); // Socket stable
+  console.log('[DEBUG] Configuration du socket:', {
+    url: socket.io.uri,
+    opts: socket.io.opts,
+    connected: socket.connected,
+  });
 
   const [state, setState] = useState({
     hand: [] as Card[],
@@ -42,7 +46,7 @@ export default function Game() {
     chatInput: '',
     playerId: null as number | null,
     turn: 1,
-    isConnected: false,
+    isConnected: socket.connected, // Initialiser avec socket.connected
     hoveredCardId: null as string | null,
     isCardHovered: false,
     isGraveyardOpen: false,
@@ -77,148 +81,49 @@ export default function Game() {
   const set = (updates: Partial<typeof state>) =>
     setState((prev) => ({ ...prev, ...updates }));
 
-  const hasJoinedRef = useRef(false);
 
   useEffect(() => {
-    socket = getSocket();
-
-    const tryJoin = () => {
-      if (!gameId || hasJoinedRef.current) return;
-      socket.emit('joinGame', gameId);
-      hasJoinedRef.current = true;
-    };
-
-    if (socket.connected) {
-      tryJoin();
-    } else {
-      socket.once('connect', tryJoin);
+    console.log('[DEBUG] Game.tsx useEffect exécuté pour gameId:', gameId);
+    if (!gameId) {
+      console.log('[DEBUG] gameId manquant, redirection vers /');
+      navigate('/');
+      return;
     }
 
+    console.log('[DEBUG] État initial du socket:', { connected: socket.connected, socketId: socket.id });
+
+    let isMounted = true;
+
+    socket.onAny((event, ...args) => {
+      if (!isMounted) return;
+      console.log('[DEBUG] Événement Socket.IO reçu:', { event, args });
+    });
+
     socket.on('connect', () => {
+      if (!isMounted) return;
+      console.log('[DEBUG] Socket connecté, socketId:', socket.id);
       set({ isConnected: true });
     });
 
-    socket.on('disconnect', () => {
-      set({ isConnected: false });
-    });
-
-    socket.on('connect_error', () => {
-      set({ isConnected: false });
-    });
-
-    socket.on(
-      'gameStart',
-      ({
+    socket.on('gameStart', ({ playerId, chatHistory }: { playerId: number; chatHistory: { playerId: number; message: string }[] }) => {
+      if (!isMounted) return;
+      console.log('[DEBUG] gameStart reçu:', { playerId, chatHistory });
+      set({
         playerId,
-        chatHistory,
-      }: {
-        playerId: number;
-        chatHistory: { playerId: number; message: string }[];
-      }) => {
-        set({ playerId, chatMessages: chatHistory, isMyTurn: playerId === 1 });
-      },
-    );
-
-    socket.on(
-      'deckSelectionUpdate',
-      (deckChoices: { 1: string | null; 2: string[] }) => {
-        const allSelected = [deckChoices[1], ...(deckChoices[2] || [])].filter(
-          Boolean,
-        ) as string[];
-        set({
-          selectedDecks: allSelected,
-          player1DeckId: deckChoices[1],
-        });
-      },
-    );
-
-    socket.on(
-      'deckSelectionDone',
-      (data: {
-        player1DeckId: string;
-        player2DeckIds: string[];
-        selectedDecks: string[];
-      }) => {
-        set({ deckSelectionData: data });
-      },
-    );
-
-    socket.on('playerReady', ({ playerId }: { playerId: number }) => {
-      if (state.playerId && playerId !== state.playerId) {
-        set({ opponentReady: true });
-      }
-    });
-
-    socket.on('bothPlayersReady', () => {
-      set({ bothReady: true });
-    });
-
-    socket.on('chatMessage', (msg: { playerId: number; message: string }) => {
-      set({ chatMessages: [...state.chatMessages, msg] });
-    });
-
-    socket.on('opponentDisconnected', () => {
-      alert("Votre adversaire s'est déconnecté.");
-      navigate('/');
-    });
-
-    socket.on('updateGameState', (gameState: any) => {
-      const playerKey = state.playerId === 1 ? 'player1' : 'player2';
-      const opponentKey = state.playerId === 1 ? 'player2' : 'player1';
-      const opponentHandLength =
-        gameState[opponentKey]?.hand?.length ||
-        gameState[opponentKey]?.opponentHand?.length ||
-        0;
-
-      const newState = {
-        field: (gameState[playerKey]?.field || []).map((c: Card | null) =>
-          c
-            ? {
-                ...c,
-                exhausted: c.exhausted !== undefined ? c.exhausted : false,
-              }
-            : null,
-        ),
-        hand: gameState[playerKey]?.hand || state.hand,
-        graveyard: gameState[playerKey]?.graveyard || state.graveyard,
-        opponentGraveyard:
-          gameState[opponentKey]?.graveyard || state.opponentGraveyard,
-        mustDiscard: gameState[playerKey]?.mustDiscard || false,
-        hasPlayedCard: gameState[playerKey]?.hasPlayedCard || false,
-        opponentField: (gameState[opponentKey]?.field || []).map(
-          (c: Card | null) =>
-            c
-              ? {
-                  ...c,
-                  exhausted: c.exhausted !== undefined ? c.exhausted : false,
-                }
-              : null,
-        ),
-        opponentHand: Array(opponentHandLength).fill({}),
-        deck: gameState[playerKey]?.deck || state.deck,
-        opponentDeck: gameState[opponentKey]?.deck || state.opponentDeck,
-        turn: gameState.turn || state.turn,
-        currentPhase: gameState.phase || state.currentPhase,
-        isMyTurn: gameState.activePlayer === socket.id,
-      };
-      set(newState);
-    });
-
-    socket.on('yourTurn', () => {
-      set({ isMyTurn: true, hasPlayedCard: false });
-    });
-
-    socket.on('endTurn', () => {
-      set({ isMyTurn: false, hasPlayedCard: false });
-      if (gameId && state.isConnected) {
-        socket.emit('updateGameState', {
-          gameId,
-          state: { hasPlayedCard: false },
-        });
-      }
+        chatMessages: chatHistory,
+        isMyTurn: playerId === 1,
+        deckSelectionDone: false,
+        randomizers: [],
+        hasChosenDeck: false,
+        selectedDecks: [],
+        player1DeckId: null,
+        isConnected: socket.connected,
+      });
     });
 
     socket.on('initialDeckList', (availableDecks: string[]) => {
+      if (!isMounted) return;
+      console.log('[DEBUG] initialDeckList reçu:', availableDecks);
       const deckImages: { [key: string]: string } = {
         assassin: '/cards/randomizers/Assassin.jpg',
         celestial: '/cards/randomizers/Celestial.jpg',
@@ -234,89 +139,179 @@ export default function Game() {
         name: id.charAt(0).toUpperCase() + id.slice(1),
         image: deckImages[id],
       }));
-      set({ randomizers: randomDeckList });
+      set({ randomizers: randomDeckList, deckSelectionDone: false, isConnected: socket.connected });
     });
 
-    socket.on('updatePhase', (phaseData: { phase: string; turn: number }) => {
-      if (!phaseData || !phaseData.phase || phaseData.turn === undefined) {
-        return;
+    socket.on('deckSelectionUpdate', (deckChoices: { 1: string | null; 2: string[] }) => {
+      if (!isMounted) return;
+      console.log('[DEBUG] deckSelectionUpdate reçu:', deckChoices);
+      const allSelected = [deckChoices[1], ...(deckChoices[2] || [])].filter(Boolean) as string[];
+      set({ selectedDecks: allSelected, player1DeckId: deckChoices[1], isConnected: socket.connected });
+    });
+
+    socket.on('deckSelectionDone', (data: { player1DeckId: string; player2DeckIds: string[]; selectedDecks: string[] }) => {
+      if (!isMounted) return;
+      console.log('[DEBUG] deckSelectionDone reçu:', data);
+      set({ deckSelectionData: data, deckSelectionDone: true, isConnected: socket.connected });
+    });
+
+    socket.on('playerReady', ({ playerId }: { playerId: number }) => {
+      if (!isMounted) return;
+      console.log('[DEBUG] playerReady reçu:', playerId);
+      if (state.playerId && playerId !== state.playerId) {
+        set({ opponentReady: true, isConnected: socket.connected });
       }
-      set({ currentPhase: phaseData.phase, turn: phaseData.turn });
     });
 
-    socket.on('drawCard', () => {
-      drawCard();
+    socket.on('bothPlayersReady', () => {
+      if (!isMounted) return;
+      console.log('[DEBUG] bothPlayersReady reçu');
+      set({ bothReady: true, isConnected: socket.connected });
+    });
+
+    socket.on('updateGameState', (gameState: any) => {
+      if (!isMounted) return;
+      console.log('[DEBUG] updateGameState reçu:', {
+        player1: {
+          field: gameState.player1.field?.filter(Boolean).length,
+          hand: gameState.player1.hand?.length,
+          deck: gameState.player1.deck?.length,
+          graveyard: gameState.player1.graveyard?.length,
+        },
+        player2: {
+          field: gameState.player2.field?.filter(Boolean).length,
+          hand: gameState.player2.hand?.length,
+          deck: gameState.player2.deck?.length,
+          graveyard: gameState.player2.graveyard?.length,
+        },
+        turn: gameState.turn,
+        phase: gameState.phase,
+        activePlayer: gameState.activePlayer,
+      });
+      const playerKey = state.playerId === 1 ? 'player1' : 'player2';
+      const opponentKey = state.playerId === 1 ? 'player2' : 'player1';
+      set({
+        field: gameState[playerKey].field || state.field,
+        hand: gameState[playerKey].hand || state.hand,
+        deck: gameState[playerKey].deck || state.deck,
+        graveyard: gameState[playerKey].graveyard || state.graveyard,
+        opponentField: gameState[opponentKey].field || state.opponentField,
+        opponentHand: Array(gameState[opponentKey].hand?.length || 0).fill({}),
+        opponentDeck: Array(gameState[opponentKey].deck?.length || 0).fill({}),
+        opponentGraveyard: gameState[opponentKey].graveyard || state.opponentGraveyard,
+        turn: gameState.turn || state.turn,
+        currentPhase: gameState.phase || state.currentPhase,
+        isMyTurn: gameState.activePlayer === socket.id,
+        isConnected: socket.connected,
+      });
+    });
+
+    socket.on('startGame', ({ gameId: receivedGameId }: { gameId: string }) => {
+      if (!isMounted) return;
+      console.log('[DEBUG] startGame reçu:', receivedGameId);
+    });
+
+    socket.on('opponentJoined', ({ gameId: receivedGameId }: { gameId: string }) => {
+      if (!isMounted) return;
+      console.log('[DEBUG] opponentJoined reçu:', receivedGameId);
+    });
+
+    socket.on('disconnect', () => {
+      if (!isMounted) return;
+      console.log('[DEBUG] Socket déconnecté');
+      set({ isConnected: false });
+    });
+
+    socket.on('connect_error', (error) => {
+      if (!isMounted) return;
+      console.log('[DEBUG] Erreur de connexion Socket:', error.message);
+      set({ isConnected: false });
+    });
+
+    socket.on('error', (message: string) => {
+      if (!isMounted) return;
+      console.log('[DEBUG] Erreur Socket:', message);
+      alert(message);
     });
 
     return () => {
-      socket.off('connect', tryJoin);
+      console.log('[DEBUG] Nettoyage des écouteurs Socket dans Game.tsx');
+      isMounted = false;
+      socket.offAny();
       socket.off('connect');
-      socket.off('disconnect');
-      socket.off('connect_error');
       socket.off('gameStart');
+      socket.off('initialDeckList');
       socket.off('deckSelectionUpdate');
       socket.off('deckSelectionDone');
       socket.off('playerReady');
       socket.off('bothPlayersReady');
-      socket.off('chatMessage');
-      socket.off('opponentDisconnected');
-      socket.off('updateGameState');
-      socket.off('yourTurn');
-      socket.off('endTurn');
-      socket.off('initialDeckList');
-      socket.off('updatePhase');
-      socket.off('drawCard');
+      socket.off('startGame');
+      socket.off('opponentJoined');
+      socket.off('disconnect');
+      socket.off('connect_error');
+      socket.off('error');
     };
-  }, [gameId, navigate, state.playerId, state.chatMessages]);
+  }, [gameId, navigate, socket]);
 
   useEffect(() => {
     if (!gameId) navigate('/');
   }, [gameId, navigate]);
 
   useEffect(() => {
+    console.log('[DEBUG] useEffect pour mulligan exécuté:', {
+      deckSelectionData: !!state.deckSelectionData,
+      bothReady: state.bothReady,
+      deckSelectionDone: state.deckSelectionDone,
+      playerId: state.playerId,
+      isConnected: state.isConnected,
+      initialDraw: state.initialDraw.length,
+      mulliganDone: state.mulliganDone,
+    });
     if (
       state.deckSelectionData &&
       state.bothReady &&
-      !state.deckSelectionDone &&
-      state.playerId !== null
+      state.playerId !== null &&
+      state.isConnected &&
+      state.initialDraw.length === 0 &&
+      !state.mulliganDone
     ) {
-      const { player1DeckId, player2DeckIds, selectedDecks } =
-        state.deckSelectionData;
+      console.log('[DEBUG] Conditions remplies pour initialisation mulligan:', state.deckSelectionData);
+      const { player1DeckId, player2DeckIds, selectedDecks } = state.deckSelectionData;
       const remainingDeckId = selectedDecks.find(
         (id: string) => id !== player1DeckId && !player2DeckIds.includes(id),
       );
+      console.log('[DEBUG] Decks pour mulligan:', { player1DeckId, player2DeckIds, remainingDeckId, selectedDecks });
 
       Promise.all([
         fetch('/deckLists.json').then((res) => res.json()),
         fetch('/cards.json').then((res) => res.json()),
       ])
         .then(([deckLists, allCards]) => {
+          console.log('[DEBUG] Données chargées:', { deckLists: Object.keys(deckLists), allCards: allCards.length });
           const getDeckCards = (deckId: string) => {
             const cardIds = deckLists[deckId] || [];
+            console.log('[DEBUG] Récupération cartes pour deckId:', deckId, { cardIds });
             return allCards.filter((card: Card) => cardIds.includes(card.id));
           };
 
           let currentPlayerCards: Card[];
           if (state.playerId === 1) {
             const player1Cards = getDeckCards(player1DeckId);
-            const remainingCards = remainingDeckId
-              ? getDeckCards(remainingDeckId)
-              : [];
+            const remainingCards = remainingDeckId ? getDeckCards(remainingDeckId) : [];
             currentPlayerCards = [...player1Cards, ...remainingCards]
               .sort(() => Math.random() - 0.5)
               .slice(0, 30);
+            console.log('[DEBUG] Cartes joueur 1:', { player1Cards: player1Cards.length, remainingCards: remainingCards.length, total: currentPlayerCards.length });
           } else {
             currentPlayerCards = player2DeckIds
               .flatMap((deckId: string) => getDeckCards(deckId))
               .sort(() => Math.random() - 0.5)
               .slice(0, 30);
+            console.log('[DEBUG] Cartes joueur 2:', { player2DeckIds, total: currentPlayerCards.length });
           }
 
           if (currentPlayerCards.length === 0) {
-            console.error(
-              '[ERROR] Aucune carte trouvée pour le deck du joueur',
-              state.playerId,
-            );
+            console.error('[ERROR] Aucune carte trouvée pour le deck du joueur:', state.playerId);
             return;
           }
 
@@ -325,40 +320,56 @@ export default function Game() {
           const rest = shuffledDeck.filter(
             (c: Card) => !drawn.some((d: Card) => d.id === c.id),
           );
+          console.log('[DEBUG] Main initiale:', { drawn: drawn.length, rest: rest.length });
 
           set({
             deck: rest,
             initialDraw: drawn,
-            deckSelectionDone: true,
+            mulliganDone: false, // Ne pas définir mulliganDone ici pour permettre l'affichage
           });
 
           if (gameId && state.isConnected) {
+            console.log('[DEBUG] Émission de updateGameState pour mulligan:', { gameId, hand: drawn.length, deck: rest.length });
             socket.emit('updateGameState', {
               gameId,
               state: { hand: drawn, deck: rest },
             });
           }
         })
-        .catch((err: Error) => console.error('[ERREUR INIT DRAW]', err));
+        .catch((err: Error) => console.error('[ERREUR INIT DRAW]', err.message));
+    } else {
+      console.log('[DEBUG] Conditions non remplies pour mulligan');
     }
   }, [
     state.deckSelectionData,
     state.bothReady,
-    state.deckSelectionDone,
     state.playerId,
+    state.isConnected,
+    state.initialDraw,
+    state.mulliganDone,
+    gameId,
   ]);
 
   const handleDeckChoice = (deckId: string) => {
-    if (!state.playerId || !state.isConnected || !gameId) return;
-    if (state.playerId === 1 && state.hasChosenDeck) return;
+    console.log('[DEBUG] handleDeckChoice appelé:', { deckId, playerId: state.playerId, isConnected: state.isConnected, gameId });
+    if (!state.playerId || !state.isConnected || !gameId) {
+      console.log('[DEBUG] handleDeckChoice bloqué:', { playerId: state.playerId, isConnected: state.isConnected, gameId });
+      return;
+    }
+    if (state.playerId === 1 && state.hasChosenDeck) {
+      console.log('[DEBUG] Joueur 1 a déjà choisi un deck');
+      return;
+    }
     if (
       state.playerId === 2 &&
       (!state.player1DeckId ||
-        state.selectedDecks.filter((d: string) => d !== state.player1DeckId)
-          .length >= 2)
-    )
+        state.selectedDecks.filter((d: string) => d !== state.player1DeckId).length >= 2)
+    ) {
+      console.log('[DEBUG] Joueur 2 ne peut pas choisir plus de decks:', { player1DeckId: state.player1DeckId, selectedDecks: state.selectedDecks });
       return;
+    }
 
+    console.log('[DEBUG] Émission de chooseDeck:', { gameId, playerId: state.playerId, deckId });
     socket.emit('chooseDeck', {
       gameId,
       playerId: state.playerId,
@@ -404,26 +415,49 @@ export default function Game() {
   };
 
   const playCardToField = (card: Card) => {
+    console.log('[DEBUG] playCardToField appelé:', {
+      card: card.id,
+      isMyTurn: state.isMyTurn,
+      mustDiscard: state.mustDiscard,
+      isConnected: state.isConnected,
+      currentPhase: state.currentPhase,
+      field: state.field.filter(Boolean).length,
+      hand: state.hand.length,
+    });
     if (
       !state.isMyTurn ||
       state.mustDiscard ||
       !state.isConnected ||
       state.currentPhase !== 'Main'
     ) {
+      console.log('[DEBUG] playCardToField bloqué:', {
+        isMyTurn: state.isMyTurn,
+        mustDiscard: state.mustDiscard,
+        isConnected: state.isConnected,
+        currentPhase: state.currentPhase,
+      });
       return;
     }
 
     const newField = [...state.field];
     const emptyIndex = newField.findIndex((slot: Card | null) => slot === null);
-    if (emptyIndex === -1) return;
+    if (emptyIndex === -1) {
+      console.log('[DEBUG] playCardToField bloqué: aucun emplacement vide');
+      return;
+    }
 
-    newField[emptyIndex] = card;
+    newField[emptyIndex] = { ...card, exhausted: false };
     const newHand = state.hand.filter((c: Card) => c.id !== card.id);
-    setState((prev) => {
-      return { ...prev, field: newField, hand: newHand };
-    });
+    set({ field: newField, hand: newHand, hasPlayedCard: true });
 
     if (gameId) {
+      console.log('[DEBUG] Émission de playCard:', {
+        gameId,
+        card: card.id,
+        fieldIndex: emptyIndex,
+        newHandLength: newHand.length,
+        newFieldLength: newField.filter(Boolean).length,
+      });
       socket.emit('playCard', {
         gameId,
         card,
@@ -533,6 +567,7 @@ export default function Game() {
   };
 
   const doMulligan = () => {
+    console.log('[DEBUG] doMulligan appelé:', { selectedForMulligan: state.selectedForMulligan.length });
     const toMulligan = state.initialDraw.filter((card: Card) =>
       state.selectedForMulligan.includes(card.id),
     );
@@ -556,6 +591,7 @@ export default function Game() {
     });
 
     if (gameId && state.isConnected) {
+      console.log('[DEBUG] Émission de updateGameState pour doMulligan:', { gameId, hand: finalHand.length, deck: newDeck.length });
       socket.emit('updateGameState', {
         gameId,
         state: { hand: finalHand, deck: newDeck },
@@ -564,6 +600,7 @@ export default function Game() {
   };
 
   const keepInitialHand = () => {
+    console.log('[DEBUG] keepInitialHand appelé:', { initialDraw: state.initialDraw.length });
     set({
       hand: state.initialDraw,
       initialDraw: [],
@@ -572,26 +609,39 @@ export default function Game() {
     });
 
     if (gameId && state.isConnected) {
+      console.log('[DEBUG] Émission de updateGameState pour keepInitialHand:', { gameId, hand: state.initialDraw.length });
       socket.emit('updateGameState', {
         gameId,
-        state: { hand: state.initialDraw },
+        state: { hand: state.initialDraw, deck: state.deck },
       });
     }
   };
 
   const handleReadyClick = () => {
-    if (!gameId || !state.playerId || state.isReady) return;
+    console.log('[DEBUG] handleReadyClick appelé:', { gameId, playerId: state.playerId, isConnected: state.isConnected, isReady: state.isReady });
+    if (!gameId || !state.playerId || !state.isConnected || state.isReady) {
+      console.log('[DEBUG] handleReadyClick bloqué:', { gameId, playerId: state.playerId, isConnected: state.isConnected, isReady: state.isReady });
+      return;
+    }
+    console.log('[DEBUG] Émission de playerReady:', { gameId, playerId: state.playerId });
     socket.emit('playerReady', { gameId, playerId: state.playerId });
     set({ isReady: true });
   };
 
   const renderInitialDraw = () => {
+    console.log('[DEBUG] renderInitialDraw appelé:', {
+      initialDraw: state.initialDraw.length,
+      mulliganDone: state.mulliganDone,
+      bothReady: state.bothReady,
+    });
     if (
       state.initialDraw.length === 0 ||
       state.mulliganDone ||
       !state.bothReady
-    )
+    ) {
+      console.log('[DEBUG] renderInitialDraw bloqué');
       return null;
+    }
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-50">
         <h2 className="text-white text-10xl font-bold mb-6">Main de départ</h2>
@@ -660,23 +710,20 @@ export default function Game() {
     isOpponentGraveyardOpen,
     mustDiscard,
     isMyTurn,
-    randomizers,
     isRightPanelOpen,
     currentPhase,
   } = state;
 
-
-
   return (
     <div className="w-full min-h-screen flex flex-row relative overflow-hidden">
       {renderInitialDraw()}
-      {!state.deckSelectionDone && (
+      {!state.deckSelectionDone && state.randomizers.length > 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-black/90 z-50">
           <h2 className="text-white text-10xl font-bold mb-4">
             Choix des decks
           </h2>
           <div className="flex gap-6">
-            {randomizers.map((deckObj) => {
+            {state.randomizers.map((deckObj) => {
               const isSelected = state.selectedDecks.includes(deckObj.id);
               const borderColor = isSelected
                 ? state.player1DeckId === deckObj.id
@@ -703,7 +750,7 @@ export default function Game() {
                     deckObj.id,
                     state.player1DeckId,
                     state.selectedDecks,
-                    randomizers,
+                    state.randomizers,
                   )}
                 </div>
               );
@@ -715,9 +762,9 @@ export default function Game() {
                 onClick={handleReadyClick}
                 className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-3 rounded-full shadow-lg hover:scale-105 hover:shadow-xl transition transform duration-200"
               >
-                <span className="text-md font-semibold">
-                  {state.isReady ? 'En attente de l’autre joueur…' : 'Ready'}
-                </span>
+          <span className="text-md font-semibold">
+            {state.isReady ? 'En attente de l’autre joueur…' : 'Ready'}
+          </span>
               </button>
               {state.isReady && (
                 <p
@@ -743,15 +790,17 @@ export default function Game() {
           }}
         >
           <div className="z-30">
-            <PhaseIndicator
-              socket={socket}
-              isMyTurn={isMyTurn}
-              playerId={playerId}
-              gameId={gameId}
-              onPhaseChange={handlePhaseChange}
-              currentPhase={currentPhase}
-              turn={turn}
-            />
+            {state.playerId !== null && (
+              <PhaseIndicator
+                socket={socket}
+                isMyTurn={isMyTurn}
+                playerId={playerId}
+                gameId={gameId}
+                onPhaseChange={handlePhaseChange}
+                currentPhase={currentPhase}
+                turn={turn}
+              />
+            )}
             <PlayerField
               key={state.field.map((c) => c?.exhausted).join('-')}
               field={field}
