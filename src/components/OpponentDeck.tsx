@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { memo } from 'react';
 
-export default function OpponentDeck({ count }: { count: number }) {
+interface OpponentDeckProps {
+  count: number;
+}
+
+function OpponentDeck({ count }: OpponentDeckProps) {
   return (
     <div
       className="flex items-center justify-center relative border-2 border-gray-500 bg-gray-800 rounded"
@@ -15,3 +19,5 @@ export default function OpponentDeck({ count }: { count: number }) {
     </div>
   );
 }
+
+export default memo(OpponentDeck);

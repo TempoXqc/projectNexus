@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { BadgeCheck } from 'lucide-react';
-import getDeckBadge from '../components/GetDeckBadge';
+import GetDeckBadge from './DeckBadge';
 
 interface DeckSelectionProps {
   randomizers: { id: string; name: string; image: string }[];
@@ -13,21 +13,19 @@ interface DeckSelectionProps {
   onReadyClick: () => void;
 }
 
-export default function DeckSelection({
-                                        randomizers,
-                                        selectedDecks,
-                                        player1DeckId,
-                                        hasChosenDeck,
-                                        isReady,
-                                        opponentReady,
-                                        onDeckChoice,
-                                        onReadyClick,
-                                      }: DeckSelectionProps) {
+function DeckSelection({
+                         randomizers,
+                         selectedDecks,
+                         player1DeckId,
+                         hasChosenDeck,
+                         isReady,
+                         opponentReady,
+                         onDeckChoice,
+                         onReadyClick,
+                       }: DeckSelectionProps) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-black/90 z-50">
-      <h2 className="text-white text-10xl font-bold mb-4">
-        Choix des decks
-      </h2>
+      <h2 className="text-white text-10xl font-bold mb-4">Choix des decks</h2>
       <div className="flex gap-6">
         {randomizers.map((deckObj) => {
           const isSelected = selectedDecks.includes(deckObj.id);
@@ -44,7 +42,9 @@ export default function DeckSelection({
               className="w-[398px] h-[550px] relative cursor-pointer transition-transform hover:scale-105 rounded shadow-lg"
             >
               <div
-                className={`w-full h-full border-4 ${borderColor} rounded ${borderColor !== 'border-transparent' ? 'shadow-lg shadow-black/50' : ''}`}
+                className={`w-full h-full border-4 ${borderColor} rounded ${
+                  borderColor !== 'border-transparent' ? 'shadow-lg shadow-black/50' : ''
+                }`}
               >
                 <img
                   src={deckObj.image}
@@ -52,12 +52,12 @@ export default function DeckSelection({
                   className="w-full h-full object-cover rounded"
                 />
               </div>
-              {getDeckBadge(
-                deckObj.id,
-                player1DeckId,
-                selectedDecks,
-                randomizers,
-              )}
+              <GetDeckBadge
+                deckId={deckObj.id}
+                player1DeckId={player1DeckId}
+                selectedDecks={selectedDecks}
+                allRandomizers={randomizers}
+              />
             </div>
           );
         })}
@@ -77,9 +77,7 @@ export default function DeckSelection({
             <p
               className={`text-sm font-medium ${opponentReady ? 'text-green-400' : 'text-yellow-300'}`}
             >
-              {opponentReady
-                ? 'L’autre joueur est prêt !'
-                : 'L’autre joueur n’est pas encore prêt.'}
+              {opponentReady ? 'L’autre joueur est prêt !' : 'L’autre joueur n’est pas encore prêt.'}
             </p>
           )}
         </div>
@@ -87,3 +85,5 @@ export default function DeckSelection({
     </div>
   );
 }
+
+export default memo(DeckSelection);

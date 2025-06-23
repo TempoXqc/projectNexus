@@ -1,5 +1,5 @@
-import React from 'react';
-import { motion, easeInOut } from 'framer-motion';
+import React, { memo, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
 import { RotateCcw, Sword, Trash2 } from 'lucide-react';
 
@@ -12,18 +12,21 @@ interface PlayerFieldProps {
   attackCard: (index: number) => void;
 }
 
-export default function PlayerField({
-                                      field,
-                                      hoveredCardId,
-                                      setHoveredCardId,
-                                      removeCardFromField,
-                                      exhaustCard,
-                                      attackCard,
-                                    }: PlayerFieldProps) {
-  const visibleCards = field
-    .map((card, index) => ({ card, index }))
-    .filter(({ card }) => card !== null) as { card: Card; index: number }[];
-
+function PlayerField({
+                       field,
+                       hoveredCardId,
+                       setHoveredCardId,
+                       removeCardFromField,
+                       exhaustCard,
+                       attackCard,
+                     }: PlayerFieldProps) {
+  const visibleCards = useMemo(
+    () =>
+      field
+        .map((card, index) => ({ card, index }))
+        .filter(({ card }) => card !== null) as { card: Card; index: number }[],
+    [field],
+  );
 
   return (
     <div
@@ -45,12 +48,12 @@ export default function PlayerField({
             opacity: 1,
             scale: 1,
             y: 0,
-            rotate: card.exhausted ? 90 : 0
+            rotate: card.exhausted ? 90 : 0,
           }}
-          transition={{ duration: 0.3, ease: easeInOut }}
+          transition={{ duration: 0.3 }}
           className="absolute w-[140px] h-[190px] bg-white shadow rounded"
           style={{
-            left: `calc(50% + ${visibleIndex * 160 - ((visibleCards.length - 1) * 160) / 2}px`,
+            left: `calc(50% + ${visibleIndex * 160 - ((visibleCards.length - 1) * 160) / 2}px)`,
             transformOrigin: 'center center',
             cursor: 'pointer',
           }}
@@ -118,3 +121,5 @@ export default function PlayerField({
     </div>
   );
 }
+
+export default memo(PlayerField);

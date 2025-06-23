@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { RefreshCcw, CreditCard as CardIcon } from 'lucide-react';
 
 interface PlayerDeckProps {
@@ -8,7 +8,7 @@ interface PlayerDeckProps {
   handCount: number;
 }
 
-export default function PlayerDeck({ count, drawCard, shuffleDeck }: PlayerDeckProps) {
+function PlayerDeck({ count, drawCard, shuffleDeck, handCount }: PlayerDeckProps) {
   return (
     <div
       className="flex flex-col items-center justify-center relative"
@@ -22,6 +22,7 @@ export default function PlayerDeck({ count, drawCard, shuffleDeck }: PlayerDeckP
           onClick={drawCard}
           className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600"
           title="Piocher une carte"
+          disabled={handCount >= 10}
         >
           <CardIcon size={16} />
         </button>
@@ -44,3 +45,5 @@ export default function PlayerDeck({ count, drawCard, shuffleDeck }: PlayerDeckP
     </div>
   );
 }
+
+export default memo(PlayerDeck);
