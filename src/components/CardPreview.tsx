@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
@@ -20,10 +19,11 @@ export default function CardPreview({ hoveredCardId, field, hand, opponentField 
 
   return (
     <motion.div
-      className="fixed top-58 left-5 z-50"
+      className="fixed top-1/2 left-5 z-50"
       style={{
         width: '18%',
-        height: '22%',
+        height: '40%', // Ajusté pour être proportionnel
+        transform: 'translateY(-50%)',
       }}
       initial={{ x: '-100%', opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}

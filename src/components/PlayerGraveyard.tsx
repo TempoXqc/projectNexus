@@ -1,4 +1,5 @@
-﻿import React from 'react';
+﻿// PlayerGraveyard.tsx
+import React from 'react';
 import Modal from './Modal';
 import { Card } from '../types/Card';
 
@@ -25,7 +26,7 @@ export default function PlayerGraveyard({
     <>
       <div
         className="flex flex-col items-center justify-center relative cursor-pointer border-4 border-gray-600 rounded-lg p-1 bg-black/40"
-        style={{ width: '150px', height: '210px' }}
+        style={{ width: '120px', height: '160px' }}
         onClick={onClick}
       >
         {count > 0 ? (
@@ -35,7 +36,7 @@ export default function PlayerGraveyard({
               alt="PlayerGraveyard"
               className="w-full h-full object-cover rounded shadow grayscale"
             />
-            <span className="absolute inset-0 flex items-center justify-center text-white font-bold text-[2rem]">
+            <span className="absolute inset-0 flex items-center justify-center text-white font-bold text-xl">
               {count}
             </span>
           </>
