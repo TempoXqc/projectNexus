@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
 
@@ -9,11 +9,15 @@ interface CardPreviewProps {
   opponentField?: (Card | null)[];
 }
 
-export default function CardPreview({ hoveredCardId, field, hand, opponentField }: CardPreviewProps) {
-  let card: Card | null | undefined = field.find((c) => c?.id === hoveredCardId) || hand.find((c) => c.id === hoveredCardId);
-  if (!card && opponentField) {
-    card = opponentField.find((c) => c?.id === hoveredCardId);
-  }
+function CardPreview({ hoveredCardId, field, hand, opponentField }: CardPreviewProps) {
+  const card = useMemo(() => {
+    let foundCard: Card | null | undefined =
+      field.find((c) => c?.id === hoveredCardId) || hand.find((c) => c.id === hoveredCardId);
+    if (!foundCard && opponentField) {
+      foundCard = opponentField.find((c) => c?.id === hoveredCardId);
+    }
+    return foundCard;
+  }, [hoveredCardId, field, hand, opponentField]);
 
   if (!card) return null;
 
@@ -22,7 +26,7 @@ export default function CardPreview({ hoveredCardId, field, hand, opponentField 
       className="fixed top-1/2 left-5 z-50"
       style={{
         width: '18%',
-        height: '40%', // Ajusté pour être proportionnel
+        height: '40%',
         transform: 'translateY(-50%)',
       }}
       initial={{ x: '-100%', opacity: 0 }}
@@ -40,3 +44,5 @@ export default function CardPreview({ hoveredCardId, field, hand, opponentField 
     </motion.div>
   );
 }
+
+export default memo(CardPreview);

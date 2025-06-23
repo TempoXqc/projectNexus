@@ -1,8 +1,12 @@
-﻿import React from 'react';
+﻿import React, { memo } from 'react';
 import { motion } from 'framer-motion';
-import { Card } from '@/types';
+import { Card } from '../types/Card';
 
-export default function OpponentHand({ opponentHand }: { opponentHand: Card[] }) {
+interface OpponentHandProps {
+  opponentHand: Card[];
+}
+
+function OpponentHand({ opponentHand }: OpponentHandProps) {
   return (
     <div
       className="flex justify-center gap-4"
@@ -21,7 +25,7 @@ export default function OpponentHand({ opponentHand }: { opponentHand: Card[] })
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3, delay: index * 0.05 }}
           className="w-[140px] h-[190px] rounded shadow bg-white"
-          style={{ width: '175px', height: '240px', position: 'relative', margin: '-2%', }}
+          style={{ width: '175px', height: '240px', position: 'relative', margin: '-2%' }}
         >
           <img
             src="/addons/backcard.png"
@@ -33,3 +37,5 @@ export default function OpponentHand({ opponentHand }: { opponentHand: Card[] })
     </div>
   );
 }
+
+export default memo(OpponentHand);

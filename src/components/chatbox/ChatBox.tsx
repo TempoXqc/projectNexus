@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { memo, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, ExternalLink, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -14,23 +14,38 @@ interface ChatBoxProps {
   isMyTurn: boolean;
 }
 
-export default function ChatBox({
-                                  chatMessages,
-                                  chatInput,
-                                  setChatInput,
-                                  sendChatMessage,
-                                  playerId,
-                                  isConnected,
-                                  gameId,
-                                  turn,
-
-                                }: ChatBoxProps) {
+function ChatBox({
+                   chatMessages,
+                   chatInput,
+                   setChatInput,
+                   sendChatMessage,
+                   playerId,
+                   isConnected,
+                   gameId,
+                   turn,
+                 }: ChatBoxProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleIconClick = (e: React.MouseEvent) => {
+  const handleIconClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsOpen(!isOpen);
-  };
+    setIsOpen((prev) => !prev);
+  }, []);
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setChatInput(e.target.value);
+    },
+    [setChatInput],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        sendChatMessage();
+      }
+    },
+    [sendChatMessage],
+  );
 
   return (
     <div className="chatbox-container" style={{ height: '100vh' }}>
@@ -50,9 +65,8 @@ export default function ChatBox({
         }}
       >
         <p className="text-white font-bold">ID de la partie : {gameId}</p>
-        <p className="text-white">Vous etes le Joueur {playerId || '...'}</p>
+        <p className="text-white">Vous êtes le Joueur {playerId || '...'}</p>
         <p className="text-white font-bold">Tour {turn}</p>
-        {/* Chat messages */}
         <div className="w-full flex-1 overflow-y-auto bg-gray-900 p-2 rounded">
           {chatMessages.map((msg, index) => (
             <p
@@ -65,17 +79,15 @@ export default function ChatBox({
             </p>
           ))}
         </div>
-        {/* Chat input */}
         <input
           type="text"
           value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
           className="w-full p-2 rounded bg-gray-800 text-white focus:outline-none"
           placeholder={isConnected ? 'Tapez un message...' : 'Déconnecté'}
           disabled={!isConnected}
         />
-        {/* Links */}
         <div className="flex flex-row items-center justify-center gap-2 mt-4">
           <a
             href="https://www.notion.so/nexus-card-game/1cd54baaf409803b8ecfe4c1fdd948ae?v=1ce54baaf4098020a27d000c66b5dc94"
@@ -119,3 +131,5 @@ export default function ChatBox({
     </div>
   );
 }
+
+export default memo(ChatBox);

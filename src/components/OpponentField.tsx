@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
 
@@ -8,11 +8,15 @@ interface OpponentFieldProps {
   setHoveredCardId: (id: string | null) => void;
 }
 
-export default function OpponentField({
-                                        opponentField,
-                                        setHoveredCardId,
-                                      }: OpponentFieldProps) {
-  const visibleCards = opponentField.filter((card): card is Card => card !== null) as Card[];
+function OpponentField({
+                         opponentField,
+                         setHoveredCardId,
+                       }: OpponentFieldProps) {
+  const visibleCards = useMemo(
+    () => opponentField.filter((card): card is Card => card !== null),
+    [opponentField],
+  );
+
   return (
     <div
       className="relative z-40"
@@ -35,7 +39,7 @@ export default function OpponentField({
           onMouseEnter={() => setHoveredCardId(card.id)}
           onMouseLeave={() => setHoveredCardId(null)}
           style={{
-            left: `calc(50% + ${visibleIndex * 160 - ((visibleCards.length - 1) * 160) / 2}px`,
+            left: `calc(50% + ${visibleIndex * 160 - ((visibleCards.length - 1) * 160) / 2}px)`,
             transformOrigin: 'center center',
             cursor: 'pointer',
           }}
@@ -50,3 +54,5 @@ export default function OpponentField({
     </div>
   );
 }
+
+export default memo(OpponentField);

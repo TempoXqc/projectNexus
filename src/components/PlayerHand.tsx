@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { memo } from 'react';
 import { Card } from '../types/Card';
 import { Play, Trash2, Plus } from 'lucide-react';
 
@@ -16,16 +15,16 @@ interface PlayerHandProps {
   playerId: number | null;
 }
 
-export default function PlayerHand({
-                                     hand,
-                                     hoveredCardId,
-                                     setHoveredCardId,
-                                     isHandHovered,
-                                     setIsHandHovered,
-                                     discardCardFromHand,
-                                     playCardToField,
-                                     addToDeck,
-                                   }: PlayerHandProps) {
+function PlayerHand({
+                      hand,
+                      hoveredCardId,
+                      setHoveredCardId,
+                      isHandHovered,
+                      setIsHandHovered,
+                      discardCardFromHand,
+                      playCardToField,
+                      addToDeck,
+                    }: PlayerHandProps) {
   return (
     <div
       className="flex justify-center items-center gap-4 flex-1 z-2"
@@ -107,3 +106,5 @@ export default function PlayerHand({
     </div>
   );
 }
+
+export default memo(PlayerHand);

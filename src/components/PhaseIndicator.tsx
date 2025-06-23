@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { memo, useEffect, useState, useCallback } from 'react';
 import { Play, Sword, Hourglass, Check } from 'lucide-react';
 import { Socket } from 'socket.io-client';
+import { PhaseData } from '../types/PhaseData'; // Supposer que PhaseData est importé
 
 interface PhaseIndicatorProps {
   socket: Socket;
@@ -12,21 +13,15 @@ interface PhaseIndicatorProps {
   turn: number;
 }
 
-interface PhaseData {
-  phase: string;
-  turn: number;
-  nextPlayerId?: number;
-}
-
-export default function PhaseIndicator({
-                                         socket,
-                                         isMyTurn,
-                                         playerId,
-                                         gameId,
-                                         onPhaseChange,
-                                         currentPhase,
-                                         turn,
-                                       }: PhaseIndicatorProps) {
+function PhaseIndicator({
+                          socket,
+                          isMyTurn,
+                          playerId,
+                          gameId,
+                          onPhaseChange,
+                          currentPhase,
+                          turn,
+                        }: PhaseIndicatorProps) {
   const [showMessage, setShowMessage] = useState(false);
   const [message, setMessage] = useState('');
   const [isAnimationActive, setIsAnimationActive] = useState(false);
@@ -52,14 +47,15 @@ export default function PhaseIndicator({
         return;
       }
       console.log('[DEBUG] handlePhaseChangeMessage - Message reçu pour phase:', phaseData.phase, 'avec turn:', phaseData.turn, 'nextPlayerId:', phaseData.nextPlayerId);
-      const nextPlayerId = phaseData.nextPlayerId !== undefined ? phaseData.nextPlayerId : (playerId === 1 ? 2 : 1);
-      const displayMessage = phaseData.phase === 'Main'
-        ? 'MainPhase'
-        : phaseData.phase === 'Battle'
-          ? 'BattlePhase'
-          : phaseData.phase === 'End' || phaseData.phase === 'Standby'
-            ? `Nouveau tour ${phaseData.turn} - Joueur ${nextPlayerId}`
-            : `Phase: ${phaseData.phase}`;
+      const nextPlayerId = phaseData.nextPlayerId !== undefined ? phaseData.nextPlayerId : playerId === 1 ? 2 : 1;
+      const displayMessage =
+        phaseData.phase === 'Main'
+          ? 'MainPhase'
+          : phaseData.phase === 'Battle'
+            ? 'BattlePhase'
+            : phaseData.phase === 'End' || phaseData.phase === 'Standby'
+              ? `Nouveau tour ${phaseData.turn} - Joueur ${nextPlayerId}`
+              : `Phase: ${phaseData.phase}`;
       console.log('[DEBUG] handlePhaseChangeMessage - Message à afficher:', displayMessage);
       setMessage(displayMessage);
       setShowMessage(true);
@@ -82,13 +78,13 @@ export default function PhaseIndicator({
     };
   }, [socket, gameId, playerId, onPhaseChange]);
 
-  const nextPhase = () => {
+  const nextPhase = useCallback(() => {
     if (!isMyTurn || !gameId || !playerId || isAnimationActive) {
       console.log('[DEBUG] nextPhase - Bloqué, isMyTurn:', isMyTurn, 'gameId:', gameId, 'playerId:', playerId, 'isAnimationActive:', isAnimationActive);
       return;
     }
 
-    let newPhase = currentPhase;
+    let newPhase: 'Standby' | 'Main' | 'Battle' | 'End' = currentPhase;
     switch (currentPhase) {
       case 'Standby':
         newPhase = 'Main';
@@ -110,9 +106,9 @@ export default function PhaseIndicator({
       socket.emit('updatePhase', { gameId, phase: newPhase, turn });
       onPhaseChange(newPhase);
     }
-  };
+  }, [isMyTurn, gameId, playerId, isAnimationActive, currentPhase, socket, turn, onPhaseChange]);
 
-  const getNextPhase = () => {
+  const getNextPhase = useCallback(() => {
     switch (currentPhase) {
       case 'Standby':
         return 'Main';
@@ -125,9 +121,9 @@ export default function PhaseIndicator({
       default:
         return 'Main';
     }
-  };
+  }, [currentPhase]);
 
-  const getNextPhaseIcon = () => {
+  const getNextPhaseIcon = useCallback(() => {
     const nextPhase = getNextPhase();
     return (
       <div className="mr-2 text-white">
@@ -137,7 +133,7 @@ export default function PhaseIndicator({
         {nextPhase === 'End' && <Check className="w-6 h-6" />}
       </div>
     );
-  };
+  }, [getNextPhase]);
 
   return (
     <div className="absolute bottom-10 right-80 z-50">
@@ -152,7 +148,9 @@ export default function PhaseIndicator({
         <button
           onClick={nextPhase}
           className={`px-4 py-3 w-56 rounded-full flex items-center justify-center transition duration-200 ${
-            isMyTurn && !isAnimationActive ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer' : 'bg-gray-500 text-gray-300 cursor-not-allowed'
+            isMyTurn && !isAnimationActive
+              ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+              : 'bg-gray-500 text-gray-300 cursor-not-allowed'
           }`}
           disabled={!isMyTurn || isAnimationActive}
         >
@@ -163,3 +161,5 @@ export default function PhaseIndicator({
     </div>
   );
 }
+
+export default memo(PhaseIndicator);
