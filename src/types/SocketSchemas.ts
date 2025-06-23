@@ -47,27 +47,31 @@ export const GameStateUpdateSchema = z.object({
     .object({
       field: z.array(CardSchema.nullable()),
       hand: z.array(CardSchema),
-      opponentHand: z.array(z.unknown()).optional(), // Ajouter opponentHand
+      opponentHand: z.array(z.unknown()).optional(),
       graveyard: z.array(CardSchema),
       mustDiscard: z.boolean(),
       hasPlayedCard: z.boolean(),
       deck: z.array(CardSchema),
+      lifePoints: z.number().optional(),
     })
     .optional(),
   player2: z
     .object({
       field: z.array(CardSchema.nullable()),
       hand: z.array(CardSchema).optional(),
-      opponentHand: z.array(z.unknown()).optional(), // Ajouter opponentHand
+      opponentHand: z.array(z.unknown()).optional(),
       graveyard: z.array(CardSchema),
       mustDiscard: z.boolean(),
       hasPlayedCard: z.boolean(),
       deck: z.array(CardSchema),
+      lifePoints: z.number().optional(),
     })
     .optional(),
   turn: z.number().optional(),
   phase: z.enum(['Standby', 'Main', 'Battle', 'End']).optional(),
   activePlayer: z.string().optional(),
+  gameOver: z.boolean().optional(),
+  winner: z.string().nullable().optional(),
 });
 
 // Schéma pour les payloads émis
@@ -96,6 +100,7 @@ export const EmitUpdateGameStateSchema = z.object({
     graveyard: z.array(CardSchema).optional(),
     hasPlayedCard: z.boolean().optional(),
     mustDiscard: z.boolean().optional(),
+    lifePoints: z.number().optional(),
   }),
 });
 
@@ -122,3 +127,8 @@ export const EmitUpdatePhaseSchema = z.object({
 });
 
 export const EmitJoinGameSchema = z.string();
+
+export const EmitUpdateLifePointsSchema = z.object({
+  gameId: z.string(),
+  lifePoints: z.number().min(0).max(30),
+});

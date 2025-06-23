@@ -68,6 +68,18 @@ function drawCardServer(game, playerKey) {
   }
 }
 
+function checkWinCondition(gameId, game) {
+  const player1Life = game.state.player1.lifePoints;
+  const player2Life = game.state.player2.lifePoints;
+  if (player1Life <= 0 || player2Life <= 0) {
+    const winner = player1Life <= 0 ? 'player2' : 'player1';
+    game.state.gameOver = true;
+    game.state.winner = winner;
+    io.to(gameId).emit('gameOver', { winner });
+    emitUpdateGameState(gameId, game.state);
+  }
+}
+
 io.on('connection', (socket) => {
   socket.onAny((event, ...args) => {
     if (event === 'yourTurn') {
@@ -92,6 +104,7 @@ io.on('connection', (socket) => {
             opponentGraveyard: [],
             mustDiscard: false,
             hasPlayedCard: false,
+            lifePoints: 30,
           },
           player2: {
             hand: [],
@@ -103,10 +116,13 @@ io.on('connection', (socket) => {
             opponentGraveyard: [],
             mustDiscard: false,
             hasPlayedCard: false,
+            lifePoints: 30,
           },
           turn: 1,
           activePlayer: socket.id,
           phase: 'Main',
+          gameOver: false,
+          winner: null,
         },
         deckChoices: { 1: null, 2: [] },
         availableDecks: getRandomDecks(),
@@ -185,6 +201,17 @@ io.on('connection', (socket) => {
     emitUpdateGameState(gameId, game.state);
   });
 
+  socket.on('updateLifePoints', ({ gameId, lifePoints }) => {
+    const game = games[gameId];
+    if (!game) return;
+    const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
+    const opponentKey = players[socket.id].playerId === 1 ? 'player2' : 'player1';
+    game.state[playerKey].lifePoints = lifePoints;
+    game.state[opponentKey].lifePoints = game.state[opponentKey].lifePoints || 30;
+    emitUpdateGameState(gameId, game.state);
+    checkWinCondition(gameId, game);
+  });
+
   socket.on('updateGameState', ({ gameId, state }) => {
     const game = games[gameId];
     if (!game) return;
@@ -201,6 +228,7 @@ io.on('connection', (socket) => {
       game.state[opponentKey].hand.length,
     ).fill({});
     emitUpdateGameState(gameId, game.state);
+    checkWinCondition(gameId, game);
   });
 
   socket.on('chooseDeck', ({ gameId, playerId, deckId }) => {
@@ -231,7 +259,6 @@ io.on('connection', (socket) => {
         player2DeckIds: game.deckChoices[2],
         selectedDecks: [...totalDecks, remaining],
       };
-
 
       const { deckLists, allCards } = loadCards();
       if (!deckLists || !allCards || allCards.length === 0) {
@@ -335,7 +362,6 @@ io.on('connection', (socket) => {
 
     emitUpdateGameState(gameId, game.state);
     io.to(gameId).emit('updatePhase', { phase, turn });
-    // Émettre phaseChangeMessage uniquement pour Main et Battle ici
     if (phase === 'Main' || phase === 'Battle') {
       io.to(gameId).emit('phaseChangeMessage', { phase, turn });
     }
@@ -347,7 +373,6 @@ io.on('connection', (socket) => {
       return;
     }
     if (game.state.activePlayer !== socket.id) {
-
       return;
     }
     const playerKey = playerId === 1 ? 'player1' : 'player2';
@@ -378,7 +403,7 @@ io.on('connection', (socket) => {
         });
         game.state.activePlayer = nextPlayerSocketId;
         game.state.turn += 1;
-        game.state.phase = 'Standby'; // Réinitialisation de la phase
+        game.state.phase = 'Standby';
         console.log('[DEBUG] endTurn - Après changement de phase et activePlayer:', {
           activePlayer: game.state.activePlayer,
           turn: game.state.turn,
@@ -417,7 +442,6 @@ io.on('connection', (socket) => {
       emitUpdateGameState(gameId, game.state);
       io.to(gameId).emit('endTurn');
       io.to(nextPlayerSocketId).emit('yourTurn');
-      // Émettre un seul message avec nextPlayerId pour Standby
       io.to(gameId).emit('phaseChangeMessage', { phase: 'Standby', turn: game.state.turn, nextPlayerId });
     }
   });

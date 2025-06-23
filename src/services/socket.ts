@@ -6,5 +6,3 @@ export const socket = io(socketUrl, {
   autoConnect: false,
   transports: ['websocket', 'polling'],
 });
-
-(window as any).socket = socket;
