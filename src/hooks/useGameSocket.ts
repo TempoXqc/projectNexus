@@ -23,9 +23,20 @@ import {
   PhaseDataSchema,
   WaitingForPlayer1ChoiceSchema,
   Player1ChoseDeckSchema,
+  EmitUpdateTokenCountSchema,
+  EmitAddAssassinTokenToOpponentDeckSchema,
+  EmitPlaceAssassinTokenAtOpponentDeckBottomSchema,
+  EmitUpdateLifePointsSchema
 } from '../types/SocketSchemas';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { z } from 'zod';
+
+const EmitHandleAssassinTokenDrawSchema = z.object({
+  gameId: z.string(),
+  playerLifePoints: z.number(),
+  opponentTokenCount: z.number(),
+});
 
 export const useGameSocket = (
   gameId: string | undefined,
@@ -192,6 +203,8 @@ export const useGameSocket = (
               hasPlayedCard: parsedGameState[playerKey]?.hasPlayedCard || false,
               deck: parsedGameState[playerKey]?.deck || [],
               lifePoints: parsedGameState[playerKey]?.lifePoints || 30,
+              tokenCount: parsedGameState[playerKey]?.tokenCount || 0,
+              tokenType: parsedGameState[playerKey]?.tokenType || null,
             },
             opponent: {
               graveyard: parsedGameState[opponentKey]?.graveyard || [],
@@ -203,6 +216,8 @@ export const useGameSocket = (
               mustDiscard: parsedGameState[opponentKey]?.mustDiscard || false,
               hasPlayedCard: parsedGameState[opponentKey]?.hasPlayedCard || false,
               lifePoints: parsedGameState[opponentKey]?.lifePoints || 30,
+              tokenCount: parsedGameState[opponentKey]?.tokenCount || 0,
+              tokenType: parsedGameState[opponentKey]?.tokenType || null,
             },
             game: {
               turn: parsedGameState.turn || 1,
@@ -212,12 +227,34 @@ export const useGameSocket = (
               winner: parsedGameState.winner || null,
             },
           };
+          console.log(`[DEBUG] updateGameState received for player ${playerId}:`, {
+            opponentDeckLength: newState.opponent?.deck?.length ?? 0,
+            opponentDeck: newState.opponent?.deck?.map(c => ({ id: c.id, name: c.name })) ?? [],
+          });
           setState(newState);
         } catch (error) {
           toast.error('Données de mise à jour du jeu invalides.', {
             toastId: 'updateGameState_error',
           });
           console.error('[ERROR] updateGameState validation failed:', error);
+        }
+      });
+
+      socket.on('handleAssassinTokenDraw', (data) => {
+        try {
+          const parsedData = EmitHandleAssassinTokenDrawSchema.parse(data);
+          const playerKey = playerId === 1 ? 'player1' : 'player2';
+          const opponentKey = playerId === 1 ? 'player2' : 'player1';
+          setState({
+            player: { lifePoints: parsedData.playerLifePoints },
+            opponent: { tokenCount: parsedData.opponentTokenCount },
+          });
+          if (playerKey === 'player1' ? parsedData.playerLifePoints <= 0 : parsedData.playerLifePoints <= 0) {
+            setState({ game: { gameOver: true, winner: opponentKey } });
+          }
+        } catch (error) {
+          toast.error('Données de pioche de token assassin invalides.', { toastId: 'assassin_token_draw_error' });
+          console.error('[ERROR] handleAssassinTokenDraw validation failed:', error);
         }
       });
 
@@ -338,6 +375,7 @@ export const useGameSocket = (
       socket.off('chatMessage');
       socket.off('opponentDisconnected');
       socket.off('updateGameState');
+      socket.off('handleAssassinTokenDraw');
       socket.off('gameOver');
       socket.off('yourTurn');
       socket.off('endTurn');
@@ -381,7 +419,19 @@ export const useGameSocket = (
           parsedData = EmitJoinGameSchema.parse(data);
           break;
         case 'updateLifePoints':
-          parsedData = data; // Add schema validation if needed
+          parsedData = EmitUpdateLifePointsSchema.parse(data);
+          break;
+        case 'updateTokenCount':
+          parsedData = EmitUpdateTokenCountSchema.parse(data);
+          break;
+        case 'addAssassinTokenToOpponentDeck':
+          parsedData = EmitAddAssassinTokenToOpponentDeckSchema.parse(data);
+          break;
+        case 'placeAssassinTokenAtOpponentDeckBottom':
+          parsedData = EmitPlaceAssassinTokenAtOpponentDeckBottomSchema.parse(data);
+          break;
+        case 'handleAssassinTokenDraw':
+          parsedData = EmitHandleAssassinTokenDrawSchema.parse(data);
           break;
         default:
           parsedData = data;

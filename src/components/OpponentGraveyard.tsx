@@ -64,7 +64,7 @@ function OpponentGraveyard({
                   className="w-full h-full object-cover rounded shadow"
                 />
                 {hoveredCardId === card.id && (
-                  <div className="absolute top-[-450px] left-1/2 transform -translate-x-1/2 z-50">
+                  <div className="absolute top-[-450px] left-1/2 transform -translate-x-1/2">
                     <div className="border-4 border-black rounded-lg shadow-2xl">
                       <img
                         src={card.image}

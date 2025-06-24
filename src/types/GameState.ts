@@ -8,6 +8,8 @@ export interface PlayerState {
   mustDiscard: boolean;
   hasPlayedCard: boolean;
   lifePoints: number;
+  tokenCount: number;
+  tokenType: 'assassin' | 'engine' | 'viking' | null;
 }
 
 export interface GameState {
@@ -23,11 +25,14 @@ export interface GameState {
   };
   ui: {
     hoveredCardId: string | null;
+    hoveredTokenId: string | null; // New: For token preview
     isCardHovered: boolean;
     isGraveyardOpen: boolean;
     isOpponentGraveyardOpen: boolean;
     isRightPanelOpen: boolean;
     isRightPanelHovered: boolean;
+    isTokenZoneOpen: boolean;
+    isOpponentTokenZoneOpen: boolean;
   };
   chat: {
     messages: { playerId: number; message: string }[];

@@ -1,6 +1,9 @@
 import { useState, useCallback } from 'react';
 import { Card } from '../types/Card';
 import { GameState, PartialGameState } from '../types/GameState';
+import { toast } from 'react-toastify';
+
+let tokenIdCounter = 0;
 
 const initialState: GameState = {
   player: {
@@ -11,6 +14,8 @@ const initialState: GameState = {
     mustDiscard: false,
     hasPlayedCard: false,
     lifePoints: 30,
+    tokenCount: 0,
+    tokenType: null,
   },
   opponent: {
     hand: [],
@@ -20,6 +25,8 @@ const initialState: GameState = {
     mustDiscard: false,
     hasPlayedCard: false,
     lifePoints: 30,
+    tokenCount: 0,
+    tokenType: null,
   },
   game: {
     turn: 1,
@@ -31,11 +38,14 @@ const initialState: GameState = {
   },
   ui: {
     hoveredCardId: null,
+    hoveredTokenId: null,
     isCardHovered: false,
     isGraveyardOpen: false,
     isOpponentGraveyardOpen: false,
     isRightPanelOpen: false,
     isRightPanelHovered: false,
+    isTokenZoneOpen: false,
+    isOpponentTokenZoneOpen: false,
   },
   chat: {
     messages: [],
@@ -68,6 +78,12 @@ const initialState: GameState = {
 const getRandomHand = <T,>(deck: T[], count: number): T[] =>
   [...deck].sort(() => 0.5 - Math.random()).slice(0, count);
 
+const generateTokenId = () => {
+  const timestamp = Date.now();
+  const uniqueId = `token_assassin_${timestamp}_${tokenIdCounter++}_${Math.random().toString(36).substr(2, 9)}`;
+  return uniqueId;
+};
+
 export const useGameState = () => {
   const [state, setState] = useState<GameState>(initialState);
 
@@ -89,6 +105,127 @@ export const useGameState = () => {
     set({ player: { lifePoints: newValue } });
     return { lifePoints: newValue };
   }, [set]);
+
+  const updateTokenCount = useCallback((newValue: number) => {
+    let max = 30;
+    if (state.player.tokenType === 'assassin') {
+      max = 8;
+    }
+    if (newValue < 0 || newValue > max) return null;
+    set({ player: { tokenCount: newValue } });
+    return { tokenCount: newValue };
+  }, [state.player.tokenType, set]);
+
+  const setHoveredTokenId = useCallback(
+    (id: string | null) => {
+      set({ ui: { hoveredTokenId: id } });
+    },
+    [set],
+  );
+
+  const addAssassinTokenToOpponentDeck = useCallback(() => {
+    if (state.player.tokenCount < 1) return null;
+    const tokenCard: Card = {
+      id: generateTokenId(),
+      name: 'Assassin Token',
+      image: '/cards/tokens/token_assassin.jpg',
+      exhausted: false,
+    };
+    const newOpponentDeck = [...state.opponent.deck, tokenCard].sort(() => Math.random() - 0.5);
+    const newTokenCount = state.player.tokenCount - 1;
+    set({
+      player: { tokenCount: newTokenCount },
+      opponent: { deck: newOpponentDeck },
+    });
+    console.log('[DEBUG] addAssassinTokenToOpponentDeck:', {
+      tokenCardId: tokenCard.id,
+      newOpponentDeckLength: newOpponentDeck.length,
+    });
+    return { tokenCount: newTokenCount, opponentDeck: newOpponentDeck };
+  }, [state.player.tokenCount, state.opponent.deck, set]);
+
+  const placeAssassinTokenAtOpponentDeckBottom = useCallback(() => {
+    if (state.player.tokenCount < 1) return null;
+    const tokenCard: Card = {
+      id: generateTokenId(),
+      name: 'Assassin Token',
+      image: '/cards/tokens/token_assassin.jpg',
+      exhausted: false,
+    };
+    const newOpponentDeck = [...state.opponent.deck, tokenCard];
+    const newTokenCount = state.player.tokenCount - 1;
+    set({
+      player: { tokenCount: newTokenCount },
+      opponent: { deck: newOpponentDeck },
+    });
+    console.log('[DEBUG] placeAssassinTokenAtOpponentDeckBottom:', {
+      tokenCardId: tokenCard.id,
+      newOpponentDeckLength: newOpponentDeck.length,
+    });
+    return { opponentDeck: newOpponentDeck, tokenCount: newTokenCount };
+  }, [state.opponent.deck, state.player.tokenCount, set]);
+
+  const handleAssassinTokenDraw = useCallback(() => {
+    if (state.opponent.tokenType !== 'assassin') return null;
+    const newLifePoints = Math.max(0, state.player.lifePoints - 2);
+    const newOpponentTokenCount = Math.min(state.opponent.tokenCount + 1, 8);
+    set({
+      player: { lifePoints: newLifePoints },
+      opponent: { tokenCount: newOpponentTokenCount },
+    });
+    toast.info('Vous avez pioché un token assassin ! -2 points de vie, le token retourne à l’adversaire.', {
+      toastId: 'assassin_token_draw',
+    });
+    console.log('[DEBUG] handleAssassinTokenDraw applied:', { newLifePoints, newOpponentTokenCount });
+    return { lifePoints: newLifePoints, opponentTokenCount: newOpponentTokenCount };
+  }, [state.opponent.tokenType, state.player.lifePoints, state.opponent.tokenCount, set]);
+
+  const drawCard = useCallback(() => {
+    if (
+      state.player.deck.length === 0 ||
+      !state.game.isMyTurn ||
+      state.player.hand.length >= 10
+    ) {
+      console.log('[DEBUG] drawCard failed:', {
+        deckLength: state.player.deck.length,
+        isMyTurn: state.game.isMyTurn,
+        handLength: state.player.hand.length,
+      });
+      return null;
+    }
+
+    let [drawnCard] = state.player.deck.slice(0, 1);
+    let newDeck = state.player.deck.slice(1);
+    let newHand = [...state.player.hand];
+
+    console.log('[DEBUG] Card drawn:', { drawnCard });
+
+    if (drawnCard.name === 'Assassin Token' && state.opponent.tokenType === 'assassin') {
+      console.log('[DEBUG] Assassin Token detected, calling handleAssassinTokenDraw');
+      const assassinResult = handleAssassinTokenDraw();
+      if (!assassinResult) {
+        console.error('[ERROR] handleAssassinTokenDraw returned null');
+        return null;
+      }
+
+      // Repioche une carte si possible
+      if (newDeck.length > 0) {
+        [drawnCard] = newDeck.slice(0, 1);
+        newDeck = newDeck.slice(1);
+        newHand = [...state.player.hand, drawnCard];
+        console.log('[DEBUG] Repioche:', { newDrawnCard: drawnCard });
+      } else {
+        newHand = [...state.player.hand];
+        console.log('[DEBUG] No cards left to repioche');
+      }
+    } else {
+      newHand = [...state.player.hand, drawnCard];
+    }
+
+    set({ player: { hand: newHand, deck: newDeck } });
+
+    return { hand: newHand, deck: newDeck };
+  }, [state.player.deck, state.game.isMyTurn, state.player.hand, state.opponent.tokenType, handleAssassinTokenDraw, set]);
 
   const removeCardFromField = useCallback((index: number) => {
     const newField = [...state.player.field];
@@ -178,21 +315,6 @@ export const useGameState = () => {
     return { hand: newHand, deck: newDeck };
   }, [state.player.hand, state.player.deck, set]);
 
-  const drawCard = useCallback(() => {
-    if (
-      state.player.deck.length === 0 ||
-      !state.game.isMyTurn ||
-      state.player.hand.length >= 10
-    ) return null;
-
-    const [drawnCard] = state.player.deck.slice(0, 1);
-    const newDeck = state.player.deck.slice(1);
-    const newHand = [...state.player.hand, drawnCard];
-    set({ player: { hand: newHand, deck: newDeck } });
-
-    return { hand: newHand, deck: newDeck };
-  }, [state.player.deck, state.game.isMyTurn, state.player.hand, set]);
-
   const shuffleDeck = useCallback(() => {
     const shuffledDeck = [...state.player.deck].sort(() => Math.random() - 0.5);
     set({ player: { deck: shuffledDeck } });
@@ -253,7 +375,23 @@ export const useGameState = () => {
     )
       return null;
 
-    set({ deckSelection: { hasChosenDeck: true } });
+    let tokenType: 'assassin' | 'engine' | 'viking' | null = null;
+    let tokenCount = 0;
+    if (deckId === 'assassin') {
+      tokenType = 'assassin';
+      tokenCount = 8;
+    } else if (deckId === 'engine') {
+      tokenType = 'engine';
+      tokenCount = 0;
+    } else if (deckId === 'viking') {
+      tokenType = 'viking';
+      tokenCount = 1;
+    }
+
+    set({
+      deckSelection: { hasChosenDeck: true },
+      player: { tokenType, tokenCount },
+    });
 
     return { deckId };
   }, [state.connection.playerId, state.connection.isConnected, state.deckSelection.hasChosenDeck, state.deckSelection.player1DeckId, state.deckSelection.selectedDecks, state.deckSelection.waitingForPlayer1, set]);
@@ -291,17 +429,40 @@ export const useGameState = () => {
         };
 
         let currentPlayerCards: Card[];
+        let tokenType: 'assassin' | 'engine' | 'viking' | null = null;
+        let tokenCount = 0;
+
         if (state.connection.playerId === 1) {
           const player1Cards = getDeckCards(player1DeckId);
           const remainingCards = remainingDeckId ? getDeckCards(remainingDeckId) : [];
           currentPlayerCards = [...player1Cards, ...remainingCards]
             .sort(() => Math.random() - 0.5)
             .slice(0, 30);
+          if (player1DeckId === 'assassin') {
+            tokenType = 'assassin';
+            tokenCount = 8;
+          } else if (player1DeckId === 'engine') {
+            tokenType = 'engine';
+            tokenCount = 0;
+          } else if (player1DeckId === 'viking') {
+            tokenType = 'viking';
+            tokenCount = 1;
+          }
         } else {
           currentPlayerCards = player2DeckIds
             .flatMap((deckId: string) => getDeckCards(deckId))
             .sort(() => Math.random() - 0.5)
             .slice(0, 30);
+          if (player2DeckIds.includes('assassin')) {
+            tokenType = 'assassin';
+            tokenCount = 8;
+          } else if (player2DeckIds.includes('engine')) {
+            tokenType = 'engine';
+            tokenCount = 0;
+          } else if (player2DeckIds.includes('viking')) {
+            tokenType = 'viking';
+            tokenCount = 1;
+          }
         }
 
         if (currentPlayerCards.length === 0) {
@@ -314,14 +475,14 @@ export const useGameState = () => {
         const rest = shuffledDeck.filter((c: Card) => !drawn.some((d: Card) => d.id === c.id));
 
         set({
-          player: { deck: rest, lifePoints: 30 },
+          player: { deck: rest, lifePoints: 30, tokenType, tokenCount },
           deckSelection: { initialDraw: drawn, deckSelectionDone: true },
         });
 
         if (state.connection.isConnected) {
           emit('updateGameState', {
             gameId,
-            state: { hand: drawn, deck: rest, lifePoints: 30 },
+            state: { hand: drawn, deck: rest, lifePoints: 30, tokenType, tokenCount },
           });
         }
       })
@@ -348,5 +509,9 @@ export const useGameState = () => {
     handleReadyClick,
     initializeDeck,
     updateLifePoints,
+    updateTokenCount,
+    setHoveredTokenId,
+    addAssassinTokenToOpponentDeck,
+    placeAssassinTokenAtOpponentDeckBottom,
   };
 };

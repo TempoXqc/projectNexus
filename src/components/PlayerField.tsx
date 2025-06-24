@@ -1,7 +1,8 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
 import { RotateCcw, Sword, Trash2 } from 'lucide-react';
+import ContextMenu from './ContextMenu';
 
 interface PlayerFieldProps {
   field: (Card | null)[];
@@ -20,6 +21,11 @@ function PlayerField({
                        exhaustCard,
                        attackCard,
                      }: PlayerFieldProps) {
+  const [contextMenu, setContextMenu] = useState<{
+    cardElement: HTMLElement | null;
+  } | null>(null);
+  const cardRefs = useRef<Map<string, HTMLElement>>(new Map());
+
   const visibleCards = useMemo(
     () =>
       field
@@ -27,6 +33,21 @@ function PlayerField({
         .filter(({ card }) => card !== null) as { card: Card; index: number }[],
     [field],
   );
+
+  const handleContextMenu = (event: React.MouseEvent, cardId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const cardElement = cardRefs.current.get(cardId) || null;
+    console.log('Right-click on card:', {
+      cardId,
+      cardElement: cardElement ? cardElement.getBoundingClientRect() : null,
+    });
+    setContextMenu({ cardElement });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
+  };
 
   return (
     <div
@@ -43,6 +64,10 @@ function PlayerField({
       {visibleCards.map(({ card, index }, visibleIndex) => (
         <motion.div
           key={`${card.id}-${card.exhausted}`}
+          ref={(el) => {
+            if (el) cardRefs.current.set(card.id, el);
+            else cardRefs.current.delete(card.id);
+          }}
           initial={{ opacity: 0, scale: 0.8, y: 20 }}
           animate={{
             opacity: 1,
@@ -63,6 +88,7 @@ function PlayerField({
           onMouseLeave={() => {
             setHoveredCardId(null);
           }}
+          onContextMenu={(event) => handleContextMenu(event, card.id)}
         >
           <img
             src={card.image}
@@ -82,7 +108,10 @@ function PlayerField({
           >
             <div className="flex gap-2 bg-gray-800 bg-opacity-90 p-1 rounded-lg shadow-lg">
               <button
-                onClick={() => attackCard(index)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  attackCard(index);
+                }}
                 className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 focus:outline-none group relative"
                 title=""
                 aria-label="Attack with card"
@@ -93,7 +122,10 @@ function PlayerField({
                 </span>
               </button>
               <button
-                onClick={() => removeCardFromField(index)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  removeCardFromField(index);
+                }}
                 className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 focus:outline-none group relative"
                 title=""
                 aria-label="Remove card from field"
@@ -104,7 +136,10 @@ function PlayerField({
                 </span>
               </button>
               <button
-                onClick={() => exhaustCard(index)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  exhaustCard(index);
+                }}
                 className="bg-yellow-500 text-white p-1 rounded-full hover:bg-yellow-600 focus:outline-none group relative"
                 title=""
                 aria-label="Exhaust card"
@@ -118,6 +153,9 @@ function PlayerField({
           </div>
         </motion.div>
       ))}
+      {contextMenu && (
+        <ContextMenu cardElement={contextMenu.cardElement} onClose={closeContextMenu} />
+      )}
     </div>
   );
 }
