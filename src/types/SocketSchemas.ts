@@ -1,53 +1,43 @@
 import { z } from 'zod';
 import { CardSchema } from './Card';
 
-// Schéma pour les messages de chat
 export const ChatMessageSchema = z.object({
   playerId: z.number(),
   message: z.string().min(1),
 });
 
-// Schéma pour gameStart
 export const GameStartSchema = z.object({
   playerId: z.number(),
   chatHistory: z.array(ChatMessageSchema),
 });
 
-// Schéma pour deckSelectionUpdate
 export const DeckSelectionUpdateSchema = z.object({
   1: z.string().nullable(),
   2: z.array(z.string()),
 });
 
-// Schéma pour deckSelectionDone
 export const DeckSelectionDoneSchema = z.object({
   player1DeckId: z.string(),
   player2DeckIds: z.array(z.string()),
   selectedDecks: z.array(z.string()),
 });
 
-// Schéma pour playerReady
 export const PlayerReadySchema = z.object({
   playerId: z.number(),
 });
 
-// Schéma pour updatePhase
 export const PhaseDataSchema = z.object({
   phase: z.enum(['Standby', 'Main', 'Battle', 'End']),
   turn: z.number(),
   nextPlayerId: z.number().optional(),
 });
 
-// Schéma pour initialDeckList
 export const InitialDeckListSchema = z.array(z.string());
 
-// Schéma pour waitingForPlayer1Choice
 export const WaitingForPlayer1ChoiceSchema = z.object({});
 
-// Schéma pour player1ChoseDeck
 export const Player1ChoseDeckSchema = z.object({});
 
-// Schéma pour updateGameState
 export const GameStateUpdateSchema = z.object({
   player1: z
     .object({
@@ -59,6 +49,8 @@ export const GameStateUpdateSchema = z.object({
       hasPlayedCard: z.boolean(),
       deck: z.array(CardSchema),
       lifePoints: z.number().optional(),
+      tokenCount: z.number().optional(),
+      tokenType: z.enum(['assassin', 'engine', 'viking']).nullable().optional(),
     })
     .optional(),
   player2: z
@@ -71,6 +63,8 @@ export const GameStateUpdateSchema = z.object({
       hasPlayedCard: z.boolean(),
       deck: z.array(CardSchema),
       lifePoints: z.number().optional(),
+      tokenCount: z.number().optional(),
+      tokenType: z.enum(['assassin', 'engine', 'viking']).nullable().optional(),
     })
     .optional(),
   turn: z.number().optional(),
@@ -80,7 +74,6 @@ export const GameStateUpdateSchema = z.object({
   winner: z.string().nullable().optional(),
 });
 
-// Schéma pour les payloads émis
 export const EmitSendMessageSchema = z.object({
   gameId: z.string(),
   message: z.string().min(1),
@@ -107,6 +100,8 @@ export const EmitUpdateGameStateSchema = z.object({
     hasPlayedCard: z.boolean().optional(),
     mustDiscard: z.boolean().optional(),
     lifePoints: z.number().optional(),
+    tokenCount: z.number().optional(),
+    tokenType: z.enum(['assassin', 'engine', 'viking']).nullable().optional(),
   }),
 });
 
@@ -137,4 +132,20 @@ export const EmitJoinGameSchema = z.string();
 export const EmitUpdateLifePointsSchema = z.object({
   gameId: z.string(),
   lifePoints: z.number().min(0).max(30),
+});
+
+export const EmitUpdateTokenCountSchema = z.object({
+  gameId: z.string(),
+  tokenCount: z.number().min(0),
+});
+
+export const EmitAddAssassinTokenToOpponentDeckSchema = z.object({
+  gameId: z.string(),
+  tokenCount: z.number().min(0).max(8),
+  tokenCard: CardSchema,
+});
+
+export const EmitPlaceAssassinTokenAtOpponentDeckBottomSchema = z.object({
+  gameId: z.string(),
+  tokenCard: CardSchema,
 });

@@ -1,6 +1,7 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useRef } from 'react';
 import { Card } from '../types/Card';
 import { Play, Trash2, Plus } from 'lucide-react';
+import ContextMenu from './ContextMenu';
 
 interface PlayerHandProps {
   hand: Card[];
@@ -25,6 +26,26 @@ function PlayerHand({
                       playCardToField,
                       addToDeck,
                     }: PlayerHandProps) {
+  const [contextMenu, setContextMenu] = useState<{
+    cardElement: HTMLElement | null;
+  } | null>(null);
+  const cardRefs = useRef<Map<string, HTMLElement>>(new Map());
+
+  const handleContextMenu = (event: React.MouseEvent, cardId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const cardElement = cardRefs.current.get(cardId) || null;
+    console.log('Right-click on card:', {
+      cardId,
+      cardElement: cardElement ? cardElement.getBoundingClientRect() : null,
+    });
+    setContextMenu({ cardElement });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
+  };
+
   return (
     <div
       className="flex justify-center items-center gap-4 flex-1 z-2"
@@ -42,10 +63,15 @@ function PlayerHand({
       {hand.map((card) => (
         <div
           key={card.id}
+          ref={(el) => {
+            if (el) cardRefs.current.set(card.id, el);
+            else cardRefs.current.delete(card.id);
+          }}
           className="relative rounded shadow p-1 bg-black cursor-pointer transition-transform hover:scale-105"
           style={{ width: '175px', height: '240px', position: 'relative', margin: '-2%' }}
           onMouseEnter={() => setHoveredCardId(card.id)}
           onMouseLeave={() => setHoveredCardId(null)}
+          onContextMenu={(event) => handleContextMenu(event, card.id)}
         >
           <img
             src={card.image}
@@ -64,7 +90,8 @@ function PlayerHand({
             >
               <div className="flex gap-2 bg-gray-800 bg-opacity-90 p-1 rounded-lg shadow-lg">
                 <button
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation();
                     playCardToField(card);
                   }}
                   className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 focus:outline-none"
@@ -77,7 +104,10 @@ function PlayerHand({
                   </span>
                 </button>
                 <button
-                  onClick={() => discardCardFromHand(card)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    discardCardFromHand(card);
+                  }}
                   className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 focus:outline-none"
                   title=""
                   aria-label="Discard card to graveyard"
@@ -88,7 +118,10 @@ function PlayerHand({
                   </span>
                 </button>
                 <button
-                  onClick={() => addToDeck(card)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    addToDeck(card);
+                  }}
                   className="bg-green-500 text-white p-1 rounded-full hover:bg-green-600 focus:outline-none"
                   title=""
                   aria-label="Add card to deck"
@@ -103,6 +136,9 @@ function PlayerHand({
           )}
         </div>
       ))}
+      {contextMenu && (
+        <ContextMenu cardElement={contextMenu.cardElement} onClose={closeContextMenu} />
+      )}
     </div>
   );
 }

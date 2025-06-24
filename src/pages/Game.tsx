@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import OpponentField from '../components/OpponentField';
 import OpponentHand from '../components/OpponentHand';
 import PlayerField from '../components/PlayerField';
@@ -9,6 +10,8 @@ import PlayerHand from '../components/PlayerHand';
 import PlayerDeck from '../components/PlayerDeck';
 import OpponentDeck from '../components/OpponentDeck';
 import OpponentGraveyard from '../components/OpponentGraveyard';
+import PlayerTokenZone from '../components/PlayerTokenZone';
+import OpponentTokenZone from '../components/OpponentTokenZone';
 import CardPreview from '../components/CardPreview';
 import PhaseIndicator from '../components/PhaseIndicator';
 import DeckSelection from '../components/DeckSelection';
@@ -39,6 +42,10 @@ export default function Game() {
     handleReadyClick,
     initializeDeck,
     updateLifePoints,
+    updateTokenCount,
+    setHoveredTokenId,
+    addAssassinTokenToOpponentDeck,
+    placeAssassinTokenAtOpponentDeckBottom,
   } = useGameState();
   const { socket, emit } = useGameSocket(
     gameId,
@@ -204,14 +211,30 @@ export default function Game() {
   );
 
   const handleDrawCard = useCallback(() => {
-    const result = drawCard();
-    if (result && gameId && state.connection.isConnected) {
-      emit('updateGameState', {
+    if (!gameId || !state.connection.playerId || !state.connection.isConnected) {
+      console.error('[ERROR] handleDrawCard failed:', {
         gameId,
-        state: { hand: result.hand, deck: result.deck },
+        playerId: state.connection.playerId,
+        isConnected: state.connection.isConnected,
       });
+      return;
     }
-  }, [drawCard, gameId, state.connection.isConnected, emit]);
+    const result = drawCard();
+    if (result) {
+      console.log('[DEBUG] handleDrawCard:', {
+        gameId,
+        playerId: state.connection.playerId,
+        handLength: result.hand.length,
+        deckLength: result.deck.length,
+      });
+      emit('drawCard', {
+        gameId,
+        playerId: state.connection.playerId,
+      });
+    } else {
+      console.log('[DEBUG] drawCard returned null');
+    }
+  }, [drawCard, gameId, state.connection.playerId, state.connection.isConnected, emit]);
 
   const handleShuffleDeck = useCallback(() => {
     const result = shuffleDeck();
@@ -236,6 +259,67 @@ export default function Game() {
     [updateLifePoints, gameId, state.connection.isConnected, emit],
   );
 
+  const handleUpdateTokenCount = useCallback(
+    (newValue: number) => {
+      const result = updateTokenCount(newValue);
+      if (result && gameId && state.connection.isConnected) {
+        emit('updateTokenCount', {
+          gameId,
+          tokenCount: newValue,
+        });
+      }
+    },
+    [updateTokenCount, gameId, state.connection.isConnected, emit],
+  );
+
+  const handleAddAssassinTokenToOpponentDeck = useCallback(() => {
+    const result = addAssassinTokenToOpponentDeck();
+    if (result && gameId && state.connection.isConnected) {
+      const assassinToken = result.opponentDeck.find((c) => c.name === 'Assassin Token');
+      emit('addAssassinTokenToOpponentDeck', {
+        gameId,
+        tokenCount: result.tokenCount,
+        tokenCard: {
+          id: assassinToken?.id || `token_assassin_${Math.random().toString(36).substr(2, 9)}`,
+          name: 'Assassin Token',
+          image: '/cards/tokens/token_assassin.jpg',
+          exhausted: false,
+        },
+      });
+      toast.success('Token assassin ajouté au deck adverse et mélangé !', {
+        toastId: 'add_assassin_token',
+      });
+    } else {
+      toast.error('Impossible d’ajouter le token assassin au deck adverse.', {
+        toastId: 'add_assassin_token_error',
+      });
+    }
+  }, [addAssassinTokenToOpponentDeck, gameId, state.connection.isConnected, emit]);
+
+  const handlePlaceAssassinTokenAtOpponentDeckBottom = useCallback(() => {
+    const result = placeAssassinTokenAtOpponentDeckBottom();
+    if (result && gameId && state.connection.isConnected) {
+      const assassinToken = result.opponentDeck[result.opponentDeck.length - 1];
+      console.log('[DEBUG] Emitting placeAssassinTokenAtOpponentDeckBottom:', {
+        gameId,
+        tokenCard: assassinToken,
+        tokenCount: result.tokenCount,
+      });
+      emit('placeAssassinTokenAtOpponentDeckBottom', {
+        gameId,
+        tokenCard: {
+          id: assassinToken.id,
+          name: 'Assassin Token',
+          image: '/cards/tokens/token_assassin.jpg',
+          exhausted: false,
+        },
+      });
+      toast.success('Token assassin placé en bas du deck adverse !', {
+        toastId: 'place_assassin_token',
+      });
+    }
+  }, [placeAssassinTokenAtOpponentDeckBottom, gameId, state.connection.isConnected, emit]);
+
   const setGraveyardOpen = useCallback(
     (isOpen: boolean) => {
       set({ ui: { isGraveyardOpen: isOpen } });
@@ -246,6 +330,20 @@ export default function Game() {
   const setOpponentGraveyardOpen = useCallback(
     (isOpen: boolean) => {
       set({ ui: { isOpponentGraveyardOpen: isOpen } });
+    },
+    [set],
+  );
+
+  const setTokenZoneOpen = useCallback(
+    (isOpen: boolean) => {
+      set({ ui: { isTokenZoneOpen: isOpen } });
+    },
+    [set],
+  );
+
+  const setOpponentTokenZoneOpen = useCallback(
+    (isOpen: boolean) => {
+      set({ ui: { isOpponentTokenZoneOpen: isOpen } });
     },
     [set],
   );
@@ -400,20 +498,43 @@ export default function Game() {
               hoveredCardId={state.ui.hoveredCardId}
               setHoveredCardId={setHoveredCardId}
             />
-          </div>
-
-          <div className="z-30 absolute left-4 top-2 flex gap-4">
-            <OpponentDeck count={state.opponent.deck.length} />
-            <OpponentGraveyard
-              count={state.opponent.graveyard.length}
-              onClick={() => setOpponentGraveyardOpen(true)}
-              isOpen={state.ui.isOpponentGraveyardOpen}
-              onClose={() => setOpponentGraveyardOpen(false)}
-              graveyard={state.opponent.graveyard}
-              hoveredCardId={state.ui.hoveredCardId}
-              setHoveredCardId={setHoveredCardId}
+            <PlayerTokenZone
+              tokenCount={state.player.tokenCount}
+              tokenType={state.player.tokenType}
+              onClick={() => setTokenZoneOpen(true)}
+              isOpen={state.ui.isTokenZoneOpen}
+              onClose={() => setTokenZoneOpen(false)}
+              updateTokenCount={handleUpdateTokenCount}
+              setHoveredTokenId={setHoveredTokenId}
+              addAssassinTokenToOpponentDeck={handleAddAssassinTokenToOpponentDeck}
+              placeAssassinTokenAtOpponentDeckBottom={handlePlaceAssassinTokenAtOpponentDeckBottom}
+              gameId={gameId}
+              playerId={state.connection.playerId}
+              opponentDeck={state.opponent.deck}
             />
           </div>
+
+          {!state.ui.isTokenZoneOpen && (
+            <div className="z-30 absolute left-4 top-2 flex gap-4">
+              <OpponentDeck count={state.opponent.deck.length} />
+              <OpponentGraveyard
+                count={state.opponent.graveyard.length}
+                onClick={() => setOpponentGraveyardOpen(true)}
+                isOpen={state.ui.isOpponentGraveyardOpen}
+                onClose={() => setOpponentGraveyardOpen(false)}
+                graveyard={state.opponent.graveyard}
+                hoveredCardId={state.ui.hoveredCardId}
+                setHoveredCardId={setHoveredCardId}
+              />
+              <OpponentTokenZone
+                tokenCount={state.opponent.tokenCount}
+                tokenType={state.opponent.tokenType}
+                onClick={() => setOpponentTokenZoneOpen(true)}
+                isOpen={state.ui.isOpponentTokenZoneOpen}
+                onClose={() => setOpponentTokenZoneOpen(false)}
+              />
+            </div>
+          )}
 
           <CardPreview
             hoveredCardId={state.ui.hoveredCardId}
