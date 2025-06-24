@@ -56,6 +56,7 @@ const initialState: GameState = {
     opponentReady: false,
     deckSelectionData: null,
     randomizers: [],
+    waitingForPlayer1: false,
   },
   connection: {
     playerId: null,
@@ -247,6 +248,7 @@ export const useGameState = () => {
     if (
       state.connection.playerId === 2 &&
       (!state.deckSelection.player1DeckId ||
+        state.deckSelection.waitingForPlayer1 ||
         state.deckSelection.selectedDecks.filter((d: string) => d !== state.deckSelection.player1DeckId).length >= 2)
     )
       return null;
@@ -254,7 +256,7 @@ export const useGameState = () => {
     set({ deckSelection: { hasChosenDeck: true } });
 
     return { deckId };
-  }, [state.connection.playerId, state.connection.isConnected, state.deckSelection.hasChosenDeck, state.deckSelection.player1DeckId, state.deckSelection.selectedDecks, set]);
+  }, [state.connection.playerId, state.connection.isConnected, state.deckSelection.hasChosenDeck, state.deckSelection.player1DeckId, state.deckSelection.selectedDecks, state.deckSelection.waitingForPlayer1, set]);
 
   const handleReadyClick = useCallback((gameId?: string) => {
     if (!gameId || !state.connection.playerId || state.deckSelection.isReady) return null;

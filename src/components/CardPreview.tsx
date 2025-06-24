@@ -23,11 +23,12 @@ function CardPreview({ hoveredCardId, field, hand, opponentField }: CardPreviewP
 
   return (
     <motion.div
-      className="fixed top-1/2 left-5 z-50"
+      className="fixed z-50"
       style={{
-        width: '18%',
-        height: '40%',
-        transform: 'translateY(-50%)',
+        width: '20%',
+        height: '80vh',
+        top: '22.5%',
+        left: '0%',
       }}
       initial={{ x: '-100%', opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
