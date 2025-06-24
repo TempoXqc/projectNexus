@@ -48,6 +48,7 @@ export interface GameState {
     opponentReady: boolean;
     deckSelectionData: any;
     randomizers: { id: string; name: string; image: string }[];
+    waitingForPlayer1: boolean;
   };
   connection: {
     playerId: number | null;

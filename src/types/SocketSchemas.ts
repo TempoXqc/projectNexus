@@ -41,6 +41,12 @@ export const PhaseDataSchema = z.object({
 // Schéma pour initialDeckList
 export const InitialDeckListSchema = z.array(z.string());
 
+// Schéma pour waitingForPlayer1Choice
+export const WaitingForPlayer1ChoiceSchema = z.object({});
+
+// Schéma pour player1ChoseDeck
+export const Player1ChoseDeckSchema = z.object({});
+
 // Schéma pour updateGameState
 export const GameStateUpdateSchema = z.object({
   player1: z

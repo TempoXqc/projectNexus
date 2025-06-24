@@ -141,6 +141,10 @@ io.on('connection', (socket) => {
       emitUpdateGameState(gameId, games[gameId].state);
       io.to(gameId).emit('playerJoined', { playerId: 2 });
       io.to(gameId).emit('initialDeckList', games[gameId].availableDecks);
+      // Notify Player 2 that Player 1 is choosing
+      if (!games[gameId].deckChoices[1]) {
+        io.to(socket.id).emit('waitingForPlayer1Choice');
+      }
     } else {
       socket.emit('error', 'La partie est pleine');
       return;
@@ -241,7 +245,14 @@ io.on('connection', (socket) => {
 
     if (playerId === 1 && !game.deckChoices[1]) {
       game.deckChoices[1] = deckId;
-    } else if (playerId === 2 && game.deckChoices[2].length < 2) {
+      // Notify Player 2 that Player 1 has chosen
+      const player2SocketId = game.players.find(
+        (id) => players[id].playerId === 2,
+      );
+      if (player2SocketId) {
+        io.to(player2SocketId).emit('player1ChoseDeck');
+      }
+    } else if (playerId === 2 && game.deckChoices[2].length < 2 && game.deckChoices[1]) {
       if (!game.deckChoices[2].includes(deckId) && deckId !== game.deckChoices[1]) {
         game.deckChoices[2].push(deckId);
       }
@@ -306,7 +317,6 @@ io.on('connection', (socket) => {
           emitUpdateGameState(gameId, game.state);
           io.to(gameId).emit('bothPlayersReady');
         }
-      } else {
       }
     }
   });

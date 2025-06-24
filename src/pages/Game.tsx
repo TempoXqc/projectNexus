@@ -274,6 +274,8 @@ export default function Game() {
           opponentReady={state.deckSelection.opponentReady}
           onDeckChoice={handleDeckChoiceCallback}
           onReadyClick={handleReadyClickCallback}
+          waitingForPlayer1={state.deckSelection.waitingForPlayer1}
+          playerId={state.connection.playerId}
         />
       )}
       <InitialDrawModal

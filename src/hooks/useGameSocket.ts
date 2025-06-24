@@ -21,6 +21,8 @@ import {
   EmitUpdatePhaseSchema,
   EmitJoinGameSchema,
   PhaseDataSchema,
+  WaitingForPlayer1ChoiceSchema,
+  Player1ChoseDeckSchema,
 } from '../types/SocketSchemas';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -126,6 +128,30 @@ export const useGameSocket = (
 
       socket.on('bothPlayersReady', () => {
         setState({ deckSelection: { bothReady: true } });
+      });
+
+      socket.on('waitingForPlayer1Choice', () => {
+        try {
+          WaitingForPlayer1ChoiceSchema.parse({});
+          setState({ deckSelection: { waitingForPlayer1: true } });
+        } catch (error) {
+          toast.error('Données d’attente du joueur 1 invalides.', {
+            toastId: 'waitingForPlayer1Choice_error',
+          });
+          console.error('[ERROR] waitingForPlayer1Choice validation failed:', error);
+        }
+      });
+
+      socket.on('player1ChoseDeck', () => {
+        try {
+          Player1ChoseDeckSchema.parse({});
+          setState({ deckSelection: { waitingForPlayer1: false } });
+        } catch (error) {
+          toast.error('Données de choix du joueur 1 invalides.', {
+            toastId: 'player1ChoseDeck_error',
+          });
+          console.error('[ERROR] player1ChoseDeck validation failed:', error);
+        }
       });
 
       socket.on('chatMessage', (msg) => {
@@ -307,6 +333,8 @@ export const useGameSocket = (
       socket.off('deckSelectionDone');
       socket.off('playerReady');
       socket.off('bothPlayersReady');
+      socket.off('waitingForPlayer1Choice');
+      socket.off('player1ChoseDeck');
       socket.off('chatMessage');
       socket.off('opponentDisconnected');
       socket.off('updateGameState');
