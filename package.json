@@ -1,54 +1,53 @@
 {
-  "name": "untitled",
-  "private": true,
-  "version": "0.0.0",
+  "name": "project-nexus",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.10",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@types/uuid": "^10.0.0",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "prettier": "^3.3.1",
-    "tailwindcss": "^4.1.10",
-    "typescript": "^5.2.2",
-    "vite": "^5.2.0"
+    "start:client": "cd client && vite",
+    "start:server": "cd server && ts-node src/index.ts",
+    "build:client": "cd client && vite build",
+    "build:server": "cd server && tsc",
+    "test:client": "cd client && vitest",
+    "test:server": "cd server && jest",
+    "lint": "eslint . --ext .js,.ts,.tsx",
+    "format": "prettier --write ."
   },
   "dependencies": {
-    "@react-pdf-viewer/core": "^3.12.0",
-    "@react-pdf-viewer/default-layout": "^3.12.0",
-    "@react-pdf/renderer": "^4.3.0",
+    "@eslint/js": "^9.29.0",
+    "@tailwindcss/postcss": "^4.0.0-alpha.27",
     "@tailwindcss/vite": "^4.1.10",
-    "boardgame.io": "^0.50.2",
-    "cors": "^2.8.5",
+    "@typescript-eslint/eslint-plugin": "^8.35.0",
+    "@typescript-eslint/parser": "^8.35.0",
     "express": "^5.1.0",
-    "framer-motion": "^12.18.1",
-    "lucide-react": "^0.516.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.2",
-    "react-toastify": "^11.0.5",
-    "socket.io": "^4.8.1",
+    "express-rate-limit": "^7.4.0",
+    "framer-motion": "^11.11.7",
+    "immer": "^10.1.1",
+    "lucide-react": "^0.523.0",
+    "mongodb": "^6.8.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.1",
+    "react-toastify": "^10.0.6",
+    "socket.io": "^4.7.5",
     "socket.io-client": "^4.8.1",
-    "zod": "^3.25.67"
+    "winston": "^3.13.1",
+    "zod": "^3.23.8"
   },
-  "main": "postcss.config.js",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/TempoXqc/projectNexus.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/TempoXqc/projectNexus/issues"
-  },
-  "homepage": "https://github.com/TempoXqc/projectNexus#readme",
-  "description": ""
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.4",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "eslint": "^9.29.0",
+    "eslint-plugin-react": "^7.36.1",
+    "eslint-plugin-typescript": "^0.14.0",
+    "jest": "^30.0.2",
+    "npm-check-updates": "^17.1.5",
+    "prettier": "^3.3.3",
+    "supertest": "^7.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2",
+    "vite": "^6.3.5",
+    "vitest": "^2.0.5"
+  }
 }

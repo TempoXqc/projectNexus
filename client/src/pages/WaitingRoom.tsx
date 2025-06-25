@@ -1,0 +1,74 @@
+// client/src/pages/WaitingRoom.tsx
+import React, { useEffect, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import { GameStartSchema } from 'types/SocketSchemas/Game';
+import { socketService } from '@/services/socketService.ts';
+
+const WaitingRoom: React.FC = () => {
+  const { gameId } = useParams<{ gameId: string }>();
+  const navigate = useNavigate();
+  const socket = socketService.getSocket();
+
+  useEffect(() => {
+    if (!gameId) {
+      navigate('/');
+      return;
+    }
+
+    socket.on('gameStart', (data) => {
+      try {
+        const parsedData = GameStartSchema.parse(data);
+        navigate(`/game/${parsedData.gameId}`, {
+          state: { playerId: parsedData.playerId, availableDecks: parsedData.availableDecks },
+        });
+      } catch (error) {
+        console.error('[ERROR] gameStart validation failed:', error);
+        toast.error('Erreur lors du démarrage de la partie.', { toastId: 'game_start_error' });
+      }
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('WebSocket connection error:', error);
+      toast.error('Erreur de connexion au serveur.', { toastId: 'connect_error' });
+      navigate('/');
+    });
+
+    socket.on('error', (message) => {
+      console.error('Server error:', message);
+      toast.error(message, { toastId: 'server_error' });
+      navigate('/');
+    });
+
+    if (!socket.connected) {
+      socketService.connect();
+    }
+
+    return () => {
+      socket.off('gameStart');
+      socket.off('connect_error');
+      socket.off('error');
+    };
+  }, [gameId, navigate, socket]);
+
+  const handleLeaveGame = useCallback(() => {
+    socket.emit('leaveGame', gameId);
+    navigate('/');
+  }, [gameId, socket, navigate]);
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4" role="main" aria-label="Salle d'attente">
+      <h1 className="text-3xl font-bold mb-4">Salle d'attente</h1>
+      <p className="text-lg mb-4">En attente d'un adversaire pour la partie {gameId}...</p>
+      <button
+        onClick={handleLeaveGame}
+        className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded"
+        aria-label="Quitter la partie"
+      >
+        Quitter
+      </button>
+    </div>
+  );
+};
+
+export default WaitingRoom;
