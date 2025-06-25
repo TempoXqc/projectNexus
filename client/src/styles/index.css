@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    user-select: none;
+}
+
+.animate-fade-in-out {
+    animation: fadeInOut 3s ease-in-out forwards;
+}
+
+@keyframes fadeInOut {
+    0% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    10% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    90% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+}
+
+@media (max-width: 1024px) {
+    .player-hand, .opponent-hand {
+        gap: 1px;
+    }
+    .player-field, .opponent-field {
+        height: 150px;
+    }
+    .player-graveyard, .player-deck, .opponent-deck, .opponent-graveyard {
+        width: 100px;
+        height: 140px;
+    }
+    .card-preview {
+        width: 25%;
+        height: 35%;
+    }
+}
+
+@media (max-width: 640px) {
+    .player-hand, .opponent-hand {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .player-field, .opponent-field {
+        height: 120px;
+    }
+    .player-graveyard, .player-deck, .opponent-deck, .opponent-graveyard {
+        width: 80px;
+        height: 120px;
+    }
+    .card-preview {
+        width: 30%;
+        height: 30%;
+        left: 2%;
+    }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #1f2937; /* bg-gray-800 */
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #4b5563; /* bg-gray-600 */
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #6b7280; /* bg-gray-500 */
+}
+
+/* Pour Firefox */
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2937;
+}

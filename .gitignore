@@ -1,3 +1,4 @@
+# project-root/.gitignore
 # Logs
 logs
 *.log
@@ -7,12 +8,20 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dépendances
 node_modules
-dist
+
+# Builds
+client/dist
+server/dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# Fichiers d'environnement
+client/.env
+server/.env
+
+# Éditeurs
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -22,3 +31,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Tests et couverture
+coverage
