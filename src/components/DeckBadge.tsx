@@ -1,12 +1,19 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { JSX } from 'react';
 
-const getDeckBadge = (
-  deckId: string,
-  player1DeckId: string | null,
-  selectedDecks: string[],
-  allRandomizers: { id: string }[],
-): JSX.Element | null => {
+interface DeckBadgeProps {
+  deckId: string;
+  player1DeckId: string | null;
+  selectedDecks: string[];
+  allRandomizers: { id: string }[];
+}
+
+function DeckBadge({
+                     deckId,
+                     player1DeckId,
+                     selectedDecks,
+                     allRandomizers,
+                   }: DeckBadgeProps): JSX.Element | null {
   if (!player1DeckId || selectedDecks.length < 3) return null;
 
   const allDeckIds = allRandomizers.map((d) => d.id);
@@ -23,6 +30,6 @@ const getDeckBadge = (
       {badgeText}
     </div>
   );
-};
+}
 
-export default getDeckBadge;
+export default memo(DeckBadge);

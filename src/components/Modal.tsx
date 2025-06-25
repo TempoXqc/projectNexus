@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -10,14 +10,14 @@ interface ModalProps {
   height?: string;
 }
 
-export default function Modal({
-                                isOpen,
-                                onClose,
-                                title,
-                                children,
-                                width = '600px',
-                                height = 'auto',
-                              }: ModalProps) {
+function Modal({
+                 isOpen,
+                 onClose,
+                 title,
+                 children,
+                 width = '600px',
+                 height = 'auto',
+               }: ModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -38,3 +38,5 @@ export default function Modal({
     </div>
   );
 }
+
+export default memo(Modal);

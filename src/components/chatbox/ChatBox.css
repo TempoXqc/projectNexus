@@ -1,0 +1,19 @@
+.chatbox-container {
+    position: relative;
+    height: 100vh;
+    width: 100%;
+}
+
+.chatbox-content {
+    position: fixed;
+    top: 0;
+    right: 0%;
+    width: 15%;
+    z-index: 20;
+    transition: right 0.3s ease-in-out;
+}
+
+.chatbox-toggle {
+    position: fixed;
+    z-index: 30;
+}

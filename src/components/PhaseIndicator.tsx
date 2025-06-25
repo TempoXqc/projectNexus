@@ -1,47 +1,90 @@
-import React, { useEffect } from 'react';
+import React, { memo, useEffect, useState, useCallback } from 'react';
 import { Play, Sword, Hourglass, Check } from 'lucide-react';
 import { Socket } from 'socket.io-client';
+import { PhaseData } from '../types/PhaseData'; // Supposer que PhaseData est importé
 
 interface PhaseIndicatorProps {
   socket: Socket;
   isMyTurn: boolean;
   playerId: number | null;
   gameId: string | undefined;
-  onPhaseChange: (newPhase: string) => void;
-  currentPhase: string;
+  onPhaseChange: (newPhase: 'Standby' | 'Main' | 'Battle' | 'End') => void;
+  currentPhase: 'Standby' | 'Main' | 'Battle' | 'End';
+  turn: number;
 }
 
-export default function PhaseIndicator({
-                                         socket,
-                                         isMyTurn,
-                                         playerId,
-                                         gameId,
-                                         onPhaseChange,
-                                         currentPhase,
-                                       }: PhaseIndicatorProps) {
+function PhaseIndicator({
+                          socket,
+                          isMyTurn,
+                          playerId,
+                          gameId,
+                          onPhaseChange,
+                          currentPhase,
+                          turn,
+                        }: PhaseIndicatorProps) {
+  const [showMessage, setShowMessage] = useState(false);
+  const [message, setMessage] = useState('');
+  const [isAnimationActive, setIsAnimationActive] = useState(false);
+
   useEffect(() => {
-    if (!socket || !gameId || !playerId) return;
-
-    const handlePhaseUpdate = (phaseData: { phase: string; turn: number }) => {
-      if (!phaseData || !phaseData.phase || phaseData.turn === undefined) {
-        return;
-      }
-      onPhaseChange(phaseData.phase);
-    };
-
-    socket.on('updatePhase', handlePhaseUpdate);
-
-    return () => {
-      socket.off('updatePhase', handlePhaseUpdate);
-    };
-  }, [socket, gameId, playerId, onPhaseChange]);
-
-  const nextPhase = () => {
-    if (!isMyTurn || !gameId || !playerId) {
+    if (!socket || !gameId || !playerId) {
+      console.log('[DEBUG] useEffect - Socket, gameId ou playerId manquant:', { socket, gameId, playerId });
       return;
     }
 
-    let newPhase = currentPhase;
+    const handlePhaseUpdate = (phaseData: PhaseData) => {
+      if (!phaseData || !phaseData.phase || phaseData.turn === undefined) {
+        console.log('[DEBUG] PhaseUpdate - Invalid data:', phaseData);
+        return;
+      }
+      console.log('[DEBUG] PhaseUpdate - Received:', phaseData.phase);
+      onPhaseChange(phaseData.phase as 'Standby' | 'Main' | 'Battle' | 'End');
+    };
+
+    const handlePhaseChangeMessage = (phaseData: PhaseData) => {
+      if (!phaseData || !phaseData.phase || phaseData.turn === undefined) {
+        console.log('[DEBUG] handlePhaseChangeMessage - Données invalides:', phaseData);
+        return;
+      }
+      console.log('[DEBUG] handlePhaseChangeMessage - Message reçu pour phase:', phaseData.phase, 'avec turn:', phaseData.turn, 'nextPlayerId:', phaseData.nextPlayerId);
+      const nextPlayerId = phaseData.nextPlayerId !== undefined ? phaseData.nextPlayerId : playerId === 1 ? 2 : 1;
+      const displayMessage =
+        phaseData.phase === 'Main'
+          ? 'MainPhase'
+          : phaseData.phase === 'Battle'
+            ? 'BattlePhase'
+            : phaseData.phase === 'End' || phaseData.phase === 'Standby'
+              ? `Nouveau tour ${phaseData.turn} - Joueur ${nextPlayerId}`
+              : `Phase: ${phaseData.phase}`;
+      console.log('[DEBUG] handlePhaseChangeMessage - Message à afficher:', displayMessage);
+      setMessage(displayMessage);
+      setShowMessage(true);
+      setIsAnimationActive(true);
+
+      const timeoutId = setTimeout(() => {
+        setShowMessage(false);
+        setIsAnimationActive(false);
+      }, 3000);
+
+      return () => clearTimeout(timeoutId);
+    };
+
+    socket.on('updatePhase', handlePhaseUpdate);
+    socket.on('phaseChangeMessage', handlePhaseChangeMessage);
+
+    return () => {
+      socket.off('updatePhase', handlePhaseUpdate);
+      socket.off('phaseChangeMessage', handlePhaseChangeMessage);
+    };
+  }, [socket, gameId, playerId, onPhaseChange]);
+
+  const nextPhase = useCallback(() => {
+    if (!isMyTurn || !gameId || !playerId || isAnimationActive) {
+      console.log('[DEBUG] nextPhase - Bloqué, isMyTurn:', isMyTurn, 'gameId:', gameId, 'playerId:', playerId, 'isAnimationActive:', isAnimationActive);
+      return;
+    }
+
+    let newPhase: 'Standby' | 'Main' | 'Battle' | 'End' = currentPhase;
     switch (currentPhase) {
       case 'Standby':
         newPhase = 'Main';
@@ -51,46 +94,72 @@ export default function PhaseIndicator({
         break;
       case 'Battle':
         newPhase = 'End';
+        socket.emit('endTurn', { gameId, nextPlayerId: playerId === 1 ? 2 : 1 });
         break;
       case 'End':
-        socket.emit('endTurn', { gameId, nextPlayerId: playerId === 1 ? 2 : 1 });
-        return;
+        newPhase = 'Standby';
+        break;
     }
 
     if (newPhase !== currentPhase) {
-      socket.emit('updatePhase', { gameId, phase: newPhase, turn: 1 });
+      console.log('[DEBUG] nextPhase - Nouvelle phase émise:', newPhase);
+      socket.emit('updatePhase', { gameId, phase: newPhase, turn });
       onPhaseChange(newPhase);
     }
-  };
+  }, [isMyTurn, gameId, playerId, isAnimationActive, currentPhase, socket, turn, onPhaseChange]);
 
-  const getPhaseIcon = () => {
+  const getNextPhase = useCallback(() => {
     switch (currentPhase) {
       case 'Standby':
-        return <Hourglass className="w-6 h-6" />;
+        return 'Main';
       case 'Main':
-        return <Play className="w-6 h-6" />;
+        return 'Battle';
       case 'Battle':
-        return <Sword className="w-6 h-6" />;
+        return 'End';
       case 'End':
-        return <Check className="w-6 h-6" />;
+        return 'Standby';
       default:
-        return null;
+        return 'Main';
     }
-  };
+  }, [currentPhase]);
+
+  const getNextPhaseIcon = useCallback(() => {
+    const nextPhase = getNextPhase();
+    return (
+      <div className="mr-2 text-white">
+        {nextPhase === 'Standby' && <Hourglass className="w-6 h-6" />}
+        {nextPhase === 'Main' && <Play className="w-6 h-6" />}
+        {nextPhase === 'Battle' && <Sword className="w-6 h-6" />}
+        {nextPhase === 'End' && <Check className="w-6 h-6" />}
+      </div>
+    );
+  }, [getNextPhase]);
 
   return (
-    <div className="absolute bottom-10 right-75 z-50">
-      <div className="flex items-center gap-2 bg-gray-800 bg-opacity-90 p-2 rounded-lg shadow-lg">
-        {getPhaseIcon()}
-        <span className="text-white text-lg">{currentPhase}</span>
+    <div className="absolute bottom-10 right-80 z-50">
+      <div className="flex flex-col items-center w-56">
+        {showMessage && (
+          <div className="fixed inset-0 flex items-center justify-center z-1000">
+            <div className="bg-gray-800 text-white p-6 rounded-lg shadow-lg animate-fade-in-out text-4xl max-w-[90%] text-center break-words">
+              {message}
+            </div>
+          </div>
+        )}
         <button
           onClick={nextPhase}
-          className="ml-2 px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-          disabled={!isMyTurn}
+          className={`px-4 py-3 w-56 rounded-full flex items-center justify-center transition duration-200 ${
+            isMyTurn && !isAnimationActive
+              ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+              : 'bg-gray-500 text-gray-300 cursor-not-allowed'
+          }`}
+          disabled={!isMyTurn || isAnimationActive}
         >
-          Suivant
+          {getNextPhaseIcon()}
+          <span>{getNextPhase()}</span>
         </button>
       </div>
     </div>
   );
 }
+
+export default memo(PhaseIndicator);

@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../types/Card';
 
@@ -10,20 +9,26 @@ interface CardPreviewProps {
   opponentField?: (Card | null)[];
 }
 
-export default function CardPreview({ hoveredCardId, field, hand, opponentField }: CardPreviewProps) {
-  let card: Card | null | undefined = field.find((c) => c?.id === hoveredCardId) || hand.find((c) => c.id === hoveredCardId);
-  if (!card && opponentField) {
-    card = opponentField.find((c) => c?.id === hoveredCardId);
-  }
+function CardPreview({ hoveredCardId, field, hand, opponentField }: CardPreviewProps) {
+  const card = useMemo(() => {
+    let foundCard: Card | null | undefined =
+      field.find((c) => c?.id === hoveredCardId) || hand.find((c) => c.id === hoveredCardId);
+    if (!foundCard && opponentField) {
+      foundCard = opponentField.find((c) => c?.id === hoveredCardId);
+    }
+    return foundCard;
+  }, [hoveredCardId, field, hand, opponentField]);
 
   if (!card) return null;
 
   return (
     <motion.div
-      className="fixed top-58 left-5 z-50"
+      className="fixed z-50"
       style={{
-        width: '18%',
-        height: '22%',
+        width: '20%',
+        height: '80vh',
+        top: '22.5%',
+        left: '0%',
       }}
       initial={{ x: '-100%', opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
@@ -40,3 +45,5 @@ export default function CardPreview({ hoveredCardId, field, hand, opponentField 
     </motion.div>
   );
 }
+
+export default memo(CardPreview);

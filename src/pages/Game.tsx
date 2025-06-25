@@ -1,763 +1,412 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import OpponentField from '../components/OpponentField';
 import OpponentHand from '../components/OpponentHand';
-import PlayerField from '../components/PlayerField.tsx';
-import ChatBox from '../components/ChatBox';
+import PlayerField from '../components/PlayerField';
+import ChatBox from '../components/chatbox/ChatBox';
 import PlayerGraveyard from '../components/PlayerGraveyard';
 import PlayerHand from '../components/PlayerHand';
-import PlayerDeck from '../components/PlayerDeck.tsx';
+import PlayerDeck from '../components/PlayerDeck';
 import OpponentDeck from '../components/OpponentDeck';
 import OpponentGraveyard from '../components/OpponentGraveyard';
-import {
-  BadgeCheck,
-  ExternalLink,
-  FileText,
-  RefreshCcw,
-  X,
-} from 'lucide-react';
-import { motion } from 'framer-motion';
-import { Card } from '../types/Card';
-import { Socket } from 'socket.io-client';
-import { getSocket } from '../socket.ts';
-import getDeckBadge from '../components/GetDeckBadge.tsx';
+import PlayerTokenZone from '../components/PlayerTokenZone';
+import OpponentTokenZone from '../components/OpponentTokenZone';
 import CardPreview from '../components/CardPreview';
 import PhaseIndicator from '../components/PhaseIndicator';
-
-let socket: Socket;
-
-const getRandomHand = <T,>(deck: T[], count: number): T[] =>
-  [...deck].sort(() => 0.5 - Math.random()).slice(0, count);
+import DeckSelection from '../components/DeckSelection';
+import InitialDrawModal from '../components/InitialDrawModal';
+import CounterPlayer from '../components/CounterPlayer';
+import CounterOpponentPlayer from '../components/CounterOpponentPlayer';
+import { useGameState } from '../hooks/useGameState';
+import { useGameSocket } from '../hooks/useGameSocket';
+import { Card } from '../types/Card';
 
 export default function Game() {
   const { gameId } = useParams();
-  const navigate = useNavigate();
-
-  const [state, setState] = useState({
-    hand: [] as Card[],
-    deck: [] as Card[],
-    graveyard: [] as Card[],
-    opponentGraveyard: [] as Card[],
-    field: Array(8).fill(null) as (Card | null)[],
-    opponentField: Array(8).fill(null) as (Card | null)[],
-    opponentHand: [] as Card[],
-    opponentDeck: [] as Card[],
-    chatMessages: [] as { playerId: number; message: string }[],
-    chatInput: '',
-    playerId: null as number | null,
-    turn: 1,
-    isConnected: false,
-    hoveredCardId: null as string | null,
-    isCardHovered: false,
-    isGraveyardOpen: false,
-    isOpponentGraveyardOpen: false,
-    mustDiscard: false,
-    hasPlayedCard: false,
-    isMyTurn: false,
-    selectedDecks: [] as string[],
-    player1DeckId: null as string | null,
-    player1Deck: [] as Card[],
-    player2Deck: [] as Card[],
-    hasChosenDeck: false,
-    deckSelectionDone: false,
-    initialDraw: [] as Card[],
-    selectedForMulligan: [] as string[],
-    mulliganDone: false,
-    isReady: false,
-    bothReady: false,
-    opponentReady: false,
-    deckSelectionData: null as {
-      player1DeckId: string;
-      player2DeckIds: string[];
-      selectedDecks: string[];
-    } | null,
-    canInitializeDraw: false,
-    randomizers: [] as { id: string; name: string; image: string }[],
-    isRightPanelOpen: true,
-    currentPhase: 'Main' as string,
-  });
-
-  const set = (updates: Partial<typeof state>) =>
-    setState((prev) => ({ ...prev, ...updates }));
-
-  const hasJoinedRef = useRef(false);
+  const {
+    state,
+    set,
+    removeCardFromField,
+    discardCardFromHand,
+    playCardToField,
+    exhaustCard,
+    attackCard,
+    addToDeck,
+    drawCard,
+    shuffleDeck,
+    toggleCardMulligan,
+    doMulligan,
+    keepInitialHand,
+    handleDeckChoice,
+    handleReadyClick,
+    initializeDeck,
+    updateLifePoints,
+    updateTokenCount,
+    setHoveredTokenId,
+    addAssassinTokenToOpponentDeck,
+    placeAssassinTokenAtOpponentDeckBottom,
+  } = useGameState();
+  const { socket, emit } = useGameSocket(
+    gameId,
+    set,
+    state.connection.playerId,
+    state.connection.isConnected,
+    state.chat.messages,
+  );
 
   useEffect(() => {
-    socket = getSocket();
-
-    const tryJoin = () => {
-      if (!gameId || hasJoinedRef.current) return;
-      socket.emit('joinGame', gameId);
-      hasJoinedRef.current = true;
-    };
-
-    if (socket.connected) {
-      tryJoin();
-    } else {
-      socket.once('connect', tryJoin);
-    }
-
-    socket.on('connect', () => {
-      set({ isConnected: true });
-    });
-
-    socket.on('disconnect', () => {
-      set({ isConnected: false });
-    });
-
-    socket.on('connect_error', () => {
-      set({ isConnected: false });
-    });
-
-    socket.on(
-      'gameStart',
-      ({
-        playerId,
-        chatHistory,
-      }: {
-        playerId: number;
-        chatHistory: { playerId: number; message: string }[];
-      }) => {
-        set({ playerId, chatMessages: chatHistory, isMyTurn: playerId === 1 });
-      },
-    );
-
-    socket.on(
-      'deckSelectionUpdate',
-      (deckChoices: { 1: string | null; 2: string[] }) => {
-        const allSelected = [deckChoices[1], ...(deckChoices[2] || [])].filter(
-          Boolean,
-        ) as string[];
-        set({
-          selectedDecks: allSelected,
-          player1DeckId: deckChoices[1],
-        });
-      },
-    );
-
-    socket.on(
-      'deckSelectionDone',
-      (data: {
-        player1DeckId: string;
-        player2DeckIds: string[];
-        selectedDecks: string[];
-      }) => {
-        set({ deckSelectionData: data });
-      },
-    );
-
-    socket.on('playerReady', ({ playerId }: { playerId: number }) => {
-      if (state.playerId && playerId !== state.playerId) {
-        set({ opponentReady: true });
-      }
-    });
-
-    socket.on('bothPlayersReady', () => {
-      set({ bothReady: true });
-    });
-
-    socket.on('chatMessage', (msg: { playerId: number; message: string }) => {
-      set({ chatMessages: [...state.chatMessages, msg] });
-    });
-
-    socket.on('opponentDisconnected', () => {
-      alert("Votre adversaire s'est déconnecté.");
-      navigate('/');
-    });
-
-    socket.on('updateGameState', (gameState: any) => {
-      const playerKey = state.playerId === 1 ? 'player1' : 'player2';
-      const opponentKey = state.playerId === 1 ? 'player2' : 'player1';
-      const opponentHandLength =
-        gameState[opponentKey]?.hand?.length ||
-        gameState[opponentKey]?.opponentHand?.length ||
-        0;
-
-      const newState = {
-        field: (gameState[playerKey]?.field || []).map((c: Card | null) =>
-          c
-            ? {
-                ...c,
-                exhausted: c.exhausted !== undefined ? c.exhausted : false,
-              }
-            : null,
-        ),
-        hand: gameState[playerKey]?.hand || state.hand,
-        graveyard: gameState[playerKey]?.graveyard || state.graveyard,
-        opponentGraveyard:
-          gameState[opponentKey]?.graveyard || state.opponentGraveyard,
-        mustDiscard: gameState[playerKey]?.mustDiscard || false,
-        hasPlayedCard: gameState[playerKey]?.hasPlayedCard || false,
-        opponentField: (gameState[opponentKey]?.field || []).map(
-          (c: Card | null) =>
-            c
-              ? {
-                  ...c,
-                  exhausted: c.exhausted !== undefined ? c.exhausted : false,
-                }
-              : null,
-        ),
-        opponentHand: Array(opponentHandLength).fill({}),
-        deck: gameState[playerKey]?.deck || state.deck,
-        opponentDeck: gameState[opponentKey]?.deck || state.opponentDeck,
-        turn: gameState.turn || state.turn,
-        currentPhase: gameState.phase || state.currentPhase,
-        isMyTurn: gameState.activePlayer === socket.id,
-      };
-      set(newState);
-    });
-
-    socket.on('yourTurn', () => {
-      set({ isMyTurn: true, hasPlayedCard: false });
-    });
-
-    socket.on('endTurn', () => {
-      set({ isMyTurn: false, hasPlayedCard: false });
-      if (gameId && state.isConnected) {
-        socket.emit('updateGameState', {
-          gameId,
-          state: { hasPlayedCard: false },
-        });
-      }
-    });
-
-    socket.on('initialDeckList', (availableDecks: string[]) => {
-      const deckImages: { [key: string]: string } = {
-        assassin: '/cards/randomizers/Assassin.jpg',
-        celestial: '/cards/randomizers/Celestial.jpg',
-        dragon: '/cards/randomizers/Dragon.jpg',
-        wizard: '/cards/randomizers/Wizard.jpg',
-        vampire: '/cards/randomizers/Vampire.jpg',
-        viking: '/cards/randomizers/Viking.jpg',
-        engine: '/cards/randomizers/Engine.jpg',
-        samurai: '/cards/randomizers/Samurai.jpg',
-      };
-      const randomDeckList = availableDecks.map((id: string) => ({
-        id,
-        name: id.charAt(0).toUpperCase() + id.slice(1),
-        image: deckImages[id],
-      }));
-      set({ randomizers: randomDeckList });
-    });
-
-    socket.on('updatePhase', (phaseData: { phase: string; turn: number }) => {
-      if (!phaseData || !phaseData.phase || phaseData.turn === undefined) {
-        return;
-      }
-      set({ currentPhase: phaseData.phase, turn: phaseData.turn });
-    });
-
-    socket.on('drawCard', () => {
-      drawCard();
-    });
-
-    return () => {
-      socket.off('connect', tryJoin);
-      socket.off('connect');
-      socket.off('disconnect');
-      socket.off('connect_error');
-      socket.off('gameStart');
-      socket.off('deckSelectionUpdate');
-      socket.off('deckSelectionDone');
-      socket.off('playerReady');
-      socket.off('bothPlayersReady');
-      socket.off('chatMessage');
-      socket.off('opponentDisconnected');
-      socket.off('updateGameState');
-      socket.off('yourTurn');
-      socket.off('endTurn');
-      socket.off('initialDeckList');
-      socket.off('updatePhase');
-      socket.off('drawCard');
-    };
-  }, [gameId, navigate, state.playerId, state.chatMessages]);
-
-  useEffect(() => {
-    if (!gameId) navigate('/');
-  }, [gameId, navigate]);
-
-  useEffect(() => {
-    if (
-      state.deckSelectionData &&
-      state.bothReady &&
-      !state.deckSelectionDone &&
-      state.playerId !== null
-    ) {
-      const { player1DeckId, player2DeckIds, selectedDecks } =
-        state.deckSelectionData;
-      const remainingDeckId = selectedDecks.find(
-        (id: string) => id !== player1DeckId && !player2DeckIds.includes(id),
-      );
-
-      Promise.all([
-        fetch('/deckLists.json').then((res) => res.json()),
-        fetch('/cards.json').then((res) => res.json()),
-      ])
-        .then(([deckLists, allCards]) => {
-          const getDeckCards = (deckId: string) => {
-            const cardIds = deckLists[deckId] || [];
-            return allCards.filter((card: Card) => cardIds.includes(card.id));
-          };
-
-          let currentPlayerCards: Card[];
-          if (state.playerId === 1) {
-            const player1Cards = getDeckCards(player1DeckId);
-            const remainingCards = remainingDeckId
-              ? getDeckCards(remainingDeckId)
-              : [];
-            currentPlayerCards = [...player1Cards, ...remainingCards]
-              .sort(() => Math.random() - 0.5)
-              .slice(0, 30);
-          } else {
-            currentPlayerCards = player2DeckIds
-              .flatMap((deckId: string) => getDeckCards(deckId))
-              .sort(() => Math.random() - 0.5)
-              .slice(0, 30);
-          }
-
-          if (currentPlayerCards.length === 0) {
-            console.error(
-              '[ERROR] Aucune carte trouvée pour le deck du joueur',
-              state.playerId,
-            );
-            return;
-          }
-
-          const shuffledDeck = [...currentPlayerCards];
-          const drawn = getRandomHand(shuffledDeck, 5);
-          const rest = shuffledDeck.filter(
-            (c: Card) => !drawn.some((d: Card) => d.id === c.id),
-          );
-
-          set({
-            deck: rest,
-            initialDraw: drawn,
-            deckSelectionDone: true,
-          });
-
-          if (gameId && state.isConnected) {
-            socket.emit('updateGameState', {
-              gameId,
-              state: { hand: drawn, deck: rest },
-            });
-          }
-        })
-        .catch((err: Error) => console.error('[ERREUR INIT DRAW]', err));
-    }
-  }, [
-    state.deckSelectionData,
-    state.bothReady,
-    state.deckSelectionDone,
-    state.playerId,
-  ]);
-
-  const handleDeckChoice = (deckId: string) => {
-    if (!state.playerId || !state.isConnected || !gameId) return;
-    if (state.playerId === 1 && state.hasChosenDeck) return;
-    if (
-      state.playerId === 2 &&
-      (!state.player1DeckId ||
-        state.selectedDecks.filter((d: string) => d !== state.player1DeckId)
-          .length >= 2)
-    )
-      return;
-
-    socket.emit('chooseDeck', {
-      gameId,
-      playerId: state.playerId,
-      deckId,
-    });
-
-    set({ hasChosenDeck: true });
-  };
-
-  const drawNewHand = () => {
-    if (state.deck.length < 5) return;
-    const drawn = getRandomHand(state.deck, 5);
-    const newDeck = state.deck.filter(
-      (card: Card) => !drawn.some((d: Card) => d.id === card.id),
-    );
-    set({ hand: drawn, deck: newDeck });
-    if (gameId && state.isConnected) {
-      socket.emit('updateGameState', {
-        gameId,
-        state: { hand: drawn, deck: newDeck },
-      });
-    }
-  };
-
-  const removeCardFromField = (index: number) => {
-    const newField = [...state.field];
-    const removedCard = newField[index];
-    newField[index] = null;
-
-    if (!removedCard) return;
-
-    const newGraveyard = [...state.graveyard, removedCard];
-    set({ field: newField, graveyard: newGraveyard });
-
-    if (gameId && state.isConnected) {
-      socket.emit('updateGameState', {
-        gameId,
-        state: { field: newField, graveyard: newGraveyard },
-      });
-    }
-  };
-
-  const discardCardFromHand = (card: Card) => {
-    if (!state.isConnected) return;
-    const newHand = state.hand.filter((c: Card) => c.id !== card.id);
-    const newGraveyard = [...state.graveyard, card];
-    set({ hand: newHand, graveyard: newGraveyard });
-
     if (gameId) {
-      socket.emit('updateGameState', {
+      initializeDeck(gameId, emit);
+    }
+  }, [gameId, initializeDeck, emit]);
+
+  const sendChatMessage = useCallback(() => {
+    if (state.chat.input.trim() && gameId && state.connection.isConnected) {
+      emit('sendMessage', { gameId, message: state.chat.input });
+      set({ chat: { input: '' } });
+    }
+  }, [state.chat.input, gameId, state.connection.isConnected, emit, set]);
+
+  const handlePhaseChange = useCallback(
+    (newPhase: 'Standby' | 'Main' | 'Battle' | 'End') => {
+      set({ game: { currentPhase: newPhase } });
+    },
+    [set],
+  );
+
+  const handleDeckChoiceCallback = useCallback(
+    (deckId: string) => {
+      const result = handleDeckChoice(deckId, gameId);
+      if (result && gameId) {
+        emit('chooseDeck', {
+          gameId,
+          playerId: state.connection.playerId,
+          deckId,
+        });
+      }
+    },
+    [handleDeckChoice, gameId, emit, state.connection.playerId],
+  );
+
+  const handleReadyClickCallback = useCallback(() => {
+    const result = handleReadyClick(gameId);
+    if (result && gameId) {
+      emit('playerReady', { gameId, playerId: state.connection.playerId });
+    }
+  }, [handleReadyClick, gameId, emit, state.connection.playerId]);
+
+  const handleKeepInitialHand = useCallback(() => {
+    const result = keepInitialHand();
+    if (result && gameId && state.connection.isConnected) {
+      emit('updateGameState', {
         gameId,
-        state: {
-          hand: newHand,
-          graveyard: newGraveyard,
+        state: { hand: result.hand, deck: state.player.deck },
+      });
+    }
+  }, [keepInitialHand, gameId, state.connection.isConnected, state.player.deck, emit]);
+
+  const handleDoMulligan = useCallback(() => {
+    const result = doMulligan();
+    if (result && gameId && state.connection.isConnected) {
+      emit('updateGameState', {
+        gameId,
+        state: { hand: result.hand, deck: result.deck },
+      });
+    }
+  }, [doMulligan, gameId, state.connection.isConnected, emit]);
+
+  const setHoveredCardId = useCallback(
+    (id: string | null) => {
+      set({ ui: { hoveredCardId: id } });
+    },
+    [set],
+  );
+
+  const setIsHandHovered = useCallback(
+    (val: boolean) => {
+      set({ ui: { isCardHovered: val } });
+    },
+    [set],
+  );
+
+  const handleRemoveCardFromField = useCallback(
+    (index: number) => {
+      const result = removeCardFromField(index);
+      if (result && gameId && state.connection.isConnected) {
+        emit('updateGameState', {
+          gameId,
+          state: { field: result.field, graveyard: result.graveyard },
+        });
+      }
+    },
+    [removeCardFromField, gameId, state.connection.isConnected, emit],
+  );
+
+  const handleExhaustCard = useCallback(
+    (index: number) => {
+      const result = exhaustCard(index);
+      if (result && gameId && state.connection.isConnected) {
+        emit('exhaustCard', {
+          gameId,
+          cardId: result.cardId,
+          fieldIndex: result.fieldIndex,
+        });
+      }
+    },
+    [exhaustCard, gameId, state.connection.isConnected, emit],
+  );
+
+  const handleAttackCard = useCallback(
+    (index: number) => {
+      const result = attackCard(index);
+      if (result && gameId && state.connection.isConnected) {
+        emit('attackCard', {
+          gameId,
+          cardId: result.cardId,
+        });
+      }
+    },
+    [attackCard, gameId, state.connection.isConnected, emit],
+  );
+
+  const handleDiscardCardFromHand = useCallback(
+    (card: Card) => {
+      const result = discardCardFromHand(card);
+      if (result && gameId && state.connection.isConnected) {
+        emit('updateGameState', {
+          gameId,
+          state: { hand: result.hand, graveyard: result.graveyard },
+        });
+      }
+    },
+    [discardCardFromHand, gameId, state.connection.isConnected, emit],
+  );
+
+  const handlePlayCardToField = useCallback(
+    (card: Card) => {
+      const result = playCardToField(card);
+      if (result && gameId && state.connection.isConnected) {
+        emit('playCard', {
+          gameId,
+          card: result.card,
+          fieldIndex: result.fieldIndex,
+        });
+      }
+    },
+    [playCardToField, gameId, state.connection.isConnected, emit],
+  );
+
+  const handleAddToDeck = useCallback(
+    (card: Card) => {
+      const result = addToDeck(card);
+      if (result && gameId && state.connection.isConnected) {
+        emit('updateGameState', {
+          gameId,
+          state: { hand: result.hand, deck: result.deck },
+        });
+      }
+    },
+    [addToDeck, gameId, state.connection.isConnected, emit],
+  );
+
+  const handleDrawCard = useCallback(() => {
+    if (!gameId || !state.connection.playerId || !state.connection.isConnected) {
+      console.error('[ERROR] handleDrawCard failed:', {
+        gameId,
+        playerId: state.connection.playerId,
+        isConnected: state.connection.isConnected,
+      });
+      return;
+    }
+    const result = drawCard();
+    if (result) {
+      console.log('[DEBUG] handleDrawCard:', {
+        gameId,
+        playerId: state.connection.playerId,
+        handLength: result.hand.length,
+        deckLength: result.deck.length,
+      });
+      emit('drawCard', {
+        gameId,
+        playerId: state.connection.playerId,
+      });
+    } else {
+      console.log('[DEBUG] drawCard returned null');
+    }
+  }, [drawCard, gameId, state.connection.playerId, state.connection.isConnected, emit]);
+
+  const handleShuffleDeck = useCallback(() => {
+    const result = shuffleDeck();
+    if (result && gameId && state.connection.isConnected) {
+      emit('updateGameState', {
+        gameId,
+        state: { deck: result.deck },
+      });
+    }
+  }, [shuffleDeck, gameId, state.connection.isConnected, emit]);
+
+  const handleUpdateLifePoints = useCallback(
+    (newValue: number) => {
+      const result = updateLifePoints(newValue);
+      if (result && gameId && state.connection.isConnected) {
+        emit('updateLifePoints', {
+          gameId,
+          lifePoints: newValue,
+        });
+      }
+    },
+    [updateLifePoints, gameId, state.connection.isConnected, emit],
+  );
+
+  const handleUpdateTokenCount = useCallback(
+    (newValue: number) => {
+      const result = updateTokenCount(newValue);
+      if (result && gameId && state.connection.isConnected) {
+        emit('updateTokenCount', {
+          gameId,
+          tokenCount: newValue,
+        });
+      }
+    },
+    [updateTokenCount, gameId, state.connection.isConnected, emit],
+  );
+
+  const handleAddAssassinTokenToOpponentDeck = useCallback(() => {
+    const result = addAssassinTokenToOpponentDeck();
+    if (result && gameId && state.connection.isConnected) {
+      const assassinToken = result.opponentDeck.find((c) => c.name === 'Assassin Token');
+      emit('addAssassinTokenToOpponentDeck', {
+        gameId,
+        tokenCount: result.tokenCount,
+        tokenCard: {
+          id: assassinToken?.id || `token_assassin_${Math.random().toString(36).substr(2, 9)}`,
+          name: 'Assassin Token',
+          image: '/cards/tokens/token_assassin.jpg',
+          exhausted: false,
         },
       });
-    }
-  };
-
-  const playCardToField = (card: Card) => {
-    if (
-      !state.isMyTurn ||
-      state.mustDiscard ||
-      !state.isConnected ||
-      state.currentPhase !== 'Main'
-    ) {
-      return;
-    }
-
-    const newField = [...state.field];
-    const emptyIndex = newField.findIndex((slot: Card | null) => slot === null);
-    if (emptyIndex === -1) return;
-
-    newField[emptyIndex] = card;
-    const newHand = state.hand.filter((c: Card) => c.id !== card.id);
-    setState((prev) => {
-      return { ...prev, field: newField, hand: newHand };
-    });
-
-    if (gameId) {
-      socket.emit('playCard', {
-        gameId,
-        card,
-        fieldIndex: emptyIndex,
+      toast.success('Token assassin ajouté au deck adverse et mélangé !', {
+        toastId: 'add_assassin_token',
+      });
+    } else {
+      toast.error('Impossible d’ajouter le token assassin au deck adverse.', {
+        toastId: 'add_assassin_token_error',
       });
     }
-  };
+  }, [addAssassinTokenToOpponentDeck, gameId, state.connection.isConnected, emit]);
 
-  const exhaustCard = (index: number) => {
-    if (
-      !state.isMyTurn ||
-      !state.isConnected ||
-      !gameId ||
-      state.currentPhase !== 'Main'
-    ) {
-      return;
-    }
-
-    const card = state.field[index];
-    if (!card) {
-      return;
-    }
-
-    const newField = [...state.field];
-    newField[index] = { ...card, exhausted: !card.exhausted };
-    set({ field: [...newField] });
-
-    socket.emit('exhaustCard', {
-      gameId,
-      cardId: card.id,
-      fieldIndex: index,
-    });
-  };
-
-  const attackCard = (index: number) => {
-    if (
-      !state.isMyTurn ||
-      !state.isConnected ||
-      !gameId ||
-      state.currentPhase !== 'Battle'
-    )
-      return;
-    const card = state.field[index];
-    if (card) {
-      removeCardFromField(index);
-      socket.emit('attackCard', { gameId, cardId: card.id });
-    }
-  };
-
-  const addToDeck = (card: Card) => {
-    const newHand = state.hand.filter((c: Card) => c.id !== card.id);
-    const newDeck = [...state.deck, card];
-    set({ hand: newHand, deck: newDeck });
-    if (gameId && state.isConnected) {
-      socket.emit('updateGameState', {
+  const handlePlaceAssassinTokenAtOpponentDeckBottom = useCallback(() => {
+    const result = placeAssassinTokenAtOpponentDeckBottom();
+    if (result && gameId && state.connection.isConnected) {
+      const assassinToken = result.opponentDeck[result.opponentDeck.length - 1];
+      console.log('[DEBUG] Emitting placeAssassinTokenAtOpponentDeckBottom:', {
         gameId,
-        state: { hand: newHand, deck: newDeck },
+        tokenCard: assassinToken,
+        tokenCount: result.tokenCount,
+      });
+      emit('placeAssassinTokenAtOpponentDeckBottom', {
+        gameId,
+        tokenCard: {
+          id: assassinToken.id,
+          name: 'Assassin Token',
+          image: '/cards/tokens/token_assassin.jpg',
+          exhausted: false,
+        },
+      });
+      toast.success('Token assassin placé en bas du deck adverse !', {
+        toastId: 'place_assassin_token',
       });
     }
-  };
+  }, [placeAssassinTokenAtOpponentDeckBottom, gameId, state.connection.isConnected, emit]);
 
-  const drawCard = () => {
-    if (
-      state.deck.length === 0 ||
-      !state.isMyTurn ||
-      !state.isConnected ||
-      state.hand.length >= 10
-    )
-      return;
-    const [drawnCard] = state.deck.slice(0, 1);
-    const newDeck = state.deck.slice(1);
-    const newHand = [...state.hand, drawnCard];
-    set({ hand: newHand, deck: newDeck });
-    if (gameId) {
-      socket.emit('updateGameState', {
-        gameId,
-        state: { hand: newHand, deck: newDeck },
-      });
-    }
-  };
+  const setGraveyardOpen = useCallback(
+    (isOpen: boolean) => {
+      set({ ui: { isGraveyardOpen: isOpen } });
+    },
+    [set],
+  );
 
-  const shuffleDeck = () => {
-    if (!state.isConnected) return;
-    const shuffledDeck = [...state.deck].sort(() => Math.random() - 0.5);
-    set({ deck: shuffledDeck });
-    if (gameId) {
-      socket.emit('updateGameState', {
-        gameId,
-        state: { deck: shuffledDeck },
-      });
-    }
-  };
+  const setOpponentGraveyardOpen = useCallback(
+    (isOpen: boolean) => {
+      set({ ui: { isOpponentGraveyardOpen: isOpen } });
+    },
+    [set],
+  );
 
-  const sendChatMessage = () => {
-    if (state.chatInput.trim() && gameId && state.isConnected) {
-      socket.emit('sendMessage', { gameId, message: state.chatInput });
-      set({ chatInput: '' });
-    }
-  };
+  const setTokenZoneOpen = useCallback(
+    (isOpen: boolean) => {
+      set({ ui: { isTokenZoneOpen: isOpen } });
+    },
+    [set],
+  );
 
-  const toggleCardMulligan = (cardId: string) => {
-    set({
-      selectedForMulligan: state.selectedForMulligan.includes(cardId)
-        ? state.selectedForMulligan.filter((id: string) => id !== cardId)
-        : [...state.selectedForMulligan, cardId],
-    });
-  };
+  const setOpponentTokenZoneOpen = useCallback(
+    (isOpen: boolean) => {
+      set({ ui: { isOpponentTokenZoneOpen: isOpen } });
+    },
+    [set],
+  );
 
-  const doMulligan = () => {
-    const toMulligan = state.initialDraw.filter((card: Card) =>
-      state.selectedForMulligan.includes(card.id),
-    );
-    const toKeep = state.initialDraw.filter(
-      (card: Card) => !state.selectedForMulligan.includes(card.id),
-    );
-    const reshuffledDeck = [...state.deck, ...toMulligan].sort(
-      () => Math.random() - 0.5,
-    );
-    const newDraw = getRandomHand(reshuffledDeck, 5 - toKeep.length);
-    const finalHand = [...toKeep, ...newDraw];
-    const newDeck = reshuffledDeck.filter(
-      (c: Card) => !newDraw.some((d: Card) => d.id === c.id),
-    );
-    set({
-      hand: finalHand,
-      deck: newDeck,
-      initialDraw: [],
-      selectedForMulligan: [],
-      mulliganDone: true,
-    });
+  const setChatInput = useCallback(
+    (input: string) => {
+      set({ chat: { input } });
+    },
+    [set],
+  );
 
-    if (gameId && state.isConnected) {
-      socket.emit('updateGameState', {
-        gameId,
-        state: { hand: finalHand, deck: newDeck },
-      });
-    }
-  };
-
-  const keepInitialHand = () => {
-    set({
-      hand: state.initialDraw,
-      initialDraw: [],
-      selectedForMulligan: [],
-      mulliganDone: true,
-    });
-
-    if (gameId && state.isConnected) {
-      socket.emit('updateGameState', {
-        gameId,
-        state: { hand: state.initialDraw },
-      });
-    }
-  };
-
-  const handleReadyClick = () => {
-    if (!gameId || !state.playerId || state.isReady) return;
-    socket.emit('playerReady', { gameId, playerId: state.playerId });
-    set({ isReady: true });
-  };
-
-  const renderInitialDraw = () => {
-    if (
-      state.initialDraw.length === 0 ||
-      state.mulliganDone ||
-      !state.bothReady
-    )
-      return null;
-    return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-50">
-        <h2 className="text-white text-2xl font-bold mb-6">Main de départ</h2>
-        <div className="flex gap-4">
-          {state.initialDraw.map((card: Card) => {
-            const isSelected = state.selectedForMulligan.includes(card.id);
-            return (
-              <div
-                key={card.id}
-                onClick={() => toggleCardMulligan(card.id)}
-                className={`relative w-[150px] h-[210px] cursor-pointer rounded border-4 ${isSelected ? 'border-red-500' : 'border-transparent'} hover:scale-105 transition-transform`}
-              >
-                <img
-                  src={card.image}
-                  alt={card.name}
-                  className="w-full h-full object-cover rounded"
-                />
-                {isSelected && (
-                  <div className="absolute top-1 left-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full shadow">
-                    Mulligan
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <div className="mt-6 flex gap-4">
-          <button
-            onClick={keepInitialHand}
-            className="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-full hover:bg-green-700 shadow-md hover:scale-105 transition"
-          >
-            <BadgeCheck className="w-4 h-4" /> Je garde ma main
-          </button>
-          {state.selectedForMulligan.length > 0 && (
-            <button
-              onClick={doMulligan}
-              className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 shadow-md hover:scale-105 transition"
-            >
-              <X className="w-4 h-4" /> Mulligan (
-              {state.selectedForMulligan.length})
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const handlePhaseChange = (newPhase: string) => {
-    set({ currentPhase: newPhase });
-  };
-
-  const {
-    hand,
-    deck,
-    graveyard,
-    opponentGraveyard,
-    field,
-    opponentField,
-    opponentHand,
-    opponentDeck,
-    chatMessages,
-    chatInput,
-    playerId,
-    turn,
-    isConnected,
-    hoveredCardId,
-    isCardHovered,
-    isGraveyardOpen,
-    isOpponentGraveyardOpen,
-    mustDiscard,
-    isMyTurn,
-    randomizers,
-    isRightPanelOpen,
-    currentPhase,
-  } = state;
-
-  const toggleRightPanel = () => {
-    set({ isRightPanelOpen: !isRightPanelOpen });
-  };
+  const fieldKey = useMemo(
+    () => state.player.field.map((c) => c?.exhausted).join('-'),
+    [state.player.field],
+  );
 
   return (
     <div className="w-full min-h-screen flex flex-row relative overflow-hidden">
-      {renderInitialDraw()}
-      {!state.deckSelectionDone && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-black/90 z-50">
-          <h2 className="text-white text-3xl font-bold mb-4">
-            Choix des decks
-          </h2>
-          <div className="flex gap-6">
-            {randomizers.map((deckObj) => {
-              const isSelected = state.selectedDecks.includes(deckObj.id);
-              const borderColor = isSelected
-                ? state.player1DeckId === deckObj.id
-                  ? 'border-blue-500'
-                  : 'border-red-500'
-                : 'border-transparent';
-
-              return (
-                <div
-                  key={deckObj.id}
-                  onClick={() => handleDeckChoice(deckObj.id)}
-                  className="w-[180px] h-[250px] relative cursor-pointer transition-transform hover:scale-105 rounded shadow-lg"
-                >
-                  <div
-                    className={`w-full h-full border-4 ${borderColor} rounded ${borderColor !== 'border-transparent' ? 'shadow-lg shadow-black/50' : ''}`}
-                  >
-                    <img
-                      src={deckObj.image}
-                      alt={deckObj.name}
-                      className="w-full h-full object-cover rounded"
-                    />
-                  </div>
-                  {getDeckBadge(
-                    deckObj.id,
-                    state.player1DeckId,
-                    state.selectedDecks,
-                    randomizers,
-                  )}
-                </div>
-              );
-            })}
+      {!state.deckSelection.deckSelectionDone && (
+        <DeckSelection
+          randomizers={state.deckSelection.randomizers}
+          selectedDecks={state.deckSelection.selectedDecks}
+          player1DeckId={state.deckSelection.player1DeckId}
+          hasChosenDeck={state.deckSelection.hasChosenDeck}
+          isReady={state.deckSelection.isReady}
+          opponentReady={state.deckSelection.opponentReady}
+          onDeckChoice={handleDeckChoiceCallback}
+          onReadyClick={handleReadyClickCallback}
+          waitingForPlayer1={state.deckSelection.waitingForPlayer1}
+          playerId={state.connection.playerId}
+        />
+      )}
+      <InitialDrawModal
+        initialDraw={state.deckSelection.initialDraw}
+        selectedForMulligan={state.deckSelection.selectedForMulligan}
+        mulliganDone={state.deckSelection.mulliganDone}
+        bothReady={state.deckSelection.bothReady}
+        onToggleCardMulligan={toggleCardMulligan}
+        onKeepInitialHand={handleKeepInitialHand}
+        onDoMulligan={handleDoMulligan}
+      />
+      {state.game.gameOver && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50">
+          <div className="bg-gray-800 p-6 rounded-lg text-white text-center">
+            <h2 className="text-2xl font-bold mb-4">
+              {state.game.winner === (state.connection.playerId === 1 ? 'player1' : 'player2')
+                ? 'Victoire !'
+                : 'Défaite !'}
+            </h2>
+            <button
+              onClick={() => window.location.href = '/'}
+              className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"
+            >
+              Retour à l'accueil
+            </button>
           </div>
-          {state.hasChosenDeck && (
-            <div className="flex flex-col items-center gap-2 mt-6">
-              <button
-                onClick={handleReadyClick}
-                className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-3 rounded-full shadow-lg hover:scale-105 hover:shadow-xl transition transform duration-200"
-              >
-                <span className="text-md font-semibold">
-                  {state.isReady ? 'En attente de l’autre joueur…' : 'Ready'}
-                </span>
-              </button>
-              {state.isReady && (
-                <p
-                  className={`text-sm font-medium ${state.opponentReady ? 'text-green-400' : 'text-yellow-300'}`}
-                >
-                  {state.opponentReady
-                    ? 'L’autre joueur est prêt !'
-                    : 'L’autre joueur n’est pas encore prêt.'}
-                </p>
-              )}
-            </div>
-          )}
         </div>
       )}
       <div className="w-full min-h-screen flex flex-row overflow-hidden">
         <div
-          className={`flex-grow min-h-screen flex flex-col justify-end items-center p-4 relative z-10 ${!isRightPanelOpen ? 'w-full' : 'w-[85%]'}`}
+          className={`flex-grow min-h-screen flex flex-col justify-end items-center p-4 relative z-10 ${
+            !state.ui.isRightPanelOpen ? 'w-full' : 'w-[85%]'
+          }`}
           style={{
             backgroundImage: 'url(/addons/background-2.jpg)',
             backgroundSize: 'cover',
@@ -765,148 +414,149 @@ export default function Game() {
             transition: 'width 0.3s ease-in-out',
           }}
         >
+          <div
+            style={{
+              position: 'absolute',
+              top: '12%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+            }}
+          >
+            <CounterOpponentPlayer
+              playerId={state.connection.playerId}
+              gameId={gameId}
+              opponentCounter={state.opponent.lifePoints}
+            />
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              top: '76%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <CounterPlayer
+              playerId={state.connection.playerId}
+              gameId={gameId}
+              counter={state.player.lifePoints}
+              updateCounter={handleUpdateLifePoints}
+            />
+          </div>
           <div className="z-30">
             <PhaseIndicator
               socket={socket}
-              isMyTurn={isMyTurn}
-              playerId={playerId}
+              isMyTurn={state.game.isMyTurn}
+              playerId={state.connection.playerId}
               gameId={gameId}
               onPhaseChange={handlePhaseChange}
-              currentPhase={currentPhase}
+              currentPhase={state.game.currentPhase}
+              turn={state.game.turn}
             />
             <PlayerField
-              key={state.field.map((c) => c?.exhausted).join('-')}
-              field={field}
-              hoveredCardId={hoveredCardId}
-              setHoveredCardId={(id) => set({ hoveredCardId: id })}
-              removeCardFromField={(index) => removeCardFromField(index)}
-              exhaustCard={(index) => exhaustCard(index)}
-              attackCard={(index) => attackCard(index)}
+              key={fieldKey}
+              field={state.player.field}
+              hoveredCardId={state.ui.hoveredCardId}
+              setHoveredCardId={setHoveredCardId}
+              removeCardFromField={handleRemoveCardFromField}
+              exhaustCard={handleExhaustCard}
+              attackCard={handleAttackCard}
             />
             <PlayerHand
-              hand={hand}
-              hoveredCardId={hoveredCardId}
-              setHoveredCardId={(id) => set({ hoveredCardId: id })}
-              isHandHovered={isCardHovered}
-              setIsHandHovered={(val) => set({ isCardHovered: val })}
-              mustDiscard={mustDiscard}
-              discardCardFromHand={(card) => discardCardFromHand(card)}
-              playCardToField={(card) => playCardToField(card)}
-              addToDeck={(card) => addToDeck(card)}
-              playerId={playerId}
+              hand={state.player.hand}
+              hoveredCardId={state.ui.hoveredCardId}
+              setHoveredCardId={setHoveredCardId}
+              isHandHovered={state.ui.isCardHovered}
+              setIsHandHovered={setIsHandHovered}
+              mustDiscard={state.player.mustDiscard}
+              discardCardFromHand={handleDiscardCardFromHand}
+              playCardToField={handlePlayCardToField}
+              addToDeck={handleAddToDeck}
+              playerId={state.connection.playerId}
             />
             <OpponentField
-              opponentField={opponentField}
-              hoveredCardId={hoveredCardId}
-              setHoveredCardId={(id) => set({ hoveredCardId: id })}
+              opponentField={state.opponent.field}
+              hoveredCardId={state.ui.hoveredCardId}
+              setHoveredCardId={setHoveredCardId}
             />
-            <OpponentHand opponentHand={opponentHand} />
+            <OpponentHand opponentHand={state.opponent.hand} />
           </div>
 
           <div className="z-30 absolute left-4 bottom-2 flex gap-4">
             <PlayerDeck
-              count={deck.length}
-              handCount={hand.length}
-              drawCard={drawCard}
-              shuffleDeck={shuffleDeck}
+              count={state.player.deck.length}
+              handCount={state.player.hand.length}
+              drawCard={handleDrawCard}
+              shuffleDeck={handleShuffleDeck}
             />
             <PlayerGraveyard
-              count={graveyard.length}
-              onClick={() => set({ isGraveyardOpen: true })}
-              isOpen={isGraveyardOpen}
-              onClose={() => set({ isGraveyardOpen: false })}
-              graveyard={graveyard}
-              hoveredCardId={hoveredCardId}
-              setHoveredCardId={(id) => set({ hoveredCardId: id })}
+              count={state.player.graveyard.length}
+              onClick={() => setGraveyardOpen(true)}
+              isOpen={state.ui.isGraveyardOpen}
+              onClose={() => setGraveyardOpen(false)}
+              graveyard={state.player.graveyard}
+              hoveredCardId={state.ui.hoveredCardId}
+              setHoveredCardId={setHoveredCardId}
+            />
+            <PlayerTokenZone
+              tokenCount={state.player.tokenCount}
+              tokenType={state.player.tokenType}
+              onClick={() => setTokenZoneOpen(true)}
+              isOpen={state.ui.isTokenZoneOpen}
+              onClose={() => setTokenZoneOpen(false)}
+              updateTokenCount={handleUpdateTokenCount}
+              setHoveredTokenId={setHoveredTokenId}
+              addAssassinTokenToOpponentDeck={handleAddAssassinTokenToOpponentDeck}
+              placeAssassinTokenAtOpponentDeckBottom={handlePlaceAssassinTokenAtOpponentDeckBottom}
+              gameId={gameId}
+              playerId={state.connection.playerId}
+              opponentDeck={state.opponent.deck}
             />
           </div>
 
-          <div className="z-30 absolute left-4 top-2 flex gap-4">
-            <OpponentDeck count={opponentDeck.length} />
-            <OpponentGraveyard
-              count={opponentGraveyard.length}
-              onClick={() => set({ isOpponentGraveyardOpen: true })}
-              isOpen={isOpponentGraveyardOpen}
-              onClose={() => set({ isOpponentGraveyardOpen: false })}
-              graveyard={opponentGraveyard}
-              hoveredCardId={hoveredCardId}
-              setHoveredCardId={(id) => set({ hoveredCardId: id })}
-            />
-          </div>
+          {!state.ui.isTokenZoneOpen && (
+            <div className="z-30 absolute left-4 top-2 flex gap-4">
+              <OpponentDeck count={state.opponent.deck.length} />
+              <OpponentGraveyard
+                count={state.opponent.graveyard.length}
+                onClick={() => setOpponentGraveyardOpen(true)}
+                isOpen={state.ui.isOpponentGraveyardOpen}
+                onClose={() => setOpponentGraveyardOpen(false)}
+                graveyard={state.opponent.graveyard}
+                hoveredCardId={state.ui.hoveredCardId}
+                setHoveredCardId={setHoveredCardId}
+              />
+              <OpponentTokenZone
+                tokenCount={state.opponent.tokenCount}
+                tokenType={state.opponent.tokenType}
+                onClick={() => setOpponentTokenZoneOpen(true)}
+                isOpen={state.ui.isOpponentTokenZoneOpen}
+                onClose={() => setOpponentTokenZoneOpen(false)}
+              />
+            </div>
+          )}
+
           <CardPreview
-            hoveredCardId={hoveredCardId}
-            field={field}
-            hand={hand}
-            opponentField={opponentField}
+            hoveredCardId={state.ui.hoveredCardId}
+            field={state.player.field}
+            hand={state.player.hand}
+            opponentField={state.opponent.field}
           />
         </div>
 
-        <motion.div
-          key={isRightPanelOpen ? 'open' : 'closed'}
-          className="min-h-screen flex flex-col items-center justify-start pt-8 gap-4 bg-black"
-          initial={{ x: 0 }}
-          animate={{ x: isRightPanelOpen ? 0 : '100%' }}
-          transition={{ duration: 0.3, ease: 'easeInOut' }}
-          style={{
-            position: 'absolute',
-            width: '15%',
-            right: 0,
-            top: 0,
-            zIndex: 20,
-          }}
-        >
-          <button
-            onClick={toggleRightPanel}
-            className="absolute top-1/2 left-[-30px] transform -translate-y-1/2 bg-gray-800 text-white p-2 rounded-full shadow-lg hover:bg-gray-700 focus:outline-none z-50"
-            aria-label={
-              isRightPanelOpen ? 'Close right panel' : 'Open right panel'
-            }
-            style={{ zIndex: 50, pointerEvents: 'auto' }}
-          >
-            <X size={20} />
-          </button>
-          <p className="text-white font-bold">ID de la partie : {gameId}</p>
-          <p className="text-white">Joueur {playerId || '...'}</p>
-          {hand.length === 0 && deck.length >= 5 && (
-            <button
-              onClick={drawNewHand}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              disabled={!isConnected}
-            >
-              <RefreshCcw className="w-5 h-5" /> Nouvelle main
-            </button>
-          )}
-          <p className="text-white font-bold">Tour {turn}</p>
-          <p className="text-white">
-            {isMyTurn ? 'À votre tour !' : "Tour de l'adversaire"}
-          </p>
+        <div className="chatbox-container">
           <ChatBox
-            chatMessages={chatMessages}
-            chatInput={chatInput}
-            setChatInput={(input) => set({ chatInput: input })}
+            chatMessages={state.chat.messages}
+            chatInput={state.chat.input}
+            setChatInput={setChatInput}
             sendChatMessage={sendChatMessage}
-            playerId={playerId}
-            isConnected={isConnected}
+            playerId={state.connection.playerId}
+            isConnected={state.connection.isConnected}
+            gameId={gameId}
+            turn={state.game.turn}
+            isMyTurn={state.game.isMyTurn}
           />
-          <div className="flex flex-col items-center gap-2 mt-4">
-            <a
-              href="https://www.notion.so/nexus-card-game/1cd54baaf409803b8ecfe4c1fdd948ae?v=1ce54baaf4098020a27d000c66b5dc94"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              <ExternalLink className="w-5 h-5" /> Wiki
-            </a>
-            <a
-              href="/addons/rules.pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              <FileText className="w-5 h-5" /> Règles
-            </a>
-          </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

@@ -65,6 +65,20 @@ function drawCardServer(game, playerKey) {
   if (game.state[playerKey].deck.length > 0) {
     const [drawnCard] = game.state[playerKey].deck.splice(0, 1);
     game.state[playerKey].hand.push(drawnCard);
+    return drawnCard;
+  }
+  return null;
+}
+
+function checkWinCondition(gameId, game) {
+  const player1Life = game.state.player1.lifePoints;
+  const player2Life = game.state.player2.lifePoints;
+  if (player1Life <= 0 || player2Life <= 0) {
+    const winner = player1Life <= 0 ? 'player2' : 'player1';
+    game.state.gameOver = true;
+    game.state.winner = winner;
+    io.to(gameId).emit('gameOver', { winner });
+    emitUpdateGameState(gameId, game.state);
   }
 }
 
@@ -92,6 +106,9 @@ io.on('connection', (socket) => {
             opponentGraveyard: [],
             mustDiscard: false,
             hasPlayedCard: false,
+            lifePoints: 30,
+            tokenCount: 0,
+            tokenType: null,
           },
           player2: {
             hand: [],
@@ -103,10 +120,15 @@ io.on('connection', (socket) => {
             opponentGraveyard: [],
             mustDiscard: false,
             hasPlayedCard: false,
+            lifePoints: 30,
+            tokenCount: 0,
+            tokenType: null,
           },
           turn: 1,
           activePlayer: socket.id,
           phase: 'Main',
+          gameOver: false,
+          winner: null,
         },
         deckChoices: { 1: null, 2: [] },
         availableDecks: getRandomDecks(),
@@ -125,6 +147,9 @@ io.on('connection', (socket) => {
       emitUpdateGameState(gameId, games[gameId].state);
       io.to(gameId).emit('playerJoined', { playerId: 2 });
       io.to(gameId).emit('initialDeckList', games[gameId].availableDecks);
+      if (!games[gameId].deckChoices[1]) {
+        io.to(socket.id).emit('waitingForPlayer1Choice');
+      }
     } else {
       socket.emit('error', 'La partie est pleine');
       return;
@@ -185,6 +210,101 @@ io.on('connection', (socket) => {
     emitUpdateGameState(gameId, game.state);
   });
 
+  socket.on('updateLifePoints', ({ gameId, lifePoints }) => {
+    const game = games[gameId];
+    if (!game) return;
+    const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
+    const opponentKey = players[socket.id].playerId === 1 ? 'player2' : 'player1';
+    game.state[playerKey].lifePoints = lifePoints;
+    game.state[opponentKey].lifePoints = game.state[opponentKey].lifePoints || 30;
+    emitUpdateGameState(gameId, game.state);
+    checkWinCondition(gameId, game);
+  });
+
+  socket.on('updateTokenCount', ({ gameId, tokenCount }) => {
+    const game = games[gameId];
+    if (!game) return;
+    const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
+    const opponentKey = players[socket.id].playerId === 1 ? 'player2' : 'player1';
+    let max = 30;
+    if (game.state[playerKey].tokenType === 'assassin') {
+      max = 8;
+    }
+    if (tokenCount >= 0 && tokenCount <= max) {
+      game.state[playerKey].tokenCount = tokenCount;
+      emitUpdateGameState(gameId, game.state);
+    }
+  });
+
+  socket.on('addAssassinTokenToOpponentDeck', ({ gameId, tokenCount, tokenCard }) => {
+    const game = games[gameId];
+    if (!game || game.state.activePlayer !== socket.id) return;
+    const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
+    const opponentKey = players[socket.id].playerId === 1 ? 'player2' : 'player1';
+    if (
+      game.state[playerKey].tokenType === 'assassin' &&
+      tokenCount >= 0 &&
+      tokenCount <= 8
+    ) {
+      game.state[playerKey].tokenCount = tokenCount;
+      game.state[opponentKey].deck = [...game.state[opponentKey].deck, tokenCard].sort(
+        () => Math.random() - 0.5
+      );
+      game.state[playerKey].opponentHand = Array(
+        game.state[opponentKey].hand.length
+      ).fill({});
+      game.state[opponentKey].opponentHand = Array(
+        game.state[playerKey].hand.length
+      ).fill({});
+      console.log('[DEBUG] addAssassinTokenToOpponentDeck:', {
+        gameId,
+        opponentDeckLength: game.state[opponentKey].deck.length,
+        tokenCard,
+      });
+      emitUpdateGameState(gameId, game.state);
+    }
+  });
+
+  socket.on('placeAssassinTokenAtOpponentDeckBottom', ({ gameId, tokenCard }) => {
+    const game = games[gameId];
+    if (!game || game.state.activePlayer !== socket.id) return;
+    const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
+    const opponentKey = players[socket.id].playerId === 1 ? 'player2' : 'player1';
+    if (game.state[playerKey].tokenType === 'assassin') {
+      game.state[playerKey].tokenCount = Math.max(0, game.state[playerKey].tokenCount - 1);
+      game.state[opponentKey].deck = [...game.state[opponentKey].deck, tokenCard];
+      game.state[playerKey].opponentHand = Array(
+        game.state[opponentKey].hand.length
+      ).fill({});
+      game.state[opponentKey].opponentHand = Array(
+        game.state[playerKey].hand.length
+      ).fill({});
+      console.log('[DEBUG] placeAssassinTokenAtOpponentDeckBottom:', {
+        gameId,
+        opponentDeckLength: game.state[opponentKey].deck.length,
+        tokenCard,
+      });
+      emitUpdateGameState(gameId, game.state);
+    }
+  });
+
+  socket.on('handleAssassinTokenDraw', ({ gameId, playerLifePoints, opponentTokenCount }) => {
+    console.log('[DEBUG] handleAssassinTokenDraw received:', { gameId, playerLifePoints, opponentTokenCount });
+    const game = games[gameId];
+    if (!game || game.state.activePlayer !== socket.id) return;
+    const playerKey = players[socket.id].playerId === 1 ? 'player1' : 'player2';
+    const opponentKey = players[socket.id].playerId === 1 ? 'player2' : 'player1';
+    if (game.state[opponentKey].tokenType === 'assassin') {
+      game.state[playerKey].lifePoints = playerLifePoints;
+      game.state[opponentKey].tokenCount = opponentTokenCount;
+      game.state[playerKey].opponentHand = Array(game.state[opponentKey].hand.length).fill({});
+      game.state[opponentKey].opponentHand = Array(game.state[playerKey].hand.length).fill({});
+      emitUpdateGameState(gameId, game.state);
+      io.to(gameId).emit('handleAssassinTokenDraw', { playerLifePoints, opponentTokenCount });
+      checkWinCondition(gameId, game);
+    }
+  });
+
   socket.on('updateGameState', ({ gameId, state }) => {
     const game = games[gameId];
     if (!game) return;
@@ -200,7 +320,13 @@ io.on('connection', (socket) => {
     game.state[playerKey].opponentHand = Array(
       game.state[opponentKey].hand.length,
     ).fill({});
+    console.log('[DEBUG] updateGameState:', {
+      gameId,
+      playerKey,
+      opponentDeckLength: game.state[opponentKey].deck.length,
+    });
     emitUpdateGameState(gameId, game.state);
+    checkWinCondition(gameId, game);
   });
 
   socket.on('chooseDeck', ({ gameId, playerId, deckId }) => {
@@ -213,9 +339,43 @@ io.on('connection', (socket) => {
 
     if (playerId === 1 && !game.deckChoices[1]) {
       game.deckChoices[1] = deckId;
-    } else if (playerId === 2 && game.deckChoices[2].length < 2) {
+      let tokenType = null;
+      let tokenCount = 0;
+      if (deckId === 'assassin') {
+        tokenType = 'assassin';
+        tokenCount = 8;
+      } else if (deckId === 'engine') {
+        tokenType = 'engine';
+        tokenCount = 0;
+      } else if (deckId === 'viking') {
+        tokenType = 'viking';
+        tokenCount = 1;
+      }
+      game.state.player1.tokenType = tokenType;
+      game.state.player1.tokenCount = tokenCount;
+      const player2SocketId = game.players.find(
+        (id) => players[id].playerId === 2,
+      );
+      if (player2SocketId) {
+        io.to(player2SocketId).emit('player1ChoseDeck');
+      }
+    } else if (playerId === 2 && game.deckChoices[2].length < 2 && game.deckChoices[1]) {
       if (!game.deckChoices[2].includes(deckId) && deckId !== game.deckChoices[1]) {
         game.deckChoices[2].push(deckId);
+        let tokenType = game.state.player2.tokenType;
+        let tokenCount = game.state.player2.tokenCount;
+        if (deckId === 'assassin' && !tokenType) {
+          tokenType = 'assassin';
+          tokenCount = 8;
+        } else if (deckId === 'engine' && !tokenType) {
+          tokenType = 'engine';
+          tokenCount = 0;
+        } else if (deckId === 'viking' && !tokenType) {
+          tokenType = 'viking';
+          tokenCount = 1;
+        }
+        game.state.player2.tokenType = tokenType;
+        game.state.player2.tokenCount = tokenCount;
       }
     }
 
@@ -231,7 +391,6 @@ io.on('connection', (socket) => {
         player2DeckIds: game.deckChoices[2],
         selectedDecks: [...totalDecks, remaining],
       };
-
 
       const { deckLists, allCards } = loadCards();
       if (!deckLists || !allCards || allCards.length === 0) {
@@ -279,7 +438,6 @@ io.on('connection', (socket) => {
           emitUpdateGameState(gameId, game.state);
           io.to(gameId).emit('bothPlayersReady');
         }
-      } else {
       }
     }
   });
@@ -322,38 +480,59 @@ io.on('connection', (socket) => {
   socket.on('updatePhase', ({ gameId, phase, turn }) => {
     const game = games[gameId];
     if (!game) {
+      console.log('[DEBUG] updatePhase - Jeu non trouvé:', gameId);
       return;
     }
     if (game.state.activePlayer !== socket.id) {
-
+      console.log('[DEBUG] updatePhase - Tentative par joueur non actif:', socket.id);
       return;
     }
     game.state.phase = phase;
     game.state.turn = turn;
+    console.log('[DEBUG] updatePhase - Phase mise à jour:', { gameId, phase, turn, activePlayer: game.state.activePlayer });
 
     emitUpdateGameState(gameId, game.state);
     io.to(gameId).emit('updatePhase', { phase, turn });
+    if (phase === 'Main' || phase === 'Battle') {
+      io.to(gameId).emit('phaseChangeMessage', { phase, turn });
+    }
   });
 
   socket.on('drawCard', ({ gameId, playerId }) => {
+    console.log('[DEBUG] drawCard received:', { gameId, playerId });
     const game = games[gameId];
-    if (!game) {
-      return;
-    }
-    if (game.state.activePlayer !== socket.id) {
-
+    if (!game || game.state.activePlayer !== socket.id) {
+      console.log('[DEBUG] drawCard - Invalid game or not active player:', { gameId, activePlayer: game?.state.activePlayer, socketId: socket.id });
       return;
     }
     const playerKey = playerId === 1 ? 'player1' : 'player2';
-    drawCardServer(game, playerKey);
     const opponentKey = playerId === 1 ? 'player2' : 'player1';
-    game.state[playerKey].opponentHand = Array(
-      game.state[opponentKey].hand.length,
-    ).fill({});
-    game.state[opponentKey].opponentHand = Array(
-      game.state[playerKey].hand.length,
-    ).fill({});
-    emitUpdateGameState(gameId, game.state);
+
+    const drawnCard = drawCardServer(game, playerKey);
+    console.log('[DEBUG] Card drawn:', { playerKey, drawnCard });
+    if (drawnCard && drawnCard.name === 'Assassin Token' && game.state[opponentKey].tokenType === 'assassin') {
+      console.log('[DEBUG] Assassin Token drawn, applying effects');
+      game.state[playerKey].lifePoints = Math.max(0, game.state[playerKey].lifePoints - 2);
+      game.state[opponentKey].tokenCount = Math.min(game.state[opponentKey].tokenCount + 1, 8);
+
+      // Repioche une carte si possible
+      const newDrawnCard = drawCardServer(game, playerKey);
+      console.log('[DEBUG] Repioche after Assassin Token:', { newDrawnCard });
+
+      game.state[playerKey].opponentHand = Array(game.state[opponentKey].hand.length).fill({});
+      game.state[opponentKey].opponentHand = Array(game.state[playerKey].hand.length).fill({});
+
+      emitUpdateGameState(gameId, game.state);
+      io.to(gameId).emit('handleAssassinTokenDraw', {
+        playerLifePoints: game.state[playerKey].lifePoints,
+        opponentTokenCount: game.state[opponentKey].tokenCount,
+      });
+      checkWinCondition(gameId, game);
+    } else {
+      game.state[playerKey].opponentHand = Array(game.state[opponentKey].hand.length).fill({});
+      game.state[opponentKey].opponentHand = Array(game.state[playerKey].hand.length).fill({});
+      emitUpdateGameState(gameId, game.state);
+    }
   });
 
   socket.on('endTurn', ({ gameId, nextPlayerId }) => {
@@ -364,13 +543,22 @@ io.on('connection', (socket) => {
         (id) => players[id].playerId === nextPlayerId,
       );
       if (nextPlayerSocketId) {
-
+        console.log('[DEBUG] endTurn - Avant changement de activePlayer:', {
+          currentPlayerId,
+          currentSocketId: socket.id,
+          nextPlayerId,
+          nextPlayerSocketId,
+        });
         game.state.activePlayer = nextPlayerSocketId;
         game.state.turn += 1;
         game.state.phase = 'Standby';
-
+        console.log('[DEBUG] endTurn - Après changement de phase et activePlayer:', {
+          activePlayer: game.state.activePlayer,
+          turn: game.state.turn,
+          phase: game.state.phase,
+        });
       } else {
-
+        console.log('[DEBUG] endTurn - Erreur: nextPlayerSocketId non trouvé pour playerId:', nextPlayerId);
         return;
       }
       game.state.player1.hasPlayedCard = false;
@@ -387,17 +575,42 @@ io.on('connection', (socket) => {
       const nextPlayerKey = nextPlayerId === 1 ? 'player1' : 'player2';
       const opponentKey = nextPlayerId === 1 ? 'player2' : 'player1';
       if (game.state.turn > 1 && game.state[nextPlayerKey].deck.length > 0 && game.state[nextPlayerKey].hand.length < 10) {
-        drawCardServer(game, nextPlayerKey);
+        const drawnCard = drawCardServer(game, nextPlayerKey);
+        console.log('[DEBUG] Automatic draw in endTurn:', { nextPlayerKey, drawnCard });
+        if (drawnCard && drawnCard.name === 'Assassin Token' && game.state[opponentKey].tokenType === 'assassin') {
+          console.log('[DEBUG] Assassin Token drawn in endTurn, applying effects');
+          game.state[nextPlayerKey].lifePoints = Math.max(0, game.state[nextPlayerKey].lifePoints - 2);
+          game.state[opponentKey].tokenCount = Math.min(game.state[opponentKey].tokenCount + 1, 8);
+
+          // Repioche une carte si possible
+          const newDrawnCard = drawCardServer(game, nextPlayerKey);
+          console.log('[DEBUG] Repioche after Assassin Token in endTurn:', { newDrawnCard });
+
+          game.state[nextPlayerKey].opponentHand = Array(game.state[opponentKey].hand.length).fill({});
+          game.state[opponentKey].opponentHand = Array(game.state[nextPlayerKey].hand.length).fill({});
+
+          emitUpdateGameState(gameId, game.state);
+          io.to(gameId).emit('handleAssassinTokenDraw', {
+            playerLifePoints: game.state[nextPlayerKey].lifePoints,
+            opponentTokenCount: game.state[opponentKey].tokenCount,
+          });
+          checkWinCondition(gameId, game);
+        }
       }
 
       game.state.player1.opponentHand = Array(game.state.player2.hand.length).fill({});
       game.state.player2.opponentHand = Array(game.state.player1.hand.length).fill({});
 
-
+      console.log('[DEBUG] endTurn - Avant émission:', {
+        gameId,
+        activePlayer: game.state.activePlayer,
+        phase: game.state.phase,
+        turn: game.state.turn,
+      });
       emitUpdateGameState(gameId, game.state);
       io.to(gameId).emit('endTurn');
       io.to(nextPlayerSocketId).emit('yourTurn');
-
+      io.to(gameId).emit('phaseChangeMessage', { phase: 'Standby', turn: game.state.turn, nextPlayerId });
     }
   });
 });
