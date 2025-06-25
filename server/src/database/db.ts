@@ -1,8 +1,10 @@
 // server/src/database/db.ts
 import { MongoClient } from 'mongodb';
-import { serverConfig } from '../config/serverConfig';
+import { serverConfig } from '../config/serverConfig.js';
 
 export async function connectToMongoDB() {
+  console.log('[DEBUG] Mongo URI utilisée :', serverConfig.mongodbUri);
+
   const client = new MongoClient(serverConfig.mongodbUri);
   try {
     await client.connect();

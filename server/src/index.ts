@@ -2,16 +2,21 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { serverConfig } from './config/serverConfig';
-import { connectToMongoDB } from './database/db';
-import { registerSocketHandlers } from './sockets/socketHandlers';
-import apiRoutes from './routes/apiRoutes';
-import { errorHandler } from './middleware/errorHandler';
-import { rateLimiter } from './middleware/rateLimiter';
+import { serverConfig } from './config/serverConfig.js';
+import { connectToMongoDB } from './database/db.js';
+import { registerSocketHandlers } from './sockets/socketHandlers.js';
+import initializeRoutes from './routes/apiRoutes.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import rateLimiter from './middleware/rateLimiter.js';
 import cors from 'cors';
+import { Db, MongoClient } from 'mongodb';
+import { GameRepository } from './database/gameRepository.js';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
-dotenv.config();
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: `${__dirname}/../../.env` });
 
 const app = express();
 const server = createServer(app);
@@ -25,17 +30,44 @@ const io = new Server(server, {
 });
 
 app.use(cors());
+// @ts-ignore
 app.use(rateLimiter);
 app.use(express.static('public'));
-app.use('/api', apiRoutes);
 app.use(errorHandler);
+app.use('/addons', express.static('addons'));
 
-connectToMongoDB().then(() => {
-  registerSocketHandlers(io);
-  server.listen(serverConfig.port, () => {
-    console.log(`Serveur démarré sur le port ${serverConfig.port}`);
+let dbInstance: Db | undefined;
+
+connectToMongoDB()
+  .then(({ db }: { client: MongoClient; db: Db }) => {
+    dbInstance = db;
+    const apiRouter = initializeRoutes(db);
+    app.use('/api', apiRouter);
+
+    if (dbInstance) {
+      registerSocketHandlers(io, dbInstance);
+    } else {
+      throw new Error('Instance de base de données non disponible');
+    }
+    server.listen(serverConfig.port, () => {
+      console.log(`Serveur démarré sur le port ${serverConfig.port}`);
+    });
+
+    if (dbInstance) {
+      registerSocketHandlers(io, dbInstance);
+      const gameRepository = new GameRepository(dbInstance);
+      setInterval(async () => {
+        try {
+          await gameRepository.cleanupInactiveGames();
+        } catch (error) {
+          console.error('Erreur lors du nettoyage des jeux inactifs :', error);
+        }
+      }, 60 * 60 * 1000);
+    } else {
+      throw new Error('Instance de base de données non disponible');
+    }
+  })
+  .catch((error: unknown) => {
+    console.error('Erreur au démarrage du serveur:', error);
+    process.exit(1);
   });
-}).catch((error) => {
-  console.error('Erreur au démarrage du serveur:', error);
-  process.exit(1);
-});

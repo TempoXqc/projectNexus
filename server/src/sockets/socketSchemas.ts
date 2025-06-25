@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CardSchema } from '../../../types/CardTypes';
+import { CardSchema } from '../../../types/CardTypes.js';
 
 export const PlayCardSchema = z.object({
   gameId: z.string(),

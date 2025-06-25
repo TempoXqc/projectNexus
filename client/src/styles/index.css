@@ -1,4 +1,4 @@
-@import "../../../node_modules/tailwindcss/dist/lib.d.mts";
+@import "tailwindcss";
 
 html,
 body,
@@ -68,4 +68,28 @@ body,
         height: 30%;
         left: 2%;
     }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #1f2937; /* bg-gray-800 */
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #4b5563; /* bg-gray-600 */
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #6b7280; /* bg-gray-500 */
+}
+
+/* Pour Firefox */
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2937;
 }

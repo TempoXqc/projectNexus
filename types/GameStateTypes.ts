@@ -1,5 +1,5 @@
 // types/GameStateTypes.ts
-import { Card } from './CardTypes';
+import { Card } from './CardTypes.js';
 
 export interface GameState {
   player: {
@@ -69,4 +69,40 @@ export interface GameState {
     isConnected: boolean;
     canInitializeDraw: boolean;
   };
+}
+
+export interface ServerGameState {
+  gameId: string;
+  players: string[];
+  chatHistory: { playerId: number; message: string }[];
+  state: {
+    player1: PlayerState;
+    player2: PlayerState;
+    turn: number;
+    activePlayer: string | null;
+    phase: 'Standby' | 'Main' | 'Battle' | 'End';
+    gameOver: boolean;
+    winner: string | null;
+  };
+  deckChoices: {
+    '1': string | null;
+    '2': string[];
+  };
+  availableDecks: string[];
+  createdAt: Date;
+  status: 'waiting' | 'started';
+}
+
+export interface PlayerState {
+  hand: Card[];
+  deck: Card[];
+  graveyard: Card[];
+  field: (Card | null)[];
+  opponentField: (Card | null)[];
+  opponentHand: (Card | null)[];
+  mustDiscard: boolean;
+  hasPlayedCard: boolean;
+  lifePoints: number;
+  tokenCount: number;
+  tokenType: 'assassin' | 'engine' | 'viking' | null;
 }

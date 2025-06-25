@@ -1,6 +1,6 @@
-// server/src/game/gameLogic.ts
-import { GameRepository } from '../database/gameRepository';
-import { CardManager } from './cardManager';
+import { Server } from 'socket.io';
+import { GameRepository } from '../database/gameRepository.js';
+import { CardManager } from './cardManager.js';
 
 export class GameLogic {
   private gameRepository: GameRepository;
@@ -9,6 +9,12 @@ export class GameLogic {
   constructor(gameRepository: GameRepository, cardManager: CardManager) {
     this.gameRepository = gameRepository;
     this.cardManager = cardManager;
+  }
+
+  async emitActiveGames(io: Server) {
+    const activeGames = await this.gameRepository.findActiveGames();
+    console.log('Émission de activeGamesUpdate:', activeGames);
+    io.to('lobby').emit('activeGamesUpdate', activeGames); // Envoie à la salle 'lobby'
   }
 
   async drawCardServer(gameId: string, playerKey: 'player1' | 'player2') {
@@ -37,10 +43,5 @@ export class GameLogic {
       return { winner };
     }
     return null;
-  }
-
-  async emitActiveGames(io: any) {
-    const activeGames = await this.gameRepository.findActiveGames();
-    io.emit('activeGamesUpdate', activeGames);
   }
 }

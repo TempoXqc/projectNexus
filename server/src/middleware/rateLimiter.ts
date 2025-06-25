@@ -1,8 +1,10 @@
-// server/src/middleware/rateLimiter.ts
 import rateLimit from 'express-rate-limit';
 
-export const rateLimiter = rateLimit({
-  windowMs: 60 * 1000,
+const rateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
-  message: 'Trop de requêtes, veuillez réessayer plus tard.',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
+
+export default rateLimiter;

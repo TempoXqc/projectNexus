@@ -1,6 +1,15 @@
-// config/serverConfig.ts
+// server/src/config/serverConfig.ts
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: resolve(__dirname, '../../../.env') });
+
 export const serverConfig = {
-  port: process.env.PORT || 3000,
+  port: Number(process.env.PORT) || 3000,
   corsOrigins: [
     'http://localhost:5176',
     'https://projectnexus-nynw.onrender.com',

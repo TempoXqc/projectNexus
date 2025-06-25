@@ -1,23 +1,27 @@
 // server/src/database/gameRepository.ts
 import { Db } from 'mongodb';
+import { ServerGameState } from '../../../types/GameStateTypes.js';
 
 export class GameRepository {
   private db: Db;
+  private get collection() {
+    return this.db.collection<ServerGameState>('games');
+  }
 
   constructor(db: Db) {
     this.db = db;
   }
 
-  async findGameById(gameId: string) {
-    return this.db.collection('games').findOne({ gameId });
+  async findGameById(gameId: string): Promise<ServerGameState | null> {
+    return await this.collection.findOne({ gameId });
   }
 
-  async insertGame(game: any) {
+  async insertGame(game: ServerGameState) {
     await this.db.collection('games').insertOne(game);
     return game;
   }
 
-  async updateGame(gameId: string, update: Partial<GameState>) {
+  async updateGame(gameId: string, update: Partial<ServerGameState>) {
     await this.db.collection('games').updateOne({ gameId }, { $set: update });
     return this.findGameById(gameId);
   }
@@ -31,7 +35,7 @@ export class GameRepository {
       .collection('games')
       .find({ status: { $in: ['waiting', 'started'] } })
       .project({ gameId: 1, status: 1, createdAt: 1, players: 1, _id: 0 })
-      .toArray();
+      .toArray() as Promise<ServerGameState[]>;
   }
 
   async cleanupInactiveGames() {

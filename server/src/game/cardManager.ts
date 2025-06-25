@@ -1,14 +1,15 @@
 // server/src/game/cardManager.ts
-import fs from 'fs';
+import { readFileSync } from 'fs';
+import { Card } from '../../../types/CardTypes.js';
 
 export class CardManager {
-  private deckLists: any;
-  private allCards: any[];
+  private deckLists: any; // À typer si nécessaire
+  private allCards: Card[];
 
   constructor() {
-    this.deckLists = JSON.parse(fs.readFileSync('public/deckLists.json', 'utf8'));
-    this.allCards = JSON.parse(fs.readFileSync('public/cards.json', 'utf8')).map(
-      (card) => ({ ...card, exhausted: false }),
+    this.deckLists = JSON.parse(readFileSync('server/public/deckLists.json', 'utf8'));
+    this.allCards = JSON.parse(readFileSync('server/public/cards.json', 'utf8')).map(
+      (card: Card) => ({ ...card, exhausted: false })
     );
   }
 

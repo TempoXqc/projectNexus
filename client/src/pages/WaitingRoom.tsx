@@ -1,9 +1,9 @@
-// client/src/pages/WaitingRoom.tsx
 import React, { useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { GameStartSchema } from 'types/SocketSchemas/Game';
 import { socketService } from '@/services/socketService.ts';
+import { PuffLoader } from 'react-spinners';
 
 const WaitingRoom: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -16,7 +16,12 @@ const WaitingRoom: React.FC = () => {
       return;
     }
 
+    // Quitter la salle lobby au montage
+    socket.emit('leaveLobby');
+    console.log('Quitter la salle lobby dans WaitingRoom');
+
     socket.on('gameStart', (data) => {
+      console.log('Données reçues pour gameStart:', data);
       try {
         const parsedData = GameStartSchema.parse(data);
         navigate(`/game/${parsedData.gameId}`, {
@@ -45,6 +50,9 @@ const WaitingRoom: React.FC = () => {
     }
 
     return () => {
+      // Rejoindre la salle lobby si on revient à la page d'accueil
+      socket.emit('joinLobby');
+      console.log('Rejoindre la salle lobby au démontage de WaitingRoom');
       socket.off('gameStart');
       socket.off('connect_error');
       socket.off('error');
@@ -60,9 +68,10 @@ const WaitingRoom: React.FC = () => {
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4" role="main" aria-label="Salle d'attente">
       <h1 className="text-3xl font-bold mb-4">Salle d'attente</h1>
       <p className="text-lg mb-4">En attente d'un adversaire pour la partie {gameId}...</p>
+      <PuffLoader color="#3B82F6" size={60} aria-label="Chargement en attente d'un adversaire" />
       <button
         onClick={handleLeaveGame}
-        className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded"
+        className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded mt-6"
         aria-label="Quitter la partie"
       >
         Quitter
