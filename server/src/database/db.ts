@@ -1,19 +1,11 @@
+// server/src/database/db.ts
 import { MongoClient } from 'mongodb';
-
-const getMongoUri = (): string => {
-  const user = process.env.VITE_SOCKET_URI_USER;
-  const pass = process.env.VITE_SOCKET_URI_PASS;
-
-  if (!user || !pass) {
-    console.error('[ERROR] Les variables d\'environnement VITE_SOCKET_URI_USER et VITE_SOCKET_URI_PASS doivent être définies');
-    throw new Error('Les variables d\'environnement VITE_SOCKET_URI_USER et VITE_SOCKET_URI_PASS doivent être définies');
-  }
-
-  return `mongodb+srv://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@clusterprojectnexus.siimev4.mongodb.net/?retryWrites=true&w=majority&appName=ClusterProjectNexus`;
-};
+import { serverConfig } from '../config/serverConfig.js';
 
 export async function connectToMongoDB() {
-  const client = new MongoClient(getMongoUri());
+  console.log('[DEBUG] Mongo URI utilisée :', serverConfig.mongodbUri);
+
+  const client = new MongoClient(serverConfig.mongodbUri);
   try {
     await client.connect();
     console.log('Connecté à MongoDB');

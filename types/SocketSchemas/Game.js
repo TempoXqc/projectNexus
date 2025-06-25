@@ -1,7 +1,7 @@
 // types/SocketSchemas/Game.ts
 import { z } from 'zod';
-import { CardSchema } from '../CardTypes';
-import { ChatMessageSchema } from './Chat';
+import { CardSchema } from '../CardTypes.js';
+import { ChatMessageSchema } from './Chat.js';
 export const GameStartSchema = z.object({
     playerId: z.number().min(1),
     gameId: z.string().min(1),

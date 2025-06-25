@@ -1,6 +1,6 @@
 // types/SocketSchemas/Action.ts
 import { z } from 'zod';
-import { CardSchema } from '../CardTypes';
+import { CardSchema } from '../CardTypes.js';
 export const EmitJoinGameSchema = z.string().min(1);
 export const EmitEndTurnSchema = z.object({
     gameId: z.string().min(1),

@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc --project tsconfig.server.json",
-    "start": "node dist/server/src/index.js",
-    "dev": "nodemon --watch src --ext ts --exec \"tsc --project tsconfig.server.json && node dist/index.js\""
+    "start": "node server/src/index.ts",
+    "dev": "nodemon --watch src --ext ts --exec \"tsc --project tsconfig.server.json && node src/index.js\""
   },
   "dependencies": {
     "cors": "^2.8.5",
