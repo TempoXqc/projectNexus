@@ -1,4 +1,5 @@
 // server/src/index.ts
+import dotenv from 'dotenv';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -13,7 +14,6 @@ import { Db, MongoClient } from 'mongodb';
 import { GameRepository } from './database/gameRepository.js';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: `${__dirname}/../../.env` });
