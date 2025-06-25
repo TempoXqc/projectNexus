@@ -1,11 +1,14 @@
-// server/src/database/db.ts
 import { MongoClient } from 'mongodb';
-import { serverConfig } from '../config/serverConfig.js';
+
+const getMongoUri = () => {
+  const user = process.env.VITE_SOCKET_URI_USER;
+  const pass = process.env.VITE_SOCKET_URI_PASS;
+  const uri = `mongodb+srv://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@clusterprojectnexus.siimev4.mongodb.net/?retryWrites=true&w=majority&appName=ClusterProjectNexus`;
+return uri;
+};
 
 export async function connectToMongoDB() {
-  console.log('[DEBUG] Mongo URI utilisée :', serverConfig.mongodbUri);
-
-  const client = new MongoClient(serverConfig.mongodbUri);
+  const client = new MongoClient(getMongoUri());
   try {
     await client.connect();
     console.log('Connecté à MongoDB');
