@@ -6,15 +6,14 @@ import { CardManager } from '../game/cardManager.js';
 import { PlayerManager } from '../game/playerManager.js';
 import { JoinGameSchema, PlayCardSchema } from './socketSchemas.js';
 import { Db } from 'mongodb';
-import { Card } from '../../../types/CardTypes.js';
 import { GameState, ServerGameState } from '../../../types/GameStateTypes.js';
+import { Card } from '../../../types/CardTypes.js';
+import { z } from 'zod';
 
 function generateGameId(): string {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
   const digits = '0123456789';
-
   const getRandom = (chars: string) => chars[Math.floor(Math.random() * chars.length)];
-
   return (
     getRandom(letters) +
     getRandom(digits) +
@@ -119,105 +118,195 @@ export function registerSocketHandlers(io: Server, db: Db) {
   const gameLogic = new GameLogic(gameRepository, cardManager);
   const playerManager = new PlayerManager();
   const gameCache = new GameCache();
+  let lastActiveGamesUpdate: string | null = null;
+  let pendingUpdateTimeout: NodeJS.Timeout | null = null;
+  const connectedSockets: Set<string> = new Set();
+
+  const scheduleActiveGamesUpdate = () => {
+    if (pendingUpdateTimeout) {
+      return;
+    }
+    pendingUpdateTimeout = setTimeout(() => {
+      gameLogic.emitActiveGames(io, lastActiveGamesUpdate, (newUpdate) => {
+        lastActiveGamesUpdate = newUpdate;
+      });
+      pendingUpdateTimeout = null;
+    }, 100);
+  };
+
+  const sendActiveGamesToSocket = async (socket: Socket) => {
+    const games = await gameRepository.findActiveGames();
+    const activeGames = games.map((game) => ({
+      gameId: game.gameId,
+      players: game.players,
+      createdAt: game.createdAt,
+      status: game.status,
+    }));
+    console.log(`Envoi de activeGamesUpdate au socket ${socket.id}:`, activeGames, 'timestamp:', new Date().toISOString());
+    socket.emit('activeGamesUpdate', activeGames);
+  };
 
   io.on('connection', (socket: Socket) => {
-    socket.join('lobby');
-    console.log(`Socket ${socket.id} a rejoint la salle lobby`);
+    console.log(`Nouveau socket connecté, ID: ${socket.id}, timestamp: ${new Date().toISOString()}`);
+
+    if (connectedSockets.has(socket.id)) {
+      console.log(`Socket ${socket.id} déjà connecté, déconnexion, timestamp: ${new Date().toISOString()}`);
+      socket.disconnect(true);
+      return;
+    }
+    connectedSockets.add(socket.id);
+
+    socket.removeAllListeners('createGame');
+    socket.removeAllListeners('joinLobby');
+    socket.removeAllListeners('leaveLobby');
+    socket.removeAllListeners('refreshLobby');
+
+    if (!socket.rooms.has('lobby')) {
+      socket.join('lobby');
+      console.log(`Socket ${socket.id} a rejoint le lobby, timestamp: ${new Date().toISOString()}`);
+      sendActiveGamesToSocket(socket);
+    }
+
+    socket.on('refreshLobby', async () => {
+      console.log(`Socket ${socket.id} a demandé un rafraîchissement du lobby, timestamp: ${new Date().toISOString()}`);
+      if (!socket.rooms.has('lobby')) {
+        socket.join('lobby');
+        console.log(`Socket ${socket.id} a rejoint le lobby, timestamp: ${new Date().toISOString()}`);
+      }
+      // Vider le cache pour les parties actives
+      const games = await gameRepository.findActiveGames();
+      games.forEach((game) => gameCache.deleteGame(game.gameId));
+      console.log(`Cache vidé pour socket ${socket.id}, timestamp: ${new Date().toISOString()}`);
+      await sendActiveGamesToSocket(socket);
+    });
 
     socket.on('joinLobby', () => {
+      if (socket.rooms.has('lobby')) {
+        console.log(`Socket ${socket.id} déjà dans le lobby, ignoré, timestamp: ${new Date().toISOString()}`);
+        return;
+      }
       socket.join('lobby');
-      console.log(`Socket ${socket.id} a rejoint la salle lobby`);
-      gameLogic.emitActiveGames(io);
+      console.log(`Socket ${socket.id} a rejoint le lobby, timestamp: ${new Date().toISOString()}`);
+      sendActiveGamesToSocket(socket);
     });
 
     socket.on('leaveLobby', () => {
-      socket.leave('lobby');
-      console.log(`Socket ${socket.id} a quitté la salle lobby`);
+      if (socket.rooms.has('lobby')) {
+        socket.leave('lobby');
+        console.log(`Socket ${socket.id} a quitté la salle lobby, timestamp: ${new Date().toISOString()}`);
+        scheduleActiveGamesUpdate();
+      }
     });
 
-    socket.on('createGame', async () => {
-      console.log('Reçu createGame pour socket ID:', socket.id);
-      const playerInfo = playerManager.getPlayer(socket.id);
-      if (playerInfo && playerInfo.gameId) {
-        console.log(`Socket ${socket.id} a déjà une partie en cours: ${playerInfo.gameId}`);
-        socket.emit('error', 'Vous avez déjà une partie en cours');
-        return;
+    socket.once('disconnect', () => {
+      console.log(`Socket ${socket.id} déconnecté, timestamp: ${new Date().toISOString()}`);
+      connectedSockets.delete(socket.id);
+      playerManager.removePlayer(socket.id);
+      if (socket.rooms.has('lobby')) {
+        socket.leave('lobby');
+        console.log(`Socket ${socket.id} a quitté la salle lobby lors de la déconnexion, timestamp: ${new Date().toISOString()}`);
+        scheduleActiveGamesUpdate();
       }
-      let gameId: string;
-      let attempts = 0;
-      const maxAttempts = 5;
+    });
 
-      do {
-        gameId = generateGameId();
-        const existingGame = await gameRepository.findGameById(gameId);
-        if (existingGame) {
-          attempts++;
-          if (attempts >= maxAttempts) {
-            socket.emit('error', 'Impossible de générer un ID de partie unique');
-            return;
-          }
-        } else {
-          break;
-        }
-      } while (true);
-
-      const newGame: ServerGameState = {
-        gameId,
-        players: [socket.id],
-        chatHistory: [],
-        state: {
-          player1: {
-            hand: [],
-            field: Array(8).fill(null),
-            opponentField: Array(8).fill(null),
-            opponentHand: [],
-            deck: [],
-            graveyard: [],
-            mustDiscard: false,
-            hasPlayedCard: false,
-            lifePoints: 30,
-            tokenCount: 0,
-            tokenType: null,
-          },
-          player2: {
-            hand: [],
-            field: Array(8).fill(null),
-            opponentField: Array(8).fill(null),
-            opponentHand: [],
-            deck: [],
-            graveyard: [],
-            mustDiscard: false,
-            hasPlayedCard: false,
-            lifePoints: 30,
-            tokenCount: 0,
-            tokenType: null,
-          },
-          turn: 1,
-          activePlayer: null,
-          phase: 'Main',
-          gameOver: false,
-          winner: null,
-        },
-        deckChoices: { '1': null, '2': [] },
-        availableDecks: cardManager.getRandomDecks(),
-        createdAt: new Date(),
-        status: 'waiting',
-      };
-
+    socket.on('createGame', async (data, ack) => {
+      console.log('Reçu createGame pour socket ID:', socket.id, { data, timestamp: new Date().toISOString() });
       try {
+        const { isRanked, gameFormat } = z
+          .object({
+            isRanked: z.boolean(),
+            gameFormat: z.enum(['BO1', 'BO3']),
+          })
+          .parse(data);
+
+        const playerInfo = playerManager.getPlayer(socket.id);
+        if (playerInfo && playerInfo.gameId) {
+          console.log(`Socket ${socket.id} a déjà une partie en cours: ${playerInfo.gameId}, timestamp: ${new Date().toISOString()}`);
+          ack({ error: 'Vous avez déjà une partie en cours' });
+          return;
+        }
+
+        let gameId: string;
+        let attempts = 0;
+        const maxAttempts = 5;
+
+        do {
+          gameId = generateGameId();
+          const existingGame = await gameRepository.findGameById(gameId);
+          if (existingGame) {
+            attempts++;
+            if (attempts >= maxAttempts) {
+              console.log(`Impossible de générer un ID de partie unique pour socket ${socket.id}, timestamp: ${new Date().toISOString()}`);
+              ack({ error: 'Impossible de générer un ID de partie unique' });
+              return;
+            }
+          } else {
+            break;
+          }
+        } while (true);
+
+        const newGame: ServerGameState = {
+          gameId,
+          players: [socket.id],
+          chatHistory: [],
+          state: {
+            player1: {
+              hand: [],
+              field: Array(8).fill(null),
+              opponentField: Array(8).fill(null),
+              opponentHand: [],
+              deck: [],
+              graveyard: [],
+              mustDiscard: false,
+              hasPlayedCard: false,
+              lifePoints: 30,
+              tokenCount: 0,
+              tokenType: null,
+            },
+            player2: {
+              hand: [],
+              field: Array(8).fill(null),
+              opponentField: Array(8).fill(null),
+              opponentHand: [],
+              deck: [],
+              graveyard: [],
+              mustDiscard: false,
+              hasPlayedCard: false,
+              lifePoints: 30,
+              tokenCount: 0,
+              tokenType: null,
+            },
+            turn: 1,
+            activePlayer: null,
+            phase: 'Main',
+            gameOver: false,
+            winner: null,
+          },
+          deckChoices: { '1': null, '2': [] },
+          availableDecks: cardManager.getRandomDecks(),
+          createdAt: new Date(),
+          status: 'waiting',
+        };
+
         await gameRepository.insertGame(newGame);
         gameCache.setGame(gameId, newGame);
         playerManager.addPlayer(socket.id, { gameId, playerId: 1 });
-        socket.emit('gameCreated', {
+
+        if (socket.rooms.has('lobby')) {
+          socket.leave('lobby');
+          console.log(`Socket ${socket.id} a quitté la salle lobby après création de partie, timestamp: ${new Date().toISOString()}`);
+        }
+        scheduleActiveGamesUpdate();
+
+        ack({
           gameId,
           playerId: 1,
           chatHistory: newGame.chatHistory,
           availableDecks: newGame.availableDecks,
         });
-        await gameLogic.emitActiveGames(io); // Émettra à la salle 'lobby'
       } catch (error) {
         console.error('Erreur lors de la création de la partie:', error);
-        socket.emit('error', 'Erreur lors de la création de la partie');
+        ack({ error: 'Erreur lors de la création de la partie' });
       }
     });
 
@@ -232,6 +321,12 @@ export function registerSocketHandlers(io: Server, db: Db) {
 
         if (game.players.length >= 2) {
           socket.emit('error', 'La partie est pleine');
+          return;
+        }
+
+        const playerInfo = playerManager.getPlayer(socket.id);
+        if (playerInfo && playerInfo.gameId) {
+          socket.emit('error', 'Vous êtes déjà dans une partie');
           return;
         }
 
@@ -252,10 +347,16 @@ export function registerSocketHandlers(io: Server, db: Db) {
           gameCache.setGame(gameId, game);
 
           const gameStartDataPlayer1 = {
-            playerId: 1, gameId, chatHistory: game.chatHistory, availableDecks: game.availableDecks,
+            playerId: 1,
+            gameId,
+            chatHistory: game.chatHistory,
+            availableDecks: game.availableDecks,
           };
           const gameStartDataPlayer2 = {
-            playerId: 2, gameId, chatHistory: game.chatHistory, availableDecks: game.availableDecks,
+            playerId: 2,
+            gameId,
+            chatHistory: game.chatHistory,
+            availableDecks: game.availableDecks,
           };
           console.log('Envoi de gameStart à player1:', gameStartDataPlayer1);
           console.log('Envoi de gameStart à player2:', gameStartDataPlayer2);
@@ -271,8 +372,13 @@ export function registerSocketHandlers(io: Server, db: Db) {
           playerManager.addPlayer(socket.id, { gameId, playerId: null });
           socket.emit('waiting', { gameId, message: 'En attente d\'un autre joueur...' });
         }
-        await gameLogic.emitActiveGames(io);
+        if (socket.rooms.has('lobby')) {
+          socket.leave('lobby');
+          console.log(`Socket ${socket.id} a quitté la salle lobby après joinGame, timestamp: ${new Date().toISOString()}`);
+        }
+        scheduleActiveGamesUpdate();
       } catch (error) {
+        console.error('Erreur lors de la jointure de la partie:', error);
         socket.emit('error', 'Erreur lors de la jointure de la partie');
       }
     });
@@ -304,6 +410,7 @@ export function registerSocketHandlers(io: Server, db: Db) {
           io.to(playerSocketId).emit('updateGameState', clientGameState);
         });
       } catch (error) {
+        console.error('Erreur lors de l\'action playCard:', error);
         socket.emit('error', 'Erreur lors de l\'action playCard');
       }
     });

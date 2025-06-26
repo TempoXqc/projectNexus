@@ -1,13 +1,20 @@
-import Home from './src/pages/Home';
-import Game from './src/pages/Game';
 import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Home from './src/pages/Home';
+import Game from './src/pages/Game';
 import WaitingRoom from './src/pages/WaitingRoom';
+import { socketService } from './src/services/socketService';
 
 function App() {
-  useEffect(() => {}, []); // À vérifier si nécessaire
+  useEffect(() => {
+    socketService.connect();
+    return () => {
+      socketService.disconnect();
+    };
+  }, []);
+
   return (
     <>
       <Routes>

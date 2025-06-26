@@ -16,10 +16,7 @@ const WaitingRoom: React.FC = () => {
       return;
     }
 
-    // Quitter la salle lobby au montage
     socket.emit('leaveLobby');
-    console.log('Quitter la salle lobby dans WaitingRoom');
-
     socket.on('gameStart', (data) => {
       console.log('Données reçues pour gameStart:', data);
       try {
@@ -50,9 +47,7 @@ const WaitingRoom: React.FC = () => {
     }
 
     return () => {
-      // Rejoindre la salle lobby si on revient à la page d'accueil
       socket.emit('joinLobby');
-      console.log('Rejoindre la salle lobby au démontage de WaitingRoom');
       socket.off('gameStart');
       socket.off('connect_error');
       socket.off('error');

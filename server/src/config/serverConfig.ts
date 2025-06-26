@@ -11,7 +11,6 @@ dotenv.config({ path: resolve(__dirname, '../../../.env') });
 export const serverConfig = {
   port: Number(process.env.PORT) || 3000,
   corsOrigins: [
-    'http://localhost:5176',
     'https://projectnexus-nynw.onrender.com',
     'https://projectnexus-staging.up.railway.app',
   ],

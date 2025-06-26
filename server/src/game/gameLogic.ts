@@ -11,10 +11,22 @@ export class GameLogic {
     this.cardManager = cardManager;
   }
 
-  async emitActiveGames(io: Server) {
-    const activeGames = await this.gameRepository.findActiveGames();
-    console.log('Émission de activeGamesUpdate:', activeGames);
-    io.to('lobby').emit('activeGamesUpdate', activeGames); // Envoie à la salle 'lobby'
+  async emitActiveGames(io: Server, lastUpdate: string | null, updateCallback: (newUpdate: string) => void) {
+    const games = await this.gameRepository.findActiveGames();
+    const activeGames = games.map((game) => ({
+      gameId: game.gameId,
+      players: game.players,
+      createdAt: game.createdAt,
+      status: game.status,
+    }));
+    const currentUpdate = JSON.stringify(activeGames);
+    if (currentUpdate !== lastUpdate) {
+      console.log('Émission de activeGamesUpdate:', activeGames);
+      io.to('lobby').emit('activeGamesUpdate', activeGames);
+      updateCallback(currentUpdate);
+    } else {
+      console.log('activeGamesUpdate inchangé, émission ignorée');
+    }
   }
 
   async drawCardServer(gameId: string, playerKey: 'player1' | 'player2') {

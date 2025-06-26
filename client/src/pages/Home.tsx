@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { socketService } from '../services/socketService.ts';
@@ -26,9 +26,12 @@ const Home: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [user, setUser] = useState<{ username: string } | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'waiting' | 'started'>('all');
+  const hasJoinedLobbyRef = useRef(false);
+  const isMountedRef = useRef(true);
 
-  // Données fictives pour le classement (à remplacer par une API réelle)
   const leaderboard = [
     { pseudo: 'Player1', score: 1500 },
     { pseudo: 'Player2', score: 1450 },
@@ -42,8 +45,37 @@ const Home: React.FC = () => {
     { pseudo: 'Player10', score: 1050 },
   ];
 
+  // Vérifier le token au montage
   useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      fetch('http://localhost:3000/api/verify', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.username && isMountedRef.current) {
+            setUser({ username: data.username });
+            toast.success(`Bienvenue, ${data.username} !`, { toastId: 'auto_login' });
+          } else {
+            localStorage.removeItem('authToken');
+          }
+        })
+        .catch((error) => {
+          console.error('Erreur lors de la vérification du token:', error);
+          localStorage.removeItem('authToken');
+        });
+    }
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
     const handleActiveGamesUpdate = (games: unknown) => {
+      if (!isMountedRef.current) return;
+      console.log('Reçu activeGamesUpdate, socket ID:', socket.id, 'games:', games, 'timestamp:', new Date().toISOString());
       try {
         const parsedGames = z.array(ActiveGameSchema).parse(games);
         setActiveGames(parsedGames);
@@ -53,50 +85,55 @@ const Home: React.FC = () => {
       }
     };
 
-    const handleGameCreated = (data: unknown) => {
-      console.log('Données reçues pour gameCreated:', data);
-      try {
-        const parsedData = GameStartSchema.parse(data);
-        navigate(`/waiting/${parsedData.gameId}`, {
-          state: { playerId: parsedData.playerId, availableDecks: parsedData.availableDecks },
-        });
-      } catch (error) {
-        console.error('[ERROR] gameCreated validation failed:', error);
-        toast.error('Erreur lors de la création de la partie.', { toastId: 'game_created_error' });
-      } finally {
-        setIsCreatingGame(false);
-      }
-    };
-
     const handleConnect = () => {
-      console.log('Socket connecté, rejoindre la salle lobby');
-      socket.emit('joinLobby');
+      console.log('Socket connecté, socket ID:', socket.id, 'timestamp:', new Date().toISOString());
+      if (!hasJoinedLobbyRef.current && isMountedRef.current && window.location.pathname === '/') {
+        setActiveGames([]);
+        socket.emit('refreshLobby');
+        hasJoinedLobbyRef.current = true;
+        console.log('Émis refreshLobby pour socket ID:', socket.id, 'timestamp:', new Date().toISOString());
+      } else {
+        console.log('refreshLobby non émis, conditions non remplies:', {
+          hasJoinedLobby: hasJoinedLobbyRef.current,
+          isMounted: isMountedRef.current,
+          pathname: window.location.pathname,
+          timestamp: new Date().toISOString(),
+        });
+      }
     };
 
     const handleConnectError = (error: Error) => {
       console.error('WebSocket connection error:', error);
       toast.error('Erreur de connexion au serveur.', { toastId: 'connect_error' });
+      hasJoinedLobbyRef.current = false;
+      setIsCreatingGame(false);
     };
 
-    socket.on('activeGamesUpdate', handleActiveGamesUpdate);
-    socket.on('gameCreated', handleGameCreated);
-    socket.on('connect', handleConnect);
-    socket.on('connect_error', handleConnectError);
+    const handleDisconnect = () => {
+      console.log('Socket déconnecté, socket ID:', socket.id, 'timestamp:', new Date().toISOString());
+      hasJoinedLobbyRef.current = false;
+      setIsCreatingGame(false);
+      setActiveGames([]);
+    };
 
-    if (!socket.connected) {
-      socketService.connect();
-    } else {
-      console.log('Socket déjà connecté, rejoindre la salle lobby');
-      socket.emit('joinLobby');
+    socket.once('connect', handleConnect);
+    socket.on('connect_error', handleConnectError);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('activeGamesUpdate', handleActiveGamesUpdate);
+
+    if (socket.connected && window.location.pathname === '/') {
+      setActiveGames([]);
+      socket.emit('refreshLobby');
+      hasJoinedLobbyRef.current = true;
+      console.log('Émis refreshLobby au montage pour socket ID:', socket.id, 'timestamp:', new Date().toISOString());
     }
 
     return () => {
-      console.log('Quitter la salle lobby');
-      socket.emit('leaveLobby');
-      socket.off('activeGamesUpdate', handleActiveGamesUpdate);
-      socket.off('gameCreated', handleGameCreated);
+      isMountedRef.current = false;
       socket.off('connect', handleConnect);
       socket.off('connect_error', handleConnectError);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('activeGamesUpdate', handleActiveGamesUpdate);
     };
   }, [socket, navigate]);
 
@@ -105,14 +142,34 @@ const Home: React.FC = () => {
       toast.error('Vous devez être connecté pour créer une partie.', { toastId: 'create_game_error' });
       return;
     }
+    if (!user) {
+      toast.error('Vous devez être connecté avec un compte pour créer une partie.', { toastId: 'auth_required' });
+      setIsAuthModalOpen(true);
+      return;
+    }
     if (isCreatingGame) {
-      console.log('Création de partie déjà en cours, ignoré');
+      console.log('Création de partie déjà en cours, ignoré', { timestamp: new Date().toISOString() });
       return;
     }
     setIsCreatingGame(true);
-    console.log('Émission de createGame, socket ID:', socket.id, { isRanked, gameFormat });
-    socket.emit('createGame', { isRanked, gameFormat });
-  }, [socket, isCreatingGame, isRanked, gameFormat]);
+    console.log('Émission de createGame, socket ID:', socket.id, { isRanked, gameFormat, timestamp: new Date().toISOString() });
+    socket.emit('createGame', { isRanked, gameFormat }, (response: any) => {
+      if (!isMountedRef.current) return;
+      console.log('Reçu ACK pour createGame:', response, 'timestamp:', new Date().toISOString());
+      try {
+        const parsedData = GameStartSchema.parse(response);
+        setIsCreatingGame(false);
+        navigate(`/waiting/${parsedData.gameId}`, {
+          state: { playerId: parsedData.playerId, availableDecks: parsedData.availableDecks },
+        });
+        hasJoinedLobbyRef.current = false;
+      } catch (error) {
+        console.error('[ERROR] createGame ACK validation failed:', error);
+        toast.error('Erreur lors de la création de la partie.', { toastId: 'game_created_error' });
+        setIsCreatingGame(false);
+      }
+    });
+  }, [socket, isRanked, gameFormat, navigate, user]);
 
   const handleJoinGame = useCallback(
     (gameId: string) => {
@@ -120,16 +177,22 @@ const Home: React.FC = () => {
         toast.error('Vous devez être connecté pour rejoindre une partie.', { toastId: 'join_game_error' });
         return;
       }
+      if (!user) {
+        toast.error('Vous devez être connecté avec un compte pour rejoindre une partie.', { toastId: 'auth_required' });
+        setIsAuthModalOpen(true);
+        return;
+      }
       try {
         const parsedGameId = EmitJoinGameSchema.parse(gameId);
         socket.emit('joinGame', parsedGameId);
+        hasJoinedLobbyRef.current = false;
         navigate(`/waiting/${gameId}`, { state: { playerId: null } });
       } catch (error) {
         console.error('[ERROR] joinGame validation failed:', error);
         toast.error('ID de partie invalide.', { toastId: 'join_game_error' });
       }
     },
-    [socket, navigate],
+    [socket, navigate, user],
   );
 
   const handleJoinAsSpectator = (gameId: string) => {
@@ -157,41 +220,76 @@ const Home: React.FC = () => {
   };
 
   const openAuthModal = () => setIsAuthModalOpen(true);
+
   const closeAuthModal = () => {
     setIsAuthModalOpen(false);
     setUsername('');
     setPassword('');
     setRememberMe(false);
+    setIsRegistering(false);
   };
 
-  const handleAuthSubmit = (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Connexion soumise', { username, password, rememberMe });
-    // Logique de connexion à implémenter
-    closeAuthModal();
+    const endpoint = isRegistering ? '/api/register' : '/api/login';
+    try {
+      const response = await fetch(`http://localhost:3000${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de l\'authentification');
+      }
+      if (rememberMe) {
+        localStorage.setItem('authToken', data.token);
+      }
+      setUser({ username: data.username });
+      toast.success(isRegistering ? 'Compte créé avec succès !' : 'Connexion réussie !', { toastId: 'auth_success' });
+      closeAuthModal();
+    } catch (error: any) {
+      console.error(`Erreur lors de ${isRegistering ? 'l\'inscription' : 'la connexion'}:`, error);
+      toast.error(error.message, { toastId: 'auth_error' });
+    }
   };
 
   const handleSignUp = () => {
-    console.log('Inscription cliquée');
-    // Logique d'inscription à implémenter
-    closeAuthModal();
+    setIsRegistering(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    setUser(null);
+    toast.info('Déconnexion réussie.', { toastId: 'logout' });
   };
 
   const filteredGames = filterStatus === 'all' ? activeGames : activeGames.filter((game) => game.status === filterStatus);
 
   return (
     <div className="min-h-screen w-full bg-gray-900 text-white flex flex-col">
-      {/* En-tête fixe, pleine largeur */}
       <header className="sticky top-0 z-10 bg-gray-900 shadow-sm w-full">
         <div className="flex justify-between items-center w-full px-8 py-4">
           <div className="flex items-center">
-            <button
-              className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"
-              aria-label="Se connecter ou créer un compte"
-              onClick={openAuthModal}
-            >
-              Connexion / Inscription
-            </button>
+            {user ? (
+              <button
+                className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded"
+                aria-label="Se déconnecter"
+                onClick={handleLogout}
+              >
+                Déconnexion ({user.username})
+              </button>
+            ) : (
+              <button
+                className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"
+                aria-label="Se connecter ou créer un compte"
+                onClick={openAuthModal}
+              >
+                Connexion / Inscription
+              </button>
+            )}
           </div>
           <nav className="flex space-x-4">
             <button
@@ -210,28 +308,13 @@ const Home: React.FC = () => {
             </button>
           </nav>
           <div className="flex items-center space-x-4">
-            <a
-              href="https://github.com/your-repo"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Visiter le GitHub du projet"
-            >
+            <a href="https://github.com/your-repo" target="_blank" rel="noopener noreferrer" aria-label="Visiter le GitHub du projet">
               <FaGithub className="w-6 h-6 text-gray-400 hover:text-white" />
             </a>
-            <a
-              href="https://discord.example.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Rejoindre le serveur Discord"
-            >
+            <a href="https://discord.example.com" target="_blank" rel="noopener noreferrer" aria-label="Rejoindre le serveur Discord">
               <FaDiscord className="w-6 h-6 text-gray-400 hover:text-white" />
             </a>
-            <a
-              href="https://twitter.com/example"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Suivre sur Twitter"
-            >
+            <a href="https://twitter.com/example" target="_blank" rel="noopener noreferrer" aria-label="Suivre sur Twitter">
               <FaTwitter className="w-6 h-6 text-gray-400 hover:text-white" />
             </a>
             <select
@@ -248,18 +331,14 @@ const Home: React.FC = () => {
         </div>
       </header>
 
-      {/* Corps principal : Grille de tuiles centrée */}
       <main className="w-full max-w-7xl mx-auto py-8 flex items-center justify-center min-h-[calc(100vh-80px)]">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
-          {/* Tuile 1 : Liste des parties actives avec filtres */}
           <div className="bg-gray-800 rounded-lg p-6 h-[600px] flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">Parties actives</h2>
               <div className="flex space-x-2">
                 <button
-                  className={`p-2 rounded-full ${
-                    filterStatus === 'waiting' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300'
-                  } hover:bg-blue-600`}
+                  className={`p-2 rounded-full ${filterStatus === 'waiting' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300'} hover:bg-blue-600`}
                   onClick={() => setFilterStatus('waiting')}
                   title="Parties en attente"
                   aria-label="Filtrer les parties en attente"
@@ -267,9 +346,7 @@ const Home: React.FC = () => {
                   <FaClock className="w-4 h-4" />
                 </button>
                 <button
-                  className={`p-2 rounded-full ${
-                    filterStatus === 'started' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300'
-                  } hover:bg-blue-600`}
+                  className={`p-2 rounded-full ${filterStatus === 'started' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300'} hover:bg-blue-600`}
                   onClick={() => setFilterStatus('started')}
                   title="Parties en cours"
                   aria-label="Filtrer les parties en cours"
@@ -277,9 +354,7 @@ const Home: React.FC = () => {
                   <FaGamepad className="w-4 h-4" />
                 </button>
                 <button
-                  className={`p-2 rounded-full ${
-                    filterStatus === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300'
-                  } hover:bg-blue-600`}
+                  className={`p-2 rounded-full ${filterStatus === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300'} hover:bg-blue-600`}
                   onClick={() => setFilterStatus('all')}
                   title="Toutes les parties"
                   aria-label="Afficher toutes les parties"
@@ -291,16 +366,9 @@ const Home: React.FC = () => {
             {filteredGames.length === 0 ? (
               <p className="text-lg text-gray-400">Aucune partie correspondante.</p>
             ) : (
-              <ul
-                className="space-y-2 overflow-y-auto custom-scrollbar flex-1"
-                role="list"
-                aria-label="Liste des parties actives"
-              >
+              <ul className="space-y-2 overflow-y-auto custom-scrollbar flex-1" role="list" aria-label="Liste des parties actives">
                 {filteredGames.map((game) => (
-                  <li
-                    key={game.gameId}
-                    className="flex justify-between items-center bg-gray-700 p-3 rounded-md"
-                  >
+                  <li key={game.gameId} className="flex justify-between items-center bg-gray-700 p-3 rounded-md">
                     <span className="text-lg">
                       Partie {game.gameId} ({game.status}, {game.players.length}/2 joueurs)
                     </span>
@@ -331,7 +399,6 @@ const Home: React.FC = () => {
             )}
           </div>
 
-          {/* Tuile 2 : Classement */}
           <div className="bg-gray-800 rounded-lg p-6 h-[600px] flex flex-col">
             <h2 className="text-2xl font-bold mb-4">Classement</h2>
             <ul className="space-y-2 overflow-y-auto custom-scrollbar flex-1 text-md">
@@ -344,9 +411,7 @@ const Home: React.FC = () => {
             </ul>
           </div>
 
-          {/* Tuile 3 : Trois sous-tuiles empilées */}
           <div className="flex flex-col gap-4 h-[600px]">
-            {/* Sous-tuile : Créer une partie */}
             <div className="bg-gray-800 rounded-lg p-6 flex-1 flex flex-col items-center justify-center">
               <h3 className="text-xl font-bold mb-4">Nouvelle partie</h3>
               <button
@@ -387,14 +452,12 @@ const Home: React.FC = () => {
               </select>
             </div>
 
-            {/* Sous-tuile : Image */}
             <div className="bg-gray-800 rounded-lg p-6 flex-1 flex flex-col items-center justify-center">
               <div className="w-full h-full bg-gray-700 rounded-lg flex items-center justify-center">
                 <span className="text-gray-400 text-sm">Image à définir</span>
               </div>
             </div>
 
-            {/* Sous-tuile : Liens Wiki et Règles */}
             <div className="bg-gray-800 rounded-lg p-6 flex-1 flex flex-col items-center justify-center">
               <div className="flex space-x-4">
                 <a
@@ -421,7 +484,6 @@ const Home: React.FC = () => {
         </div>
       </main>
 
-      {/* Modale de connexion/inscription */}
       {isAuthModalOpen && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-20"
@@ -429,12 +491,9 @@ const Home: React.FC = () => {
           role="dialog"
           aria-label="Modale de connexion ou inscription"
         >
-          <div
-            className="bg-gray-800 rounded-lg p-6 w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4">
-              <h3 className="text-xl font-bold text-center">Connexion</h3>
+              <h3 className="text-xl font-bold text-center">{isRegistering ? 'Inscription' : 'Connexion'}</h3>
               <div>
                 <label htmlFor="username" className="block text-sm font-medium mb-1">
                   Nom d'utilisateur
@@ -476,19 +535,15 @@ const Home: React.FC = () => {
                   Se souvenir de moi
                 </label>
               </div>
-              <a
-                href="#"
-                className="text-sm text-blue-500 hover:underline text-center"
-                aria-label="Mot de passe oublié"
-              >
+              <a href="#" className="text-sm text-blue-500 hover:underline text-center" aria-label="Mot de passe oublié">
                 Mot de passe oublié ?
               </a>
               <button
                 type="submit"
                 className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded text-md"
-                aria-label="Se connecter"
+                aria-label={isRegistering ? 'S\'inscrire' : 'Se connecter'}
               >
-                Connexion
+                {isRegistering ? 'S\'inscrire' : 'Se connecter'}
               </button>
               <div className="flex items-center gap-2">
                 <hr className="flex-1 border-gray-600" />
@@ -497,11 +552,11 @@ const Home: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={handleSignUp}
+                onClick={() => setIsRegistering(!isRegistering)}
                 className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded text-md"
-                aria-label="S'inscrire"
+                aria-label={isRegistering ? 'Se connecter' : 'S\'inscrire'}
               >
-                Inscription
+                {isRegistering ? 'Se connecter' : 'S\'inscrire'}
               </button>
               <p className="text-sm text-gray-400 italic text-center">
                 En utilisant la fonction Se souvenir de moi, vous consentez à ce qu'un cookie soit stocké dans votre navigateur pour identifier votre compte lors de futures visites.{' '}
@@ -520,7 +575,6 @@ const Home: React.FC = () => {
         </div>
       )}
 
-      {/* Version du site */}
       <div className="fixed bottom-4 right-4 text-gray-400 text-sm" aria-label="Version du site">
         v0.0.1
       </div>

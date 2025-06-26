@@ -19,7 +19,7 @@ dist-ssr
 
 # Fichiers d'environnement
 client/.env
-server/.env
+server/dist/.env
 
 # Éditeurs
 .vscode/*
