@@ -5,7 +5,12 @@ import GetDeckBadge from './DeckBadge';
 import DeckInfoPreview from './DeckInfoPreview';
 
 interface DeckSelectionProps {
-  randomizers: { id: string; name: string; image: string }[];
+  randomizers: {
+    id: string;
+    name: string;
+    image: string;
+    infoImage: string;
+  }[];
   selectedDecks: string[];
   player1DeckId: string[] | string | null;
   hasChosenDeck: boolean;
@@ -43,20 +48,6 @@ function DeckSelection({
   const player2DeckIds = deckSelectionData?.player2DeckIds || [];
   const canChooseDeck = playerId === 1 || (playerId === 2 && !waitingForPlayer1 && normalizedPlayer1DeckId.length > 0);
   const player2DeckCount = player2DeckIds.length;
-
-  console.log('DeckSelection render:', {
-    playerId,
-    hasChosenDeck,
-    isReady,
-    opponentReady,
-    waitingForPlayer1,
-    player1DeckId: normalizedPlayer1DeckId,
-    player2DeckIds,
-    selectedDecks,
-    canChooseDeck,
-    player2DeckCount,
-  }, 'timestamp:', new Date().toISOString());
-
   const allDecksSelected = normalizedPlayer1DeckId.length >= 2 && player2DeckCount >= 2;
 
   const togglePreview = (deckId: string) => {
@@ -126,16 +117,6 @@ function DeckSelection({
             const isDisabled =
               (playerId === 1 && hasChosenDeck) ||
               (playerId === 2 && (waitingForPlayer1 || normalizedPlayer1DeckId.length === 0 || player2DeckCount >= 2 || isPlayer1Deck));
-
-            console.log(`Deck ${deckObj.id} state:`, {
-              isSelected,
-              isPlayer1Deck,
-              isPlayer2Selection,
-              isDisabled,
-              canChooseDeck,
-              rawPlayer1DeckId: player1DeckId,
-              player2DeckIds,
-            }, 'timestamp:', new Date().toISOString());
 
             return (
               <motion.div

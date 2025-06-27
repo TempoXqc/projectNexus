@@ -91,24 +91,6 @@ const GameLayout = memo(
      setChatInput,
      deckSelectionData,
    }: GameLayoutProps) => {
-    console.log('Rendu de GameLayout, état:', {
-      deckSelectionDone: state.deckSelection.deckSelectionDone,
-      bothReady: state.deckSelection.bothReady,
-      initialDrawLength: state.deckSelection.initialDraw.length,
-      mulliganDone: state.deckSelection.mulliganDone,
-      playerDeckLength: state.player.deck.length,
-      playerHandLength: state.player.hand.length,
-      isReady: state.deckSelection.isReady,
-      opponentReady: state.deckSelection.opponentReady,
-    }, 'timestamp:', new Date().toISOString());
-
-    console.log('Conditions pour InitialDrawModal:', {
-      deckSelectionDone: state.deckSelection.deckSelectionDone,
-      bothReady: state.deckSelection.bothReady,
-      initialDrawLength: state.deckSelection.initialDraw.length,
-      mulliganDone: state.deckSelection.mulliganDone,
-    }, 'timestamp:', new Date().toISOString());
-
     return (
       <div className="w-full min-h-screen flex flex-row relative overflow-hidden" role="main" aria-label="Interface de jeu">
         {!state.deckSelection.bothReady && (

@@ -7,7 +7,6 @@ import { socketService } from '@/services/socketService.ts';
 import { EmitSendMessageSchema } from 'types/SocketSchemas/Chat';
 import { GameStartSchema } from 'types/SocketSchemas/Game';
 import { EmitJoinGameSchema } from 'types/SocketSchemas/Action';
-import { mapDeckImages } from '@/utils/mapDeckImages.ts';
 import { Card } from 'types/CardTypes.ts';
 
 interface ServerToClientEvents {
@@ -89,11 +88,9 @@ export const useGameSocket = (
     }
 
     const socket = socketRef.current;
-    console.log('Initialisation de useGameSocket, gameId:', gameId, 'socket.connected:', socket.connected, 'playerId:', playerId, 'timestamp:', new Date().toISOString());
 
     const persistentListeners = () => {
       socket.on('connect', () => {
-        console.log(`Socket connecté dans useGameSocket, ID: ${socket.id}, timestamp: ${new Date().toISOString()}`);
         setState((prev) => ({
           ...prev,
           connection: { ...prev.connection, isConnected: true },

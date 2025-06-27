@@ -48,7 +48,7 @@ export interface GameState {
   };
   deckSelection: {
     selectedDecks: string[];
-    player1DeckId: string[] | string | null; // Accepte chaîne ou tableau
+    player1DeckId: string[] | string | null;
     player1Deck: Card[];
     player2Deck: Card[];
     hasChosenDeck: boolean;
@@ -60,7 +60,7 @@ export interface GameState {
     bothReady: boolean;
     opponentReady: boolean;
     deckSelectionData: { player1DeckId: string[] | string | null; player2DeckIds: string[]; selectedDecks: string[] } | null;
-    randomizers: { id: string; name: string; image: string }[];
+    randomizers: { id: string; name: string; image: string;  infoImage: string; }[];
     waitingForPlayer1: boolean;
   };
   connection: {

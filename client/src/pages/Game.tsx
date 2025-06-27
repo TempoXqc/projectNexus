@@ -107,16 +107,6 @@ export default function Game() {
     };
   }, [socket, set]);
 
-  useEffect(() => {
-    console.log('État de deckSelection:', {
-      deckSelectionDone: state.deckSelection.deckSelectionDone,
-      bothReady: state.deckSelection.bothReady,
-      initialDraw: state.deckSelection.initialDraw,
-      isReady: state.deckSelection.isReady,
-      opponentReady: state.deckSelection.opponentReady,
-    }, 'timestamp:', new Date().toISOString());
-  }, [state.deckSelection]);
-
   const sendChatMessage = useCallback(() => {
     if (state.chat.input.trim() && gameId && state.connection.isConnected) {
       emit('sendMessage' as keyof ClientToServerEvents, { gameId, message: state.chat.input });

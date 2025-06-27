@@ -1,6 +1,14 @@
 import { Db } from 'mongodb';
 import { Card } from '../../../types/CardTypes.js';
 
+interface DeckDocument {
+  id: string;
+  name: string;
+  cardIds: string[];
+  image?: string;
+  infoImage?: string;
+}
+
 export class CardManager {
   private deckLists: { [key: string]: string[] };
   private allCards: Card[];
@@ -18,26 +26,20 @@ export class CardManager {
 
   async initialize() {
     await this.loadData();
-    console.log('Decks chargés depuis MongoDB, decks disponibles:', Object.keys(this.deckLists), 'timestamp:', new Date().toISOString());
-    console.log('Contenu de deckLists:', JSON.stringify(this.deckLists, null, 2), 'timestamp:', new Date().toISOString());
-    console.log('Cartes chargées, nombre de cartes:', this.allCards.length, 'timestamp:', new Date().toISOString());
   }
 
-  private async loadData() {
-    console.log('Chargement des données depuis MongoDB Atlas', 'timestamp:', new Date().toISOString());
 
+  private async loadData() {
     try {
       const deckListsCollection = this.db.collection('decklists');
       const deckListsDocs = await deckListsCollection.find({}).toArray();
-      console.log('Résultat de deckListsCollection.find():', deckListsDocs, 'timestamp:', new Date().toISOString());
       if (deckListsDocs.length === 0) {
         console.error('Aucun deck trouvé dans la collection decklists', 'timestamp:', new Date().toISOString());
       }
       this.deckLists = deckListsDocs.reduce((acc, doc) => {
-        acc[doc._id.toString()] = doc.cardIds;
+        acc[doc.id.toString()] = doc.cardIds;
         return acc;
       }, {} as { [key: string]: string[] });
-      console.log('decklists chargé avec succès, decks disponibles:', Object.keys(this.deckLists), 'timestamp:', new Date().toISOString());
     } catch (error) {
       console.error('Erreur lors du chargement de decklists depuis MongoDB Atlas:', error, 'timestamp:', new Date().toISOString());
       throw new Error(`Erreur lors du chargement de decklists: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
@@ -51,7 +53,6 @@ export class CardManager {
         image: card.image,
         exhausted: false,
       }));
-      console.log('cards chargé avec succès, nombre de cartes:', this.allCards.length, 'timestamp:', new Date().toISOString());
     } catch (error) {
       console.error('Erreur lors du chargement de cards depuis MongoDB Atlas:', error, 'timestamp:', new Date().toISOString());
       throw new Error(`Erreur lors du chargement de cards: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
@@ -66,21 +67,25 @@ export class CardManager {
     return this.allCards;
   }
 
-  async getRandomDecks(count: number = 4): Promise<{ id: string; name: string; image: string }[]> {
+  async getRandomDecks(count: number = 4): Promise<{ id: string; name: string; image: string; infoImage: string }[]> {
     try {
       const deckListsCollection = this.db.collection('decklists');
-      const deckListsDocs = await deckListsCollection.find({}).toArray();
-      console.log('Résultat de deckListsCollection.find():', deckListsDocs, 'timestamp:', new Date().toISOString());
+      const deckListsDocs = await deckListsCollection.find<DeckDocument>({}).toArray();
+      console.log('[DEBUG] Documents bruts de decklists:', JSON.stringify(deckListsDocs, null, 2));
       if (deckListsDocs.length === 0) {
         console.error('Aucun deck trouvé dans la collection decklists', 'timestamp:', new Date().toISOString());
         return [];
       }
-      const deckData = deckListsDocs.map((deck: any) => ({
-        id: deck._id.toString(), // Utiliser _id au lieu de id
-        name: deck.name,
-        image: deck.image || `https://res.cloudinary.com/dsqxexeam/image/upload/v1750992816/${deck.name}_default.png`,
-      }));
-      console.log('Decks récupérés pour getRandomDecks:', deckData, 'timestamp:', new Date().toISOString());
+      const deckData = deckListsDocs.map((deck) => {
+        const mappedDeck = {
+          id: deck.id.toString(),
+          name: deck.name,
+          image: deck.image || `https://res.cloudinary.com/dsqxexeam/image/upload/v1750992816/${deck.name}_default.png`,
+          infoImage: deck.infoImage || `https://res.cloudinary.com/dsqxexeam/image/upload/v1750992816/${deck.name}_default.png`,
+        };
+        console.log('[DEBUG] Deck mappé:', JSON.stringify(mappedDeck, null, 2));
+        return mappedDeck;
+      });
       const shuffled = deckData.sort(() => Math.random() - 0.5);
       return shuffled.slice(0, count);
     } catch (error) {

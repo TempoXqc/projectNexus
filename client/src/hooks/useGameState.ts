@@ -10,8 +10,6 @@ import { initialGameState } from '@/utils/initialGameState.ts';
 export const useGameState = () => {
   const initialStateRef = useRef<GameState>(initialGameState);
   const [state, setState] = useState<GameState>(initialStateRef.current);
-  console.log('État actuel de GameState:', state);
-
   const set = useCallback(
     (updates: Partial<GameState> | ((prev: GameState) => Partial<GameState>)) => {
       setState((prev) =>
@@ -24,10 +22,6 @@ export const useGameState = () => {
           Object.assign(draft.chat, partialUpdate.chat || {});
           Object.assign(draft.deckSelection, partialUpdate.deckSelection || {});
           Object.assign(draft.connection, partialUpdate.connection || {});
-          console.log('État mis à jour dans useGameState:', {
-            deckSelection: draft.deckSelection,
-            player: draft.player,
-          }, 'timestamp:', new Date().toISOString());
         }),
       );
     },
