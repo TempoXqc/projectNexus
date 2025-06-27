@@ -8,14 +8,14 @@ interface DeckInfoPreviewProps {
 
 function DeckInfoPreview({ hoveredDeckId, randomizers }: DeckInfoPreviewProps) {
   const deckInfoImages: { [key: string]: string } = {
-    assassin: '/cards/randomizers-info/Assassin-info.jpg',
-    celestial: '/cards/randomizers-info/Celestial-info.jpg',
-    dragon: '/cards/randomizers-info/Dragon-info.jpg',
-    wizard: '/cards/randomizers-info/Wizard-info.jpg',
-    vampire: '/cards/randomizers-info/Vampire-info.jpg',
-    viking: '/cards/randomizers-info/Viking-info.jpg',
-    engine: '/cards/randomizers-info/Engine-info.jpg',
-    samurai: '/cards/randomizers-info/Samurai-info.jpg',
+    assassin: '/addons/randomizers-info/Assassin-info.jpg',
+    celestial: '/addons/randomizers-info/Celestial-info.jpg',
+    dragon: '/addons/randomizers-info/Dragon-info.jpg',
+    wizard: '/addons/randomizers-info/Wizard-info.jpg',
+    vampire: '/addons/randomizers-info/Vampire-info.jpg',
+    viking: '/addons/randomizers-info/Viking-info.jpg',
+    engine: '/addons/randomizers-info/Engine-info.jpg',
+    samurai: '/addons/randomizers-info/Samurai-info.jpg',
   };
 
   const deck = useMemo(() => {

@@ -10,7 +10,6 @@ export class SocketService {
       transports: ['websocket', 'polling'],
       reconnection: false,
     });
-    console.log('Nouveau socket créé, ID:', this.socket.id, 'timestamp:', new Date().toISOString());
   }
 
   connect() {
@@ -23,10 +22,8 @@ export class SocketService {
       return;
     }
     this.isConnecting = true;
-    console.log('Socket.IO connecting to: http://localhost:3000', 'timestamp:', new Date().toISOString());
     this.socket.connect();
     this.socket.on('connect', () => {
-      console.log('Socket connecté dans socketService, ID:', this.socket.id, 'timestamp:', new Date().toISOString());
       this.isConnecting = false;
     });
     this.socket.on('connect_error', (error) => {
@@ -37,12 +34,10 @@ export class SocketService {
 
   disconnect() {
     this.socket.disconnect();
-    console.log('Socket déconnecté, ID:', this.socket.id, 'timestamp:', new Date().toISOString());
     this.isConnecting = false;
   }
 
   getSocket(): Socket {
-    console.log('getSocket appelé, socket ID:', this.socket.id, 'connected:', this.socket.connected, 'timestamp:', new Date().toISOString());
     return this.socket;
   }
 }

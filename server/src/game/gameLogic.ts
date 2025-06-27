@@ -2,6 +2,14 @@ import { Server } from 'socket.io';
 import { GameRepository } from '../database/gameRepository.js';
 import { CardManager } from './cardManager.js';
 
+interface ActiveGameProjection {
+  gameId: string;
+  players: string[];
+  createdAt: Date;
+  status: 'waiting' | 'started';
+  playersReady: number[];
+}
+
 export class GameLogic {
   private gameRepository: GameRepository;
   private cardManager: CardManager;

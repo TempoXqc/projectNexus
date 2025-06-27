@@ -52,7 +52,7 @@ export const usePlayerState = (
       const tokenCard: Card = {
         id: generateTokenId(),
         name: 'Assassin Token',
-        image: '/cards/tokens/token_assassin.jpg',
+        image: '/addons/tokens/token_assassin.jpg',
         exhausted: false,
       };
       const newOpponentDeck = [...state.opponent.deck, tokenCard].sort(() => Math.random() - 0.5);
@@ -93,7 +93,7 @@ export const usePlayerState = (
       const tokenCard: Card = {
         id: generateTokenId(),
         name: 'Assassin Token',
-        image: '/cards/tokens/token_assassin.jpg',
+        image: '/addons/tokens/token_assassin.jpg',
         exhausted: false,
       };
       const newOpponentDeck = [...state.opponent.deck, tokenCard];

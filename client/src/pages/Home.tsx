@@ -1,10 +1,11 @@
+// src/pages/Home.tsx
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { socketService } from '../services/socketService.ts';
 import { z } from 'zod';
-import { GameStartSchema } from 'types/SocketSchemas/Game';
-import { EmitJoinGameSchema } from 'types/SocketSchemas/Action';
+import { GameStartSchema } from 'types/SocketSchemas/Game.ts';
+import { EmitJoinGameSchema } from 'types/SocketSchemas/Action.ts';
 import { FaGithub, FaDiscord, FaTwitter, FaEye, FaClock, FaGamepad, FaList } from 'react-icons/fa';
 
 const ActiveGameSchema = z.object({
@@ -45,7 +46,6 @@ const Home: React.FC = () => {
     { pseudo: 'Player10', score: 1050 },
   ];
 
-  // Vérifier le token au montage
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     if (token) {
@@ -75,7 +75,6 @@ const Home: React.FC = () => {
 
     const handleActiveGamesUpdate = (games: unknown) => {
       if (!isMountedRef.current) return;
-      console.log('Reçu activeGamesUpdate, socket ID:', socket.id, 'games:', games, 'timestamp:', new Date().toISOString());
       try {
         const parsedGames = z.array(ActiveGameSchema).parse(games);
         setActiveGames(parsedGames);
@@ -86,12 +85,10 @@ const Home: React.FC = () => {
     };
 
     const handleConnect = () => {
-      console.log('Socket connecté, socket ID:', socket.id, 'timestamp:', new Date().toISOString());
       if (!hasJoinedLobbyRef.current && isMountedRef.current && window.location.pathname === '/') {
         setActiveGames([]);
         socket.emit('refreshLobby');
         hasJoinedLobbyRef.current = true;
-        console.log('Émis refreshLobby pour socket ID:', socket.id, 'timestamp:', new Date().toISOString());
       } else {
         console.log('refreshLobby non émis, conditions non remplies:', {
           hasJoinedLobby: hasJoinedLobbyRef.current,
@@ -110,7 +107,6 @@ const Home: React.FC = () => {
     };
 
     const handleDisconnect = () => {
-      console.log('Socket déconnecté, socket ID:', socket.id, 'timestamp:', new Date().toISOString());
       hasJoinedLobbyRef.current = false;
       setIsCreatingGame(false);
       setActiveGames([]);
@@ -125,7 +121,6 @@ const Home: React.FC = () => {
       setActiveGames([]);
       socket.emit('refreshLobby');
       hasJoinedLobbyRef.current = true;
-      console.log('Émis refreshLobby au montage pour socket ID:', socket.id, 'timestamp:', new Date().toISOString());
     }
 
     return () => {
@@ -135,7 +130,7 @@ const Home: React.FC = () => {
       socket.off('disconnect', handleDisconnect);
       socket.off('activeGamesUpdate', handleActiveGamesUpdate);
     };
-  }, [socket, navigate]);
+  }, [socket]);
 
   const handleCreateGame = useCallback(() => {
     if (!socket.connected) {
@@ -152,15 +147,14 @@ const Home: React.FC = () => {
       return;
     }
     setIsCreatingGame(true);
-    console.log('Émission de createGame, socket ID:', socket.id, { isRanked, gameFormat, timestamp: new Date().toISOString() });
     socket.emit('createGame', { isRanked, gameFormat }, (response: any) => {
       if (!isMountedRef.current) return;
       console.log('Reçu ACK pour createGame:', response, 'timestamp:', new Date().toISOString());
       try {
-        const parsedData = GameStartSchema.parse(response);
+        const parsedData = GameStartSchema.parse(response); // Use updated GameStartSchema
         setIsCreatingGame(false);
         navigate(`/waiting/${parsedData.gameId}`, {
-          state: { playerId: parsedData.playerId, availableDecks: parsedData.availableDecks },
+          state: { playerId: parsedData.playerId ?? null, availableDecks: parsedData.availableDecks },
         });
         hasJoinedLobbyRef.current = false;
       } catch (error) {
@@ -169,7 +163,7 @@ const Home: React.FC = () => {
         setIsCreatingGame(false);
       }
     });
-  }, [socket, isRanked, gameFormat, navigate, user]);
+  }, [socket, isRanked, gameFormat, user]);
 
   const handleJoinGame = useCallback(
     (gameId: string) => {
@@ -182,17 +176,32 @@ const Home: React.FC = () => {
         setIsAuthModalOpen(true);
         return;
       }
-      try {
-        const parsedGameId = EmitJoinGameSchema.parse(gameId);
-        socket.emit('joinGame', parsedGameId);
-        hasJoinedLobbyRef.current = false;
-        navigate(`/waiting/${gameId}`, { state: { playerId: null } });
-      } catch (error) {
-        console.error('[ERROR] joinGame validation failed:', error);
-        toast.error('ID de partie invalide.', { toastId: 'join_game_error' });
-      }
+      socket.emit('checkPlayerGame', { playerId: user.username }, (response) => {
+        if (response.exists && response.gameId) {
+          toast.error('Vous êtes déjà dans une partie.', { toastId: 'already_in_game' });
+          navigate(`/waiting/${response.gameId}`, {
+            state: { playerId: null, availableDecks: response.availableDecks },
+          });
+          return;
+        }
+        try {
+          const parsedGameId = EmitJoinGameSchema.parse(gameId);
+          socket.emit('checkGameExists', parsedGameId, (exists: boolean) => {
+            if (exists) {
+              socket.emit('joinGame', parsedGameId);
+              navigate(`/waiting/${gameId}`, { state: { playerId: null } });
+            } else {
+              toast.error("La partie n'existe pas.", { toastId: 'game_not_found' });
+              setActiveGames((prev) => prev.filter((game) => game.gameId !== gameId));
+            }
+          });
+        } catch (error) {
+          console.error('[ERROR] joinGame validation failed:', error);
+          toast.error('ID de partie invalide.', { toastId: 'join_game_error' });
+        }
+      });
     },
-    [socket, navigate, user],
+    [socket, user],
   );
 
   const handleJoinAsSpectator = (gameId: string) => {
@@ -256,15 +265,22 @@ const Home: React.FC = () => {
     }
   };
 
-  const handleSignUp = () => {
-    setIsRegistering(true);
-  };
-
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     setUser(null);
     toast.info('Déconnexion réussie.', { toastId: 'logout' });
   };
+
+  const handleCheckPlayerGame = useCallback(() => {
+    if (!socket.connected || !user) return;
+    socket.emit('checkPlayerGame', { playerId: user.username }, (response) => {
+      if (response.exists && response.gameId) {
+        navigate(`/waiting/${response.gameId}`, {
+          state: { playerId: null, availableDecks: response.availableDecks },
+        });
+      }
+    });
+  }, [socket, user]);
 
   const filteredGames = filterStatus === 'all' ? activeGames : activeGames.filter((game) => game.status === filterStatus);
 
@@ -396,6 +412,15 @@ const Home: React.FC = () => {
                   </li>
                 ))}
               </ul>
+            )}
+            {user && (
+              <button
+                onClick={handleCheckPlayerGame}
+                className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded mt-4 text-sm"
+                aria-label="Rejoindre la partie en cours"
+              >
+                Rejoindre la partie en cours
+              </button>
             )}
           </div>
 

@@ -11,7 +11,7 @@ function OpponentDeck({ count }: OpponentDeckProps) {
       style={{ width: '120px', height: '160px' }}
     >
       <img
-        src="/addons/nexus-back.jpg"
+        src="/cards/nexus-back.jpg"
         alt="Opponent Deck"
         className="w-full h-full object-cover rounded"
       />

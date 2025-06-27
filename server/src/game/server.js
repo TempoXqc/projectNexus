@@ -100,8 +100,8 @@
 //   let deckLists = {};
 //   let allCards = [];
 //   try {
-//     deckLists = JSON.parse(fs.readFileSync('public/deckLists.json', 'utf8'));
-//     allCards = JSON.parse(fs.readFileSync('public/cards.json', 'utf8')).map(
+//     deckLists = JSON.parse(fs.readFileSync('public/deckLists.jsonl', 'utf8'));
+//     allCards = JSON.parse(fs.readFileSync('public/cards.jsonl', 'utf8')).map(
 //       (card) => ({
 //         ...card,
 //         exhausted: false,

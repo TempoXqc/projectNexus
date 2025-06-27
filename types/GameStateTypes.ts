@@ -1,4 +1,3 @@
-// types/GameStateTypes.ts
 import { Card } from './CardTypes.js';
 
 export interface GameState {
@@ -11,7 +10,7 @@ export interface GameState {
     hasPlayedCard: boolean;
     lifePoints: number;
     tokenCount: number;
-    tokenType: 'assassin' | 'engine' | 'viking' | null;
+    tokenType: 'assassin' | 'viking' | 'engine' | 'celestial' | 'dragon' | 'samurai' | 'wizard' | 'vampire' | null;
   };
   opponent: {
     hand: Card[];
@@ -22,7 +21,7 @@ export interface GameState {
     hasPlayedCard: boolean;
     lifePoints: number;
     tokenCount: number;
-    tokenType: 'assassin' | 'engine' | 'viking' | null;
+    tokenType: 'assassin' | 'viking' | 'engine' | 'celestial' | 'dragon' | 'samurai' | 'wizard' | 'vampire' | null;
   };
   game: {
     turn: number;
@@ -49,7 +48,7 @@ export interface GameState {
   };
   deckSelection: {
     selectedDecks: string[];
-    player1DeckId: string | null;
+    player1DeckId: string[] | string | null; // Accepte chaîne ou tableau
     player1Deck: Card[];
     player2Deck: Card[];
     hasChosenDeck: boolean;
@@ -60,7 +59,7 @@ export interface GameState {
     isReady: boolean;
     bothReady: boolean;
     opponentReady: boolean;
-    deckSelectionData: { player1DeckId: string; player2DeckIds: string[]; selectedDecks: string[] } | null;
+    deckSelectionData: { player1DeckId: string[] | string | null; player2DeckIds: string[]; selectedDecks: string[] } | null;
     randomizers: { id: string; name: string; image: string }[];
     waitingForPlayer1: boolean;
   };
@@ -85,12 +84,13 @@ export interface ServerGameState {
     winner: string | null;
   };
   deckChoices: {
-    '1': string | null;
+    '1': string[]; // Tableau pour cohérence
     '2': string[];
   };
-  availableDecks: string[];
+  availableDecks: { id: string; name: string; image: string }[];
   createdAt: Date;
   status: 'waiting' | 'started';
+  playersReady: Set<number>;
 }
 
 export interface PlayerState {
@@ -104,5 +104,9 @@ export interface PlayerState {
   hasPlayedCard: boolean;
   lifePoints: number;
   tokenCount: number;
-  tokenType: 'assassin' | 'engine' | 'viking' | null;
+  tokenType: 'assassin' | 'viking' | 'engine' | 'celestial' | 'dragon' | 'samurai' | 'wizard' | 'vampire' | null;
+}
+
+export interface PersistedServerGameState extends Omit<ServerGameState, 'playersReady'> {
+  playersReady: number[];
 }

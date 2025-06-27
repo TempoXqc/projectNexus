@@ -28,7 +28,7 @@ function OpponentHand({ opponentHand }: OpponentHandProps) {
           style={{ width: '175px', height: '240px', position: 'relative', margin: '-2%' }}
         >
           <img
-            src="/addons/backcard.png"
+            src="/cards/backcard.png"
             alt="Opponent card"
             className="w-full h-full object-cover rounded"
           />

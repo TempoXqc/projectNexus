@@ -7,7 +7,7 @@ import DeckInfoPreview from './DeckInfoPreview';
 interface DeckSelectionProps {
   randomizers: { id: string; name: string; image: string }[];
   selectedDecks: string[];
-  player1DeckId: string | null;
+  player1DeckId: string[] | string | null;
   hasChosenDeck: boolean;
   isReady: boolean;
   opponentReady: boolean;
@@ -15,6 +15,7 @@ interface DeckSelectionProps {
   onReadyClick: () => void;
   playerId: number | null | undefined;
   waitingForPlayer1: boolean;
+  deckSelectionData: { player1DeckId: string[] | string | null; player2DeckIds: string[]; selectedDecks: string[] } | null;
 }
 
 function DeckSelection({
@@ -28,20 +29,35 @@ function DeckSelection({
                          onReadyClick,
                          playerId,
                          waitingForPlayer1,
+                         deckSelectionData,
                        }: DeckSelectionProps) {
   const [previewDeckId, setPreviewDeckId] = useState<string | null>(null);
   const [isPreviewClicked, setIsPreviewClicked] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
   const zoomButtonsRef = useRef<HTMLButtonElement[]>([]);
-  const canChooseDeck = playerId === 1 || (playerId === 2 && !waitingForPlayer1 && player1DeckId);
+  const normalizedPlayer1DeckId = Array.isArray(player1DeckId)
+    ? player1DeckId
+    : typeof player1DeckId === 'string'
+      ? player1DeckId.split(',')
+      : [];
+  const player2DeckIds = deckSelectionData?.player2DeckIds || [];
+  const canChooseDeck = playerId === 1 || (playerId === 2 && !waitingForPlayer1 && normalizedPlayer1DeckId.length > 0);
+  const player2DeckCount = player2DeckIds.length;
 
-  // Check if all decks are selected (Player 1: 1 deck, Player 2: 2 decks)
-  const allDecksSelected =
-    player1DeckId && selectedDecks.length === 3 && selectedDecks.includes(player1DeckId);
+  console.log('DeckSelection render:', {
+    playerId,
+    hasChosenDeck,
+    isReady,
+    opponentReady,
+    waitingForPlayer1,
+    player1DeckId: normalizedPlayer1DeckId,
+    player2DeckIds,
+    selectedDecks,
+    canChooseDeck,
+    player2DeckCount,
+  }, 'timestamp:', new Date().toISOString());
 
-  // Check if Player 2 is currently selecting their decks
-  const isPlayer2Selecting =
-    playerId === 1 && hasChosenDeck && player1DeckId && selectedDecks.length < 3;
+  const allDecksSelected = normalizedPlayer1DeckId.length >= 2 && player2DeckCount >= 2;
 
   const togglePreview = (deckId: string) => {
     if (previewDeckId === deckId && isPreviewClicked) {
@@ -68,11 +84,8 @@ function DeckSelection({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      const isOutsidePreview =
-        previewRef.current && !previewRef.current.contains(target);
-      const isOutsideZoomButtons = !zoomButtonsRef.current.some((button) =>
-        button.contains(target),
-      );
+      const isOutsidePreview = previewRef.current && !previewRef.current.contains(target);
+      const isOutsideZoomButtons = !zoomButtonsRef.current.some((button) => button.contains(target));
 
       if (isOutsidePreview && isOutsideZoomButtons && isPreviewClicked) {
         setPreviewDeckId(null);
@@ -98,40 +111,49 @@ function DeckSelection({
           {allDecksSelected
             ? "Les decks sont sélectionnés, bonne partie !"
             : playerId === 1
-              ? isPlayer2Selecting
+              ? hasChosenDeck
                 ? 'Joueur 1 : En attente du choix du joueur 2...'
                 : 'Joueur 1 : Choisissez votre deck'
               : waitingForPlayer1
                 ? 'Joueur 2 : En attente du choix du joueur 1...'
-                : 'Joueur 2 : Sélectionnez vos deux decks'}
+                : `Joueur 2 : Sélectionnez votre ${player2DeckCount === 1 ? 'deuxième deck' : 'premier deck'}`}
         </h2>
         <div className="grid grid-cols-4 gap-4">
           {randomizers.map((deckObj, index) => {
-            const isSelected = selectedDecks.includes(deckObj.id);
-            const isPlayer1Deck = player1DeckId === deckObj.id;
-            const isPlayer2Selection = playerId === 2 && isSelected && !isPlayer1Deck;
+            const isPlayer1Deck = normalizedPlayer1DeckId.includes(deckObj.id);
+            const isPlayer2Selection = player2DeckIds.includes(deckObj.id);
+            const isSelected = playerId === 1 ? isPlayer1Deck : isPlayer2Selection;
+            const isDisabled =
+              (playerId === 1 && hasChosenDeck) ||
+              (playerId === 2 && (waitingForPlayer1 || normalizedPlayer1DeckId.length === 0 || player2DeckCount >= 2 || isPlayer1Deck));
+
+            console.log(`Deck ${deckObj.id} state:`, {
+              isSelected,
+              isPlayer1Deck,
+              isPlayer2Selection,
+              isDisabled,
+              canChooseDeck,
+              rawPlayer1DeckId: player1DeckId,
+              player2DeckIds,
+            }, 'timestamp:', new Date().toISOString());
 
             return (
               <motion.div
                 key={deckObj.id}
-                whileHover={{ scale: canChooseDeck ? 1.05 : 1 }}
-                whileTap={{ scale: canChooseDeck ? 0.95 : 1 }}
+                whileHover={{ scale: canChooseDeck && !isDisabled ? 1.05 : 1 }}
+                whileTap={{ scale: canChooseDeck && !isDisabled ? 0.95 : 1 }}
                 className={`relative p-4 rounded-lg ${
                   isPlayer1Deck
                     ? 'bg-blue-600'
                     : isPlayer2Selection
                       ? 'bg-red-600'
                       : isSelected
-                        ? 'bg-blue-600'
-                        : canChooseDeck && (playerId === 1 || deckObj.id !== player1DeckId)
+                        ? 'bg-gray-500'
+                        : canChooseDeck && !isDisabled
                           ? 'bg-gray-700 hover:bg-gray-600 cursor-pointer'
                           : 'bg-gray-500 cursor-not-allowed'
                 }`}
-                onClick={() =>
-                  canChooseDeck &&
-                  (playerId === 1 || deckObj.id !== player1DeckId) &&
-                  onDeckChoice(deckObj.id)
-                }
+                onClick={() => canChooseDeck && !isDisabled && onDeckChoice(deckObj.id)}
                 onMouseEnter={() => handleMouseEnter(deckObj.id)}
                 onMouseLeave={() => handleMouseLeave()}
               >
@@ -154,13 +176,16 @@ function DeckSelection({
                   src={deckObj.image}
                   alt={deckObj.name}
                   className="w-full h-64 object-cover rounded"
+                  onError={() => {
+                    console.error(`Erreur de chargement de l'image: ${deckObj.image}`, 'timestamp:', new Date().toISOString());}}
                 />
                 <p className="text-white text-center mt-2">{deckObj.name}</p>
                 <GetDeckBadge
                   deckId={deckObj.id}
-                  player1DeckId={player1DeckId}
+                  player1DeckId={normalizedPlayer1DeckId}
                   selectedDecks={selectedDecks}
                   allRandomizers={randomizers}
+                  player2DeckIds={player2DeckIds}
                 />
               </motion.div>
             );

@@ -33,7 +33,7 @@ function OpponentGraveyard({
         {count > 0 ? (
           <>
             <img
-              src="/addons/nexus-back.jpg"
+              src="/cards/nexus-back.jpg"
               alt="OpponentGraveyard"
               className="w-full h-full object-cover rounded shadow grayscale"
             />

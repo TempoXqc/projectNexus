@@ -1,5 +1,5 @@
-// client/src/hooks/useGameState.ts
-import { useState, useCallback } from 'react';
+// src/hooks/useGameState.ts
+import { useState, useCallback, useRef } from 'react';
 import { GameState } from 'types/GameStateTypes';
 import { produce } from 'immer';
 import { useCardActions } from '@/hooks/useCardActions.ts';
@@ -8,7 +8,9 @@ import { usePlayerState } from '@/hooks/usePlayerState.ts';
 import { initialGameState } from '@/utils/initialGameState.ts';
 
 export const useGameState = () => {
-  const [state, setState] = useState<GameState>(initialGameState);
+  const initialStateRef = useRef<GameState>(initialGameState);
+  const [state, setState] = useState<GameState>(initialStateRef.current);
+  console.log('État actuel de GameState:', state);
 
   const set = useCallback(
     (updates: Partial<GameState> | ((prev: GameState) => Partial<GameState>)) => {
@@ -22,6 +24,10 @@ export const useGameState = () => {
           Object.assign(draft.chat, partialUpdate.chat || {});
           Object.assign(draft.deckSelection, partialUpdate.deckSelection || {});
           Object.assign(draft.connection, partialUpdate.connection || {});
+          console.log('État mis à jour dans useGameState:', {
+            deckSelection: draft.deckSelection,
+            player: draft.player,
+          }, 'timestamp:', new Date().toISOString());
         }),
       );
     },

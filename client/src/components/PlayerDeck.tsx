@@ -35,7 +35,7 @@ function PlayerDeck({ count, drawCard, shuffleDeck, handCount }: PlayerDeckProps
         </button>
       </div>
       <img
-        src="/addons/nexus-back.jpg"
+        src="/cards/nexus-back.jpg"
         alt="Deck"
         className="w-full h-full object-cover rounded shadow"
       />

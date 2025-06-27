@@ -1,22 +1,21 @@
-// client/src/pages/Game.tsx
 import { useCallback, useEffect, useMemo } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { GameState } from 'types/GameStateTypes';
 import { Card } from 'types/CardTypes';
-import { useGameSocket } from '@/hooks/useGameSocket.ts';
+import { useGameSocket, ClientToServerEvents } from '@/hooks/useGameSocket.ts';
 import { useGameState } from '@/hooks/useGameState.ts';
-import { mapDeckImages } from '@/utils/mapDeckImages.ts';
 import GameLayout from '@/components/GameLayout.tsx';
 import { shuffleDeck } from '@/utils/shuffleDeck.ts';
 
 interface LocationState {
-  playerId?: number| null;
+  playerId?: number | null;
   availableDecks?: string[];
 }
 
 export default function Game() {
   const { gameId } = useParams<{ gameId: string }>();
+  const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as LocationState | null;
   const {
@@ -32,7 +31,6 @@ export default function Game() {
     keepInitialHand,
     handleDeckChoice,
     handleReadyClick,
-    initializeDeck,
     updateLifePoints,
     updateTokenCount,
     setHoveredTokenId,
@@ -40,35 +38,88 @@ export default function Game() {
     placeAssassinTokenAtOpponentDeckBottom,
     addToDeck,
   } = useGameState();
-  const { socket, emit } = useGameSocket(
+  const { socket, emit, tryJoin } = useGameSocket(
     gameId,
     set,
-    state.connection.playerId,
+    state.connection.playerId ?? locationState?.playerId ?? null,
     state.connection.isConnected,
-    state.chat.messages,
   );
 
   useEffect(() => {
-    if (locationState?.availableDecks) {
-      const randomDeckList = mapDeckImages(locationState.availableDecks);
+    if (!gameId || !locationState?.playerId) {
+      console.log('gameId ou playerId manquant, redirection vers /');
+      navigate('/');
+      return;
+    }
+
+    if (state.connection.playerId !== locationState.playerId || !state.connection.isConnected) {
+      console.log('Mise à jour de playerId et isConnected depuis location.state:', {
+        playerId: locationState.playerId,
+        availableDecks: locationState.availableDecks,
+      });
       set((prev: GameState): Partial<GameState> => ({
+        connection: {
+          ...prev.connection,
+          playerId: locationState.playerId,
+          isConnected: true,
+        },
         deckSelection: {
           ...prev.deckSelection,
-          randomizers: randomDeckList,
+          randomizers: locationState.availableDecks || prev.deckSelection.randomizers, // [{ id, name, image }, ...]
         },
       }));
     }
-  }, [locationState, set]);
+
+    if (!state.connection.isConnected) {
+      tryJoin();
+    }
+  }, [gameId, locationState, state.connection.playerId, state.connection.isConnected, set, tryJoin, navigate]);
 
   useEffect(() => {
-    if (gameId) {
-      initializeDeck(gameId, emit);
-    }
-  }, [gameId, initializeDeck, emit]);
+    socket.on('initializeDeck', ({ deck, initialDraw, tokenType, tokenCount }) => {
+      console.log('initializeDeck reçu dans Game.tsx:', {
+        deckLength: deck.length,
+        initialDrawLength: initialDraw.length,
+        tokenType,
+        tokenCount,
+      }, 'timestamp:', new Date().toISOString());
+      set((prev: GameState): Partial<GameState> => {
+        const newState = {
+          player: {
+            ...prev.player,
+            deck,
+            hand: initialDraw,
+            tokenType,
+            tokenCount,
+          },
+          deckSelection: {
+            ...prev.deckSelection,
+            initialDraw,
+          },
+        };
+        console.log('Mise à jour de l\'état après initializeDeck:', newState, 'timestamp:', new Date().toISOString());
+        return newState;
+      });
+    });
+
+    return () => {
+      socket.off('initializeDeck');
+    };
+  }, [socket, set]);
+
+  useEffect(() => {
+    console.log('État de deckSelection:', {
+      deckSelectionDone: state.deckSelection.deckSelectionDone,
+      bothReady: state.deckSelection.bothReady,
+      initialDraw: state.deckSelection.initialDraw,
+      isReady: state.deckSelection.isReady,
+      opponentReady: state.deckSelection.opponentReady,
+    }, 'timestamp:', new Date().toISOString());
+  }, [state.deckSelection]);
 
   const sendChatMessage = useCallback(() => {
     if (state.chat.input.trim() && gameId && state.connection.isConnected) {
-      emit('sendMessage', { gameId, message: state.chat.input });
+      emit('sendMessage' as keyof ClientToServerEvents, { gameId, message: state.chat.input });
       set({ chat: { ...state.chat, input: '' } });
     }
   }, [state.chat.input, gameId, state.connection.isConnected, emit, set]);
@@ -76,7 +127,7 @@ export default function Game() {
   const handlePhaseChange = useCallback(
     (newPhase: 'Standby' | 'Main' | 'Battle' | 'End') => {
       if (gameId && state.connection.isConnected) {
-        emit('updatePhase', { gameId, phase: newPhase, turn: state.game.turn });
+        emit('updatePhase' as keyof ClientToServerEvents, { gameId, phase: newPhase, turn: state.game.turn });
       }
       set({
         game: {
@@ -85,7 +136,7 @@ export default function Game() {
         },
       });
     },
-    [gameId, state.connection.isConnected, state.game, emit, set],
+    [gameId, state.connection.isConnected, state.game.turn, emit, set],
   );
 
   const handleDeckChoiceCallback = useCallback(
@@ -94,12 +145,20 @@ export default function Game() {
         toast.error('ID de partie manquant.', { toastId: 'deck_choice_error' });
         return;
       }
+      if (!state.connection.playerId || !state.connection.isConnected) {
+        console.error('Impossible de choisir un deck:', {
+          playerId: state.connection.playerId,
+          isConnected: state.connection.isConnected,
+        });
+        toast.error('Erreur : joueur non connecté ou non identifié.', { toastId: 'deck_choice_error' });
+        return;
+      }
       const result = handleDeckChoice(deckId, gameId, emit);
       if (!result) {
         toast.error('Erreur lors du choix du deck.', { toastId: 'deck_choice_error' });
       }
     },
-    [handleDeckChoice, gameId, emit],
+    [handleDeckChoice, gameId, state.connection.playerId, state.connection.isConnected, emit],
   );
 
   const handleReadyClickCallback = useCallback(() => {
@@ -116,7 +175,7 @@ export default function Game() {
   const handleKeepInitialHand = useCallback(() => {
     const result = keepInitialHand();
     if (result && gameId && state.connection.isConnected) {
-      emit('updateGameState', {
+      emit('updateGameState' as keyof ClientToServerEvents, {
         gameId,
         state: { hand: result.hand, deck: state.player.deck },
       });
@@ -126,12 +185,23 @@ export default function Game() {
   const handleDoMulligan = useCallback(() => {
     const result = doMulligan();
     if (result && gameId && state.connection.isConnected) {
-      emit('updateGameState', {
+      emit('updateGameState' as keyof ClientToServerEvents, {
         gameId,
         state: { hand: result.hand, deck: result.deck },
       });
     }
   }, [doMulligan, gameId, state.connection.isConnected, emit]);
+
+  const handleQuitGame = useCallback(() => {
+    if (gameId && state.connection.isConnected) {
+      emit('leaveGame', { gameId, playerId: state.connection.playerId }, () => {
+        navigate('/');
+        toast.success('Partie quittée avec succès.', { toastId: 'game_quit' });
+      });
+    } else {
+      toast.error('Impossible de quitter la partie.', { toastId: 'quit_game_error' });
+    }
+  }, [gameId, state.connection.isConnected, state.connection.playerId, emit, navigate]);
 
   const setHoveredCardId = useCallback(
     (id: string | null) => {
@@ -161,7 +231,7 @@ export default function Game() {
     (index: number) => {
       const result = removeCardFromField(index);
       if (result && gameId && state.connection.isConnected) {
-        emit('updateGameState', {
+        emit('updateGameState' as keyof ClientToServerEvents, {
           gameId,
           state: { field: result.field, graveyard: result.graveyard },
         });
@@ -174,7 +244,7 @@ export default function Game() {
     (index: number) => {
       const result = exhaustCard(index);
       if (result && gameId && state.connection.isConnected) {
-        emit('exhaustCard', {
+        emit('exhaustCard' as keyof ClientToServerEvents, {
           gameId,
           cardId: result.cardId,
           fieldIndex: result.fieldIndex,
@@ -188,7 +258,7 @@ export default function Game() {
     (index: number) => {
       const result = attackCard(index);
       if (result && gameId && state.connection.isConnected) {
-        emit('attackCard', {
+        emit('attackCard' as keyof ClientToServerEvents, {
           gameId,
           cardId: result.cardId,
         });
@@ -201,7 +271,7 @@ export default function Game() {
     (card: Card) => {
       const result = discardCardFromHand(card);
       if (result && gameId && state.connection.isConnected) {
-        emit('updateGameState', {
+        emit('updateGameState' as keyof ClientToServerEvents, {
           gameId,
           state: { hand: result.hand, graveyard: result.graveyard },
         });
@@ -214,7 +284,7 @@ export default function Game() {
     (card: Card) => {
       const result = playCardToField(card);
       if (result && gameId && state.connection.isConnected) {
-        emit('playCard', {
+        emit('playCard' as keyof ClientToServerEvents, {
           gameId,
           card: result.card,
           fieldIndex: result.fieldIndex,
@@ -228,7 +298,7 @@ export default function Game() {
     (card: Card) => {
       const result = addToDeck(card);
       if (result && gameId && state.connection.isConnected) {
-        emit('updateGameState', {
+        emit('updateGameState' as keyof ClientToServerEvents, {
           gameId,
           state: { hand: result.hand, deck: result.deck },
         });
@@ -244,9 +314,9 @@ export default function Game() {
       });
       return;
     }
-    const result = drawCard((event, data) => emit(event, { ...data, gameId, playerId: state.connection.playerId }));
+    const result = drawCard((event, data) => emit(event as keyof ClientToServerEvents, { ...data, gameId, playerId: state.connection.playerId }));
     if (result) {
-      emit('drawCard', {
+      emit('drawCard' as keyof ClientToServerEvents, {
         gameId,
         playerId: state.connection.playerId,
       });
@@ -256,7 +326,7 @@ export default function Game() {
   const handleShuffleDeck = useCallback(() => {
     const result = shuffleDeck(state.player.deck);
     if (result && gameId && state.connection.isConnected) {
-      emit('updateGameState', {
+      emit('updateGameState' as keyof ClientToServerEvents, {
         gameId,
         state: { deck: result },
       });
@@ -267,7 +337,7 @@ export default function Game() {
     (newValue: number) => {
       const result = updateLifePoints(newValue);
       if (result && gameId && state.connection.isConnected) {
-        emit('updateLifePoints', {
+        emit('updateLifePoints' as keyof ClientToServerEvents, {
           gameId,
           lifePoints: newValue,
         });
@@ -280,7 +350,7 @@ export default function Game() {
     (newValue: number) => {
       const result = updateTokenCount(newValue);
       if (result && gameId && state.connection.isConnected) {
-        emit('updateTokenCount', {
+        emit('updateTokenCount' as keyof ClientToServerEvents, {
           gameId,
           tokenCount: newValue,
         });
@@ -290,14 +360,14 @@ export default function Game() {
   );
 
   const handleAddAssassinTokenToOpponentDeck = useCallback(() => {
-    const result = addAssassinTokenToOpponentDeck((event, data) => emit(event, { ...data, gameId }));
+    const result = addAssassinTokenToOpponentDeck((event, data) => emit(event as keyof ClientToServerEvents, { ...data, gameId }));
     if (!result && gameId && state.connection.isConnected) {
       toast.error('Erreur lors de l’ajout du token assassin.', { toastId: 'add_assassin_token_error' });
     }
   }, [addAssassinTokenToOpponentDeck, gameId, state.connection.isConnected, emit]);
 
   const handlePlaceAssassinTokenAtOpponentDeckBottom = useCallback(() => {
-    const result = placeAssassinTokenAtOpponentDeckBottom((event, data) => emit(event, { ...data, gameId }));
+    const result = placeAssassinTokenAtOpponentDeckBottom((event, data) => emit(event as keyof ClientToServerEvents, { ...data, gameId }));
     if (!result && gameId && state.connection.isConnected) {
       toast.error('Erreur lors du placement du token assassin.', { toastId: 'place_assassin_token_error' });
     }
@@ -373,13 +443,14 @@ export default function Game() {
       state={state}
       set={set}
       fieldKey={fieldKey}
-      playerId={locationState?.playerId ?? null}
+      playerId={state.connection.playerId ?? locationState?.playerId ?? null}
       gameId={gameId}
       socket={socket}
       sendChatMessage={sendChatMessage}
       handlePhaseChange={handlePhaseChange}
       handleDeckChoice={handleDeckChoiceCallback}
       handleReadyClick={handleReadyClickCallback}
+      handleQuitGame={handleQuitGame}
       handleKeepInitialHand={handleKeepInitialHand}
       handleDoMulligan={handleDoMulligan}
       setHoveredCardId={setHoveredCardId}
@@ -402,6 +473,7 @@ export default function Game() {
       setTokenZoneOpen={setTokenZoneOpen}
       setOpponentTokenZoneOpen={setOpponentTokenZoneOpen}
       setChatInput={setChatInput}
+      deckSelectionData={state.deckSelection.deckSelectionData}
     />
   );
 }
