@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "concurrently \"npm run start:client\" \"npm run start:server\"",
     "start:client": "cd client && vite",
     "start:server": "node server/dist/server/src/index.js",
     "build:client": "cd client && vite build",
