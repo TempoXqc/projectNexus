@@ -1,4 +1,3 @@
-// types/SocketSchemas/Game.ts
 import { z } from 'zod';
 import { CardSchema } from '../CardTypes.js';
 import { ChatMessageSchema } from './Chat.js';
