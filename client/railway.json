@@ -2,10 +2,11 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "ls -la types/SocketSchemas && cd client && npm install && npm run build -- --omit=dev"
+    "buildCommand": "ls -la /app/types/SocketSchemas && cd /app/client && npm install && npm run build"
   },
   "deploy": {
-    "startCommand": "vite preview",
-    "outputDirectory": "dist/client"
+    "startCommand": "cd /app/client && vite preview",
+    "outputDirectory": "dist/client",
+    "sleepApplication": false
   }
 }
