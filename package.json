@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --config client/vite.config.ts",
+    "build": "vite build",
     "preview": "vite preview",
     "start": "vite preview"
   },
