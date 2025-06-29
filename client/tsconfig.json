@@ -10,9 +10,9 @@
     "outDir": "./dist",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "baseUrl": "src",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["*"],
+      "@/*": ["src/*"],
       "types/*": ["../types/*"]
     },
     "allowImportingTsExtensions": true,
