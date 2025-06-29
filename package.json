@@ -8,6 +8,7 @@
     "start:server": "node server/dist/server/src/index.js",
     "build:client": "cd client && vite build",
     "build:server": "tsc --project server/tsconfig.server.json",
+    "build": "npm run build:client && npm run build:server",
     "test:client": "cd client && vitest",
     "test:server": "cd server && jest",
     "lint": "eslint . --ext .js,.ts,.tsx",
