@@ -5,6 +5,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [tailwindcss()],
+  root: __dirname,
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -12,7 +13,8 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist',
+    outDir: '../dist/client',
+    emptyOutDir: true,
   },
   esbuild: {
     format: 'esm',
