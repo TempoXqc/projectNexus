@@ -5,7 +5,8 @@
     "buildCommand": "npm run build"
   },
   "deploy": {
-    "startCommand": "npm start",
+    "startCommand": "vite preview",
+    "outputDirectory": "dist",
     "sleepApplication": false
   }
 }
