@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { Db, ObjectId, InsertOneResult } from 'mongodb';
+import { Db, ObjectId } from 'mongodb';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
@@ -32,25 +32,35 @@ const LoginSchema = z.object({
 const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Token requis' });
+  if (!token) {
+    res.status(401).json({ error: 'Token requis' });
+    return;
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string };
     const db = req.db;
-    if (!db) return res.status(500).json({ error: 'Base de données non disponible' });
+    if (!db) {
+      res.status(500).json({ error: 'Base de données non disponible' });
+      return;
+    }
 
     const user = await db.collection<User>('users').findOne({ _id: new ObjectId(decoded.userId) });
-    if (!user) return res.status(401).json({ error: 'Utilisateur non trouvé' });
+    if (!user) {
+      res.status(401).json({ error: 'Utilisateur non trouvé' });
+      return;
+    }
 
     if (!user.username || !user.password || !user.createdAt) {
-      return res.status(500).json({ error: 'Données utilisateur invalides' });
+      res.status(500).json({ error: 'Données utilisateur invalides' });
+      return;
     }
 
     req.user = user;
     next();
   } catch (error) {
     console.error('Erreur de vérification du token:', error);
-    return res.status(403).json({ error: 'Token invalide' });
+    res.status(403).json({ error: 'Token invalide' });
   }
 };
 
@@ -61,7 +71,8 @@ export const setupAuthRoutes = (db: Db): Router => {
       const usersCollection = db.collection<UserInsert>('users');
       const existingUser = await usersCollection.findOne({ username });
       if (existingUser) {
-        return res.status(400).json({ error: 'Nom d\'utilisateur déjà pris' });
+        res.status(400).json({ error: 'Nom d\'utilisateur déjà pris' });
+        return;
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -70,19 +81,18 @@ export const setupAuthRoutes = (db: Db): Router => {
         password: hashedPassword,
         createdAt: new Date(),
       };
-      const result: InsertOneResult<User> = await usersCollection.insertOne(userInsert);
+      const result = await usersCollection.insertOne(userInsert);
 
       const token = jwt.sign({ userId: result.insertedId.toString() }, process.env.JWT_SECRET as string, {
         expiresIn: '30d',
       });
-      console.log(`[POST /api/register] Nouveau utilisateur inscrit: ${username} timestamp: ${new Date().toISOString()}`);
       res.status(201).json({ token, username });
     } catch (error) {
-      console.error('Erreur lors de l\'inscription:', error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ errors: error.errors });
+        res.status(400).json({ errors: error.errors });
+      } else {
+        res.status(500).json({ error: 'Erreur serveur' });
       }
-      res.status(500).json({ error: 'Erreur serveur' });
     }
   });
 
@@ -92,12 +102,14 @@ export const setupAuthRoutes = (db: Db): Router => {
       const usersCollection = db.collection<User>('users');
       const user = await usersCollection.findOne({ username });
       if (!user) {
-        return res.status(401).json({ error: 'Nom d\'utilisateur ou mot de passe incorrect' });
+        res.status(401).json({ error: 'Nom d\'utilisateur ou mot de passe incorrect' });
+        return;
       }
 
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
-        return res.status(401).json({ error: 'Nom d\'utilisateur ou mot de passe incorrect' });
+        res.status(401).json({ error: 'Nom d\'utilisateur ou mot de passe incorrect' });
+        return;
       }
 
       const token = jwt.sign({ userId: user._id.toString() }, process.env.JWT_SECRET as string, {
@@ -108,7 +120,8 @@ export const setupAuthRoutes = (db: Db): Router => {
     } catch (error) {
       console.error('Erreur lors de la connexion:', error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ errors: error.errors });
+        res.status(400).json({ errors: error.errors });
+        return;
       }
       res.status(500).json({ error: 'Erreur serveur' });
     }
