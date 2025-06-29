@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "build": "tsc --project tsconfig.server.json",
-    "start": "node server/src/index.ts",
-    "dev": "nodemon --watch src --ext ts --exec \"tsc --project tsconfig.server.json && node src/index.js\""
+    "start": "node dist/server/src/index.js"
   },
   "dependencies": {
+    "bcrypt": "^6.0.0",
+    "jsonwebtoken": "^9.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
