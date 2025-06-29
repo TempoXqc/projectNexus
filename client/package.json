@@ -9,6 +9,7 @@
     "start": "vite preview"
   },
   "dependencies": {
+    "@vitejs/plugin-react": "^4.6.0",
     "framer-motion": "^11.11.7",
     "immer": "^10.1.1",
     "lucide-react": "^0.523.0",
