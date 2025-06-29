@@ -3,10 +3,17 @@ import { z } from 'zod';
 import { CardSchema } from '../CardTypes.js';
 import { ChatMessageSchema } from './Chat.js';
 export const GameStartSchema = z.object({
-    playerId: z.number().min(1),
+    playerId: z.number().nullable(),
     gameId: z.string().min(1),
     chatHistory: z.array(ChatMessageSchema),
-    availableDecks: z.array(z.string().min(1)),
+    availableDecks: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), image: z.string().min(1), infoImage: z.string().min(1) })),
+});
+// Add schema for createGame ACK
+export const CreateGameAckSchema = z.object({
+    gameId: z.string().min(1),
+    playerId: z.number().nullable(),
+    chatHistory: z.array(ChatMessageSchema),
+    availableDecks: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), image: z.string().min(1) })),
 });
 export const GameStateUpdateSchema = z.object({
     player1: z
@@ -20,7 +27,7 @@ export const GameStateUpdateSchema = z.object({
         deck: z.array(CardSchema),
         lifePoints: z.number().min(0).max(30).optional(),
         tokenCount: z.number().min(0).optional(),
-        tokenType: z.enum(['assassin', 'engine', 'viking']).nullable().optional(),
+        tokenType: z.enum(['assassin', 'engine', 'viking', 'celestial', 'dragon', 'samurai', 'wizard', 'vampire']).nullable().optional(),
     })
         .optional(),
     player2: z
@@ -34,7 +41,7 @@ export const GameStateUpdateSchema = z.object({
         deck: z.array(CardSchema),
         lifePoints: z.number().min(0).max(30).optional(),
         tokenCount: z.number().min(0).optional(),
-        tokenType: z.enum(['assassin', 'engine', 'viking']).nullable().optional(),
+        tokenType: z.enum(['assassin', 'engine', 'viking', 'celestial', 'dragon', 'samurai', 'wizard', 'vampire']).nullable().optional(),
     })
         .optional(),
     turn: z.number().min(1).optional(),
@@ -54,7 +61,7 @@ export const EmitUpdateGameStateSchema = z.object({
         mustDiscard: z.boolean().optional(),
         lifePoints: z.number().min(0).max(30).optional(),
         tokenCount: z.number().min(0).optional(),
-        tokenType: z.enum(['assassin', 'engine', 'viking']).nullable().optional(),
+        tokenType: z.enum(['assassin', 'engine', 'viking', 'celestial', 'dragon', 'samurai', 'wizard', 'vampire']).nullable().optional(),
     }),
 });
 export const GameOverSchema = z.object({
