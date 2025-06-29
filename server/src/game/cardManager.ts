@@ -1,5 +1,5 @@
 import { Db } from 'mongodb';
-import { Card } from '../../../types/CardTypes.js';
+import { Card } from '../../../types/CardTypes'
 
 interface DeckDocument {
   id: string;

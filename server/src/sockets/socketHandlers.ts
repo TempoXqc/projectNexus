@@ -7,7 +7,7 @@ import { PlayerManager } from '../game/playerManager.js';
 import { JoinGameSchema, PlayCardSchema } from './socketSchemas.js';
 import { Db, ObjectId } from 'mongodb';
 import { GameState, ServerGameState } from '../../../types/GameStateTypes.js';
-import { Card } from '../../../types/CardTypes.js';
+import { Card } from '../../../types/CardTypes'
 import { z } from 'zod';
 
 function generateGameId(): string {
