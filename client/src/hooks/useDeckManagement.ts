@@ -1,10 +1,9 @@
-// client/src/hooks/useDeckManagement.ts
 import { useCallback } from 'react';
 import { GameState } from 'types/GameStateTypes';
 import { Card } from 'types/CardTypes';
-import { toast } from 'react-toastify';
 import { shuffleDeck } from '@/utils/shuffleDeck.ts';
 import { getRandomHand } from '@/utils/getRandomHand.ts';
+import { ClientToServerEvents } from '@/hooks/useGameSocket.ts';
 
 export const useDeckManagement = (
   state: GameState,
@@ -66,8 +65,21 @@ export const useDeckManagement = (
 
   const handleDeckChoice = useCallback(
     (deckId: string, gameId?: string, emit?: (event: string, data: any) => void) => {
+      console.log('Appel de handleDeckChoice:', {
+        deckId,
+        gameId,
+        playerId: state.connection.playerId,
+        isConnected: state.connection.isConnected,
+        hasChosenDeck: state.deckSelection.hasChosenDeck,
+        waitingForPlayer1: state.deckSelection.waitingForPlayer1,
+      });
       if (!state.connection.playerId || !state.connection.isConnected || !gameId) {
         console.log('Returning null because playerId, isConnected, or gameId is missing');
+        console.log('handleDeckChoice failed:', {
+          playerId: state.connection.playerId,
+          isConnected: state.connection.isConnected,
+          gameId,
+        });
         return null;
       }
       if (state.connection.playerId === 1 && state.deckSelection.hasChosenDeck) {
@@ -78,12 +90,21 @@ export const useDeckManagement = (
         state.connection.playerId === 2 &&
         (!state.deckSelection.player1DeckId ||
           state.deckSelection.waitingForPlayer1 ||
-          state.deckSelection.selectedDecks.filter((d: string) => d !== state.deckSelection.player1DeckId).length >= 2)
+          state.deckSelection.selectedDecks.filter((d: string) =>
+            Array.isArray(state.deckSelection.player1DeckId)
+              ? !state.deckSelection.player1DeckId.includes(d)
+              : !state.deckSelection.player1DeckId?.split(',').includes(d)
+          ).length >= 2)
       ) {
+        console.log('Returning null for player 2:', {
+          player1DeckId: state.deckSelection.player1DeckId,
+          waitingForPlayer1: state.deckSelection.waitingForPlayer1,
+          availableDecks: state.deckSelection.selectedDecks,
+        });
         return null;
       }
 
-      let tokenType: 'assassin' | 'engine' | 'viking' | null = null;
+      let tokenType: 'assassin' | 'engine' | 'viking' | 'celestial' | 'dragon' | 'samurai' | 'wizard' | null = null;
       let tokenCount = 0;
       if (deckId === 'assassin') {
         tokenType = 'assassin';
@@ -94,14 +115,32 @@ export const useDeckManagement = (
       } else if (deckId === 'viking') {
         tokenType = 'viking';
         tokenCount = 1;
+      } else if (deckId === 'celestial') {
+        tokenType = 'celestial';
+        tokenCount = 0;
+      } else if (deckId === 'dragon') {
+        tokenType = 'dragon';
+        tokenCount = 0;
+      } else if (deckId === 'samurai') {
+        tokenType = 'samurai';
+        tokenCount = 0;
+      } else if (deckId === 'wizard') {
+        tokenType = 'wizard';
+        tokenCount = 0;
       }
 
       set({
-        deckSelection: { ...state.deckSelection, hasChosenDeck: true },
+        deckSelection: {
+          ...state.deckSelection,
+          hasChosenDeck: true,
+          selectedDecks: [...new Set([...state.deckSelection.selectedDecks, deckId])],
+          player1DeckId: state.connection.playerId === 1 ? [deckId] : state.deckSelection.player1DeckId,
+        },
         player: { ...state.player, tokenType, tokenCount },
       });
 
       if (emit) {
+        console.log('Émission de chooseDeck:', { gameId, playerId: state.connection.playerId, deckId });
         emit('chooseDeck', { gameId, playerId: state.connection.playerId, deckId });
       }
 
@@ -111,9 +150,13 @@ export const useDeckManagement = (
   );
 
   const handleReadyClick = useCallback(
-    (gameId: string, emit?: (event: string, data: any) => void) => {
+    (gameId: string, emit?: (event: keyof ClientToServerEvents, data: any) => void) => {
       if (!gameId || !state.connection.playerId || state.deckSelection.isReady) {
-        console.log('Returning null because gameId, playerId, or isReady is invalid');
+        console.log('Returning null because gameId, playerId, or isReady is invalid', {
+          gameId,
+          playerId: state.connection.playerId,
+          isReady: state.deckSelection.isReady,
+        });
         return null;
       }
       set({
@@ -121,6 +164,7 @@ export const useDeckManagement = (
       });
 
       if (emit) {
+        console.log('Émission de playerReady:', { gameId, playerId: state.connection.playerId }, 'timestamp:', new Date().toISOString());
         emit('playerReady', { gameId, playerId: state.connection.playerId });
       }
 
@@ -129,130 +173,11 @@ export const useDeckManagement = (
     [state.connection.playerId, state.deckSelection.isReady, state.deckSelection, set],
   );
 
-  const initializeDeck = useCallback(
-    (gameId: string, emit: (event: string, data: any) => void) => {
-      if (
-        !state.deckSelection.deckSelectionData ||
-        !state.deckSelection.bothReady ||
-        state.deckSelection.deckSelectionDone ||
-        state.connection.playerId === null
-      ) {
-        console.log('Returning null because deckSelectionData, bothReady, deckSelectionDone, or playerId is invalid');
-        return null;
-      }
-
-      const { player1DeckId, player2DeckIds, selectedDecks } = state.deckSelection.deckSelectionData;
-      const remainingDeckId = selectedDecks.find(
-        (id: string) => id !== player1DeckId && !player2DeckIds.includes(id),
-      );
-
-      Promise.all([
-        fetch('/deckLists.json').then((res) => {
-          if (!res.ok) throw new Error('Erreur lors du chargement de deckLists.json');
-          return res.json();
-        }),
-        fetch('/cards.json').then((res) => {
-          if (!res.ok) throw new Error('Erreur lors du chargement de cards.json');
-          return res.json();
-        }),
-      ])
-        .then(([deckLists, allCards]) => {
-          const getDeckCards = (deckId: string): Card[] => {
-            const cardIds = deckLists[deckId] || [];
-            return allCards.filter((card: Card) => cardIds.includes(card.id));
-          };
-
-          let currentPlayerCards: Card[] = [];
-          let tokenType: 'assassin' | 'engine' | 'viking' | null = null;
-          let tokenCount = 0;
-
-          if (state.connection.playerId === 1) {
-            const player1Cards = getDeckCards(player1DeckId);
-            const remainingCards = remainingDeckId ? getDeckCards(remainingDeckId) : [];
-            currentPlayerCards = [...player1Cards, ...remainingCards]
-              .sort(() => Math.random() - 0.5)
-              .slice(0, 30);
-            if (player1DeckId === 'assassin') {
-              tokenType = 'assassin';
-              tokenCount = 8;
-            } else if (player1DeckId === 'engine') {
-              tokenType = 'engine';
-              tokenCount = 0;
-            } else if (player1DeckId === 'viking') {
-              tokenType = 'viking';
-              tokenCount = 1;
-            }
-          } else {
-            currentPlayerCards = player2DeckIds
-              .flatMap((deckId: string) => getDeckCards(deckId))
-              .sort(() => Math.random() - 0.5)
-              .slice(0, 30);
-            if (player2DeckIds.includes('assassin')) {
-              tokenType = 'assassin';
-              tokenCount = 8;
-            } else if (player2DeckIds.includes('engine')) {
-              tokenType = 'engine';
-              tokenCount = 0;
-            } else if (player2DeckIds.includes('viking')) {
-              tokenType = 'viking';
-              tokenCount = 1;
-            }
-          }
-
-          if (currentPlayerCards.length === 0) {
-            console.error('[ERROR] Aucune carte trouvée pour le deck du joueur', state.connection.playerId);
-            toast.error('Erreur : aucune carte trouvée pour le deck.', {
-              toastId: 'initialize_deck_error',
-            });
-            return;
-          }
-
-          const shuffledDeck: Card[] = [...currentPlayerCards];
-          const drawn: Card[] = getRandomHand(shuffledDeck, 5);
-          const rest: Card[] = shuffledDeck.filter(
-            (c: Card) => !drawn.some((d: Card) => d.id === c.id),
-          );
-
-          set({
-            player: {
-              ...state.player,
-              deck: rest,
-              lifePoints: 30,
-              tokenType,
-              tokenCount,
-            },
-            deckSelection: {
-              ...state.deckSelection,
-              initialDraw: drawn,
-              deckSelectionDone: true,
-            },
-          });
-
-          if (state.connection.isConnected) {
-            emit('updateGameState', {
-              gameId,
-              state: { hand: drawn, deck: rest, lifePoints: 30, tokenType, tokenCount },
-            });
-          }
-        })
-        .catch((err: Error) => {
-          console.error('[ERREUR INIT DRAW]', err);
-          toast.error('Erreur lors du chargement des decks.', {
-            toastId: 'initialize_deck_error',
-          });
-        });
-
-      return { deckSelectionDone: true };
-    },
-    [state.deckSelection.deckSelectionData, state.deckSelection.bothReady, state.deckSelection.deckSelectionDone, state.connection.playerId, state.connection.isConnected, state.player, state.deckSelection, set],
-  );
-
   return {
     toggleCardMulligan,
     doMulligan,
     keepInitialHand,
     handleDeckChoice,
     handleReadyClick,
-    initializeDeck,
   };
 };

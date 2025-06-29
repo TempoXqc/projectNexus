@@ -1,8 +1,5 @@
-// client/src/components/GameLayout.tsx
 import { GameState } from 'types/GameStateTypes';
-import { Card } from 'types/CardTypes';
-import { Socket } from 'socket.io-client';
-import { memo } from 'react';
+import { memo, ReactNode } from 'react';
 import InitialDrawModal from './InitialDrawModal';
 import CounterPlayer from '@/components/CounterPlayer.tsx';
 import PhaseIndicator from '@/components/PhaseIndicator.tsx';
@@ -25,9 +22,9 @@ interface GameLayoutProps {
   state: GameState;
   set: (updates: Partial<GameState> | ((prev: GameState) => Partial<GameState>)) => void;
   fieldKey: string;
-  playerId: number | null | undefined;
+  playerId: number | null;
   gameId: string | undefined;
-  socket: Socket;
+  socket: any;
   sendChatMessage: () => void;
   handlePhaseChange: (newPhase: 'Standby' | 'Main' | 'Battle' | 'End') => void;
   handleDeckChoice: (deckId: string) => void;
@@ -39,9 +36,9 @@ interface GameLayoutProps {
   removeCardFromField: (index: number) => void;
   exhaustCard: (index: number) => void;
   attackCard: (index: number) => void;
-  discardCardFromHand: (card: Card) => void;
-  playCardToField: (card: Card) => void;
-  addToDeck: (card: Card) => void;
+  discardCardFromHand: (card: any) => void;
+  playCardToField: (card: any) => void;
+  addToDeck: (card: any) => void;
   drawCard: () => void;
   shuffleDeck: () => void;
   updateLifePoints: (newValue: number) => void;
@@ -54,6 +51,8 @@ interface GameLayoutProps {
   setTokenZoneOpen: (isOpen: boolean) => void;
   setOpponentTokenZoneOpen: (isOpen: boolean) => void;
   setChatInput: (input: string) => void;
+  deckSelectionData: { player1DeckId: string[] | string | null; player2DeckIds: string[]; selectedDecks: string[] } | null;
+  children?: ReactNode;
 }
 
 const GameLayout = memo(
@@ -90,10 +89,11 @@ const GameLayout = memo(
      setTokenZoneOpen,
      setOpponentTokenZoneOpen,
      setChatInput,
+     deckSelectionData,
    }: GameLayoutProps) => {
     return (
       <div className="w-full min-h-screen flex flex-row relative overflow-hidden" role="main" aria-label="Interface de jeu">
-        {!state.deckSelection.deckSelectionDone && (
+        {!state.deckSelection.bothReady && (
           <DeckSelection
             randomizers={state.deckSelection.randomizers}
             selectedDecks={state.deckSelection.selectedDecks}
@@ -103,29 +103,32 @@ const GameLayout = memo(
             opponentReady={state.deckSelection.opponentReady}
             onDeckChoice={handleDeckChoice}
             onReadyClick={handleReadyClick}
-            waitingForPlayer1={state.deckSelection.waitingForPlayer1}
             playerId={playerId}
+            waitingForPlayer1={state.deckSelection.waitingForPlayer1}
+            deckSelectionData={deckSelectionData}
           />
         )}
-        <InitialDrawModal
-          initialDraw={state.deckSelection.initialDraw}
-          selectedForMulligan={state.deckSelection.selectedForMulligan}
-          mulliganDone={state.deckSelection.mulliganDone}
-          bothReady={state.deckSelection.bothReady}
-          onToggleCardMulligan={(cardId: string) =>
-            set((prev) => ({
-              ...prev,
-              deckSelection: {
-                ...prev.deckSelection,
-                selectedForMulligan: prev.deckSelection.selectedForMulligan.includes(cardId)
-                  ? prev.deckSelection.selectedForMulligan.filter((id) => id !== cardId)
-                  : [...prev.deckSelection.selectedForMulligan, cardId],
-              },
-            }))
-          }
-          onKeepInitialHand={handleKeepInitialHand}
-          onDoMulligan={handleDoMulligan}
-        />
+        {state.deckSelection.deckSelectionDone && state.deckSelection.bothReady && state.deckSelection.initialDraw.length > 0 && !state.deckSelection.mulliganDone && (
+          <InitialDrawModal
+            initialDraw={state.deckSelection.initialDraw}
+            selectedForMulligan={state.deckSelection.selectedForMulligan}
+            mulliganDone={state.deckSelection.mulliganDone}
+            bothReady={state.deckSelection.bothReady}
+            onToggleCardMulligan={(cardId: string) =>
+              set((prev) => ({
+                ...prev,
+                deckSelection: {
+                  ...prev.deckSelection,
+                  selectedForMulligan: prev.deckSelection.selectedForMulligan.includes(cardId)
+                    ? prev.deckSelection.selectedForMulligan.filter((id) => id !== cardId)
+                    : [...prev.deckSelection.selectedForMulligan, cardId],
+                },
+              }))
+            }
+            onKeepInitialHand={handleKeepInitialHand}
+            onDoMulligan={handleDoMulligan}
+          />
+        )}
         {state.game.gameOver && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50" role="dialog" aria-label="Fin de partie">
             <div className="bg-gray-800 p-6 rounded-lg text-white text-center">

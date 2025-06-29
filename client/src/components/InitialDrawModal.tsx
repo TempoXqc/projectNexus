@@ -28,6 +28,13 @@ function InitialDrawModal({
   const previewRef = useRef<HTMLDivElement>(null);
   const zoomButtonsRef = useRef<HTMLButtonElement[]>([]);
 
+  console.log('Tentative de rendu de InitialDrawModal:', {
+    initialDrawLength: initialDraw.length,
+    mulliganDone,
+    bothReady,
+    selectedForMulligan,
+  }, 'timestamp:', new Date().toISOString());
+
   const togglePreview = (cardId: string) => {
     if (previewCardId === cardId && isPreviewClicked) {
       setPreviewCardId(null);
@@ -72,8 +79,15 @@ function InitialDrawModal({
   }, [isPreviewClicked]);
 
   if (initialDraw.length === 0 || mulliganDone || !bothReady) {
+    console.log('InitialDrawModal non rendu:', {
+      initialDrawLength: initialDraw.length,
+      mulliganDone,
+      bothReady,
+    }, 'timestamp:', new Date().toISOString());
     return null;
   }
+
+  console.log('InitialDrawModal rendu avec:', { initialDraw: initialDraw.map(card => card.id) }, 'timestamp:', new Date().toISOString());
 
   return (
     <motion.div
@@ -112,7 +126,7 @@ function InitialDrawModal({
                       if (el) zoomButtonsRef.current[index] = el;
                     }}
                     onClick={(e) => {
-                      e.stopPropagation(); // Prevent triggering onToggleCardMulligan
+                      e.stopPropagation();
                       togglePreview(card.id);
                     }}
                     className="p-2 bg-gray-800 rounded-full shadow-md hover:bg-gray-700 transition"

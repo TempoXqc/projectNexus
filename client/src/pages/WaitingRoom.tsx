@@ -1,7 +1,8 @@
+// src/pages/WaitingRoom.tsx
 import React, { useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { GameStartSchema } from 'types/SocketSchemas/Game';
+import { GameStartSchema } from 'types/SocketSchemas/Game.ts';
 import { socketService } from '@/services/socketService.ts';
 import { PuffLoader } from 'react-spinners';
 
@@ -16,16 +17,38 @@ const WaitingRoom: React.FC = () => {
       return;
     }
 
-    socket.emit('leaveLobby');
+    if (!socket.connected) {
+      console.log('Socket non connecté, tentative de connexion...');
+      socketService.connect();
+    }
+
+    socket.on('connect', () => {
+      console.log(`Socket connecté, ID: ${socket.id}, gameId: ${gameId}, timestamp: ${new Date().toISOString()}`);
+      // Tenter de rejoindre la partie si le joueur n'est pas encore assigné
+      socket.emit('checkGameExists', gameId, (exists: boolean) => {
+        if (exists) {
+          socket.emit('joinGame', gameId);
+        } else {
+          console.log(`Partie ${gameId} n'existe pas, redirection vers /`);
+          navigate('/');
+          toast.error("La partie n'existe plus.", { toastId: 'game_not_found' });
+        }
+      });
+    });
+
     socket.on('gameStart', (data) => {
-      console.log('Données reçues pour gameStart:', data);
+      console.log('Données brutes reçues pour gameStart:', JSON.stringify(data, null, 2));
       try {
-        const parsedData = GameStartSchema.parse(data);
+        const parsedData = GameStartSchema.parse(data); // Line 42
+        console.log('Navigation vers Game.tsx avec state:', {
+          playerId: parsedData.playerId,
+          availableDecks: parsedData.availableDecks,
+        });
         navigate(`/game/${parsedData.gameId}`, {
           state: { playerId: parsedData.playerId, availableDecks: parsedData.availableDecks },
         });
       } catch (error) {
-        console.error('[ERROR] gameStart validation failed:', error);
+        console.error('[ERROR] gameStart validation failed:', error); // Line 51
         toast.error('Erreur lors du démarrage de la partie.', { toastId: 'game_start_error' });
       }
     });
@@ -42,12 +65,8 @@ const WaitingRoom: React.FC = () => {
       navigate('/');
     });
 
-    if (!socket.connected) {
-      socketService.connect();
-    }
-
     return () => {
-      socket.emit('joinLobby');
+      socket.off('connect');
       socket.off('gameStart');
       socket.off('connect_error');
       socket.off('error');
@@ -55,7 +74,7 @@ const WaitingRoom: React.FC = () => {
   }, [gameId, navigate, socket]);
 
   const handleLeaveGame = useCallback(() => {
-    socket.emit('leaveGame', gameId);
+    socket.emit('leaveGame', { gameId, playerId: null });
     navigate('/');
   }, [gameId, socket, navigate]);
 

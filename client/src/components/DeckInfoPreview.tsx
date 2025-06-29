@@ -1,28 +1,35 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 interface DeckInfoPreviewProps {
   hoveredDeckId: string | null;
-  randomizers: { id: string; name: string; image: string }[];
+  randomizers: {
+    id: string;
+    name: string;
+    image: string;
+    infoImage: string;
+  }[];
 }
 
 function DeckInfoPreview({ hoveredDeckId, randomizers }: DeckInfoPreviewProps) {
-  const deckInfoImages: { [key: string]: string } = {
-    assassin: '/cards/randomizers-info/Assassin-info.jpg',
-    celestial: '/cards/randomizers-info/Celestial-info.jpg',
-    dragon: '/cards/randomizers-info/Dragon-info.jpg',
-    wizard: '/cards/randomizers-info/Wizard-info.jpg',
-    vampire: '/cards/randomizers-info/Vampire-info.jpg',
-    viking: '/cards/randomizers-info/Viking-info.jpg',
-    engine: '/cards/randomizers-info/Engine-info.jpg',
-    samurai: '/cards/randomizers-info/Samurai-info.jpg',
-  };
-
   const deck = useMemo(() => {
-    return randomizers.find((deck) => deck.id === hoveredDeckId);
+    const match = randomizers.find((deck) => deck.id === hoveredDeckId);
+    console.log('[DEBUG] hoveredDeckId:', hoveredDeckId);
+    console.log('[DEBUG] Matching deck:', match);
+    return match;
   }, [hoveredDeckId, randomizers]);
 
-  if (!deck || !deckInfoImages[deck.id]) return null;
+  useEffect(() => {
+    if (!deck) {
+      console.log('[DEBUG] Aucun deck trouvé pour hoveredDeckId:', hoveredDeckId);
+    } else if (!deck.infoImage) {
+      console.log('[DEBUG] Le deck existe mais pas de infoImage:', deck);
+    } else {
+      console.log('[DEBUG] Affichage de l’image info pour le deck:', deck.name, '->', deck.infoImage);
+    }
+  }, [deck, hoveredDeckId]);
+
+  if (!deck || !deck.infoImage) return null;
 
   return (
     <motion.div
@@ -40,7 +47,7 @@ function DeckInfoPreview({ hoveredDeckId, randomizers }: DeckInfoPreviewProps) {
     >
       <div className="border-1 border-white rounded-lg shadow-2xl w-full h-full">
         <img
-          src={deckInfoImages[deck.id]}
+          src={deck.infoImage}
           alt={`${deck.name} Info`}
           className="rounded shadow-2xl border-2 border-white w-full h-full object-cover"
         />

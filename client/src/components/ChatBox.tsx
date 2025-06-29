@@ -99,7 +99,7 @@ function ChatBox({
             <ExternalLink className="w-5 h-5" /> Wiki
           </a>
           <a
-            href="/addons/rules.pdf"
+            href="/cards/rules.pdf"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
