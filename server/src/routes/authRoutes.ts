@@ -59,7 +59,7 @@ const authenticateToken = async (req: Request, res: Response, next: NextFunction
   }
 };
 
-export const setupAuthRoutes = (db: Db) => {
+export const setupAuthRoutes = (db: Db): Router => {
   // Inscription
   router.post('/register', async (req: Request, res: Response) => {
     try {
