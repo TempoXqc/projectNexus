@@ -1,5 +1,5 @@
 {
-  "name": "project-nexus-client",
+  "name": "project-nexus",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -9,7 +9,9 @@
     "start": "vite preview"
   },
   "dependencies": {
+    "@tempoxqc/project-nexus-types": "^1.0.3",
     "@vitejs/plugin-react": "^4.6.0",
+    "@rollup/rollup-linux-x64-gnu": "^4.24.2",
     "framer-motion": "^11.11.7",
     "immer": "^10.1.1",
     "lucide-react": "^0.523.0",
