@@ -1,14 +1,16 @@
 import { io, Socket } from 'socket.io-client';
+import { clientConfig } from '../config/clientConfig';
 
 export class SocketService {
   private socket: Socket;
   private isConnecting: boolean = false;
 
   constructor() {
-    this.socket = io('http://localhost:3000', {
+    this.socket = io(clientConfig.socketUrl, {
       autoConnect: false,
       transports: ['websocket', 'polling'],
       reconnection: false,
+      path: '/socket.io'
     });
   }
 
@@ -17,13 +19,14 @@ export class SocketService {
       console.log('Connexion déjà en cours ou établie, ignoré', {
         isConnecting: this.isConnecting,
         connected: this.socket.connected,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       });
       return;
     }
     this.isConnecting = true;
     this.socket.connect();
     this.socket.on('connect', () => {
+      console.log('WebSocket connecté');
       this.isConnecting = false;
     });
     this.socket.on('connect_error', (error) => {

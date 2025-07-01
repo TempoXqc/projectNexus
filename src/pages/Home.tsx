@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { GameStartSchema } from '@tempoxqc/project-nexus-types';
 import { EmitJoinGameSchema } from '@tempoxqc/project-nexus-types';
 import { FaGithub, FaDiscord, FaTwitter, FaEye, FaClock, FaGamepad, FaList } from 'react-icons/fa';
+import { clientConfig } from '@/config/clientConfig.ts';
 
 const ActiveGameSchema = z.object({
   gameId: z.string().min(1),
@@ -242,12 +243,10 @@ const Home: React.FC = () => {
     e.preventDefault();
     const endpoint = isRegistering ? '/api/register' : '/api/login';
     try {
-      const response = await fetch(`http://localhost:3000${endpoint}`, {
+      const response = await fetch(`${clientConfig.apiUrl}/api/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ username, password }),
+        headers: { 'Content-Type': 'application/json' }
       });
       const data = await response.json();
       if (!response.ok) {
