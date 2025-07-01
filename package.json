@@ -9,9 +9,8 @@
     "start": "vite preview"
   },
   "dependencies": {
-    "@tempoxqc/project-nexus-types": "^1.0.5",
+    "@tempoxqc/project-nexus-types": "^1.0.8",
     "@vitejs/plugin-react": "^4.6.0",
-    "@rollup/rollup-win32-x64-msvc": "^4.24.2",
     "framer-motion": "^11.11.7",
     "immer": "^10.1.1",
     "lucide-react": "^0.523.0",
