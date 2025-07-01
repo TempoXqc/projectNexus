@@ -2,10 +2,17 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm ci --verbose && npm run build"
+    "buildCommand": "npm ci && npm run build",
+    "nixpacksPlan": {
+      "phases": {
+        "build": {
+          "cmd": "npm ci && npm run build",
+          "cacheDirectories": []
+        }
+      }
+    }
   },
   "deploy": {
-    "startCommand": "vite preview",
     "outputDirectory": "dist",
     "sleepApplication": false
   }
