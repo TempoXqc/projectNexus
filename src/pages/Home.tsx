@@ -1,11 +1,9 @@
-// src/pages/Home.tsx
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { socketService } from '../services/socketService.ts';
 import { z } from 'zod';
-import { GameStartSchema } from '@tempoxqc/project-nexus-types';
-import { EmitJoinGameSchema } from '@tempoxqc/project-nexus-types';
+import { GameStartSchema, EmitJoinGameSchema } from '@tempoxqc/project-nexus-types';
 import { FaGithub, FaDiscord, FaTwitter, FaEye, FaClock, FaGamepad, FaList } from 'react-icons/fa';
 import { clientConfig } from '@/config/clientConfig.ts';
 
@@ -50,7 +48,7 @@ const Home: React.FC = () => {
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     if (token) {
-      fetch('http://localhost:3000/api/verify', {
+      fetch(`${clientConfig.apiUrl}/api/verify`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -65,7 +63,7 @@ const Home: React.FC = () => {
           }
         })
         .catch((error) => {
-          console.error('Erreur lors de la vérification du token:', error);
+          console.error('Erreur lors de la vérification du token:', error, 'URL:', clientConfig.apiUrl);
           localStorage.removeItem('authToken');
         });
     }
@@ -101,7 +99,7 @@ const Home: React.FC = () => {
     };
 
     const handleConnectError = (error: Error) => {
-      console.error('WebSocket connection error:', error);
+      console.error('WebSocket connection error:', error, 'URL:', clientConfig.socketUrl);
       toast.error('Erreur de connexion au serveur.', { toastId: 'connect_error' });
       hasJoinedLobbyRef.current = false;
       setIsCreatingGame(false);
@@ -152,7 +150,7 @@ const Home: React.FC = () => {
       if (!isMountedRef.current) return;
       console.log('Reçu ACK pour createGame:', response, 'timestamp:', new Date().toISOString());
       try {
-        const parsedData = GameStartSchema.parse(response); // Use updated GameStartSchema
+        const parsedData = GameStartSchema.parse(response);
         setIsCreatingGame(false);
         navigate(`/waiting/${parsedData.gameId}`, {
           state: { playerId: parsedData.playerId ?? null, availableDecks: parsedData.availableDecks },
@@ -243,7 +241,7 @@ const Home: React.FC = () => {
     e.preventDefault();
     const endpoint = isRegistering ? '/api/register' : '/api/login';
     try {
-      const response = await fetch(`${clientConfig.apiUrl}/api/login`, {
+      const response = await fetch(`${clientConfig.apiUrl}${endpoint}`, {
         method: 'POST',
         body: JSON.stringify({ username, password }),
         headers: { 'Content-Type': 'application/json' }
@@ -259,7 +257,7 @@ const Home: React.FC = () => {
       toast.success(isRegistering ? 'Compte créé avec succès !' : 'Connexion réussie !', { toastId: 'auth_success' });
       closeAuthModal();
     } catch (error: any) {
-      console.error(`Erreur lors de ${isRegistering ? 'l\'inscription' : 'la connexion'}:`, error);
+      console.error(`Erreur lors de ${isRegistering ? 'l\'inscription' : 'la connexion'}:`, error, 'URL:', clientConfig.apiUrl);
       toast.error(error.message, { toastId: 'auth_error' });
     }
   };
