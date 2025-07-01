@@ -18,7 +18,7 @@ dist-ssr
 *.local
 
 # Fichiers d'environnement
-client/.env
+.env
 server/dist/.env
 
 # Éditeurs
