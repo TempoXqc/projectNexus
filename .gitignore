@@ -12,14 +12,9 @@ lerna-debug.log*
 node_modules
 
 # Builds
-client/dist
-server/dist
+dist
 dist-ssr
 *.local
-
-# Fichiers d'environnement
-.env
-server/dist/.env
 
 # Éditeurs
 .vscode/*
@@ -34,3 +29,9 @@ server/dist/.env
 
 # Tests et couverture
 coverage
+
+# Fichiers d'environnement
+.env
+.env.local
+.env.development
+.env.production
