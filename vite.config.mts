@@ -1,11 +1,11 @@
-﻿import { defineConfig } from 'vite';
+﻿// client/vite.config.ts
+import { defineConfig } from 'vite';
 import * as path from 'path';
 import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   root: __dirname,
-  plugins: [react(), tailwindcss()],
+  plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -13,12 +13,9 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    assetsDir: 'assets',
     emptyOutDir: true,
-    sourcemap: true
   },
-  server: {
-    port: 5173
+  esbuild: {
+    format: 'esm',
   },
-  envPrefix: 'VITE_'
 });

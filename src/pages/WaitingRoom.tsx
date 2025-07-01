@@ -2,9 +2,9 @@
 import React, { useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { socketService } from '@/services/socketService.ts';
 import { PuffLoader } from 'react-spinners';
 import { GameStartSchema } from '@tempoxqc/project-nexus-types';
+import { socketService } from '@/services/socketService.ts';
 
 const WaitingRoom: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
