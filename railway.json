@@ -1,0 +1,19 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm ci && npm run build && ls -la dist/assets",
+    "nixpacksPlan": {
+      "phases": {
+        "build": {
+          "cmd": "npm ci && npm run build && ls -la dist/assets",
+          "cacheDirectories": []
+        }
+      }
+    }
+  },
+  "deploy": {
+    "outputDirectory": "dist",
+    "sleepApplication": false
+  }
+}
