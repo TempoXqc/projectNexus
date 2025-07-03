@@ -106,9 +106,11 @@ const Home: React.FC = () => {
     };
 
     const handleDisconnect = () => {
+      console.error('[Home] WebSocket déconnecté');
       hasJoinedLobbyRef.current = false;
       setIsCreatingGame(false);
       setActiveGames([]);
+      toast.error('Connexion au serveur perdue.', { toastId: 'disconnect_error' });
     };
 
     socket.once('connect', handleConnect);
@@ -169,7 +171,7 @@ const Home: React.FC = () => {
         setIsCreatingGame(false);
       }
     });
-    // Ajouter un timeout pour détecter l'absence de réponse
+    // Timeout pour détecter l'absence de réponse
     setTimeout(() => {
       if (isCreatingGame && isMountedRef.current) {
         console.error('[Home] Timeout: Aucune réponse reçue pour createGame après 10 secondes');
