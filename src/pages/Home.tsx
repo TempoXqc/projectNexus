@@ -152,7 +152,7 @@ const Home: React.FC = () => {
     }
     setIsCreatingGame(true);
     socket.emit('createGame', { isRanked, gameFormat }, (response: any) => {
-      console.log('[Home] Reçu ACK pour createGame:', response, 'timestamp:', new Date().toISOString());
+      console.log('[Home] Réponse brute pour createGame:', response, 'timestamp:', new Date().toISOString());
       if (!isMountedRef.current) {
         console.log('[Home] Composant démonté, abandon de la réponse');
         setIsCreatingGame(false);
@@ -178,7 +178,7 @@ const Home: React.FC = () => {
         toast.error('Le serveur ne répond pas. Veuillez réessayer.', { toastId: 'create_game_timeout' });
         setIsCreatingGame(false);
       }
-    }, 10000);
+    }, 100);
   }, [socket, isRanked, gameFormat, user, navigate]);
 
   const handleJoinGame = useCallback(
