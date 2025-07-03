@@ -151,7 +151,11 @@ const Home: React.FC = () => {
     setIsCreatingGame(true);
     socket.emit('createGame', { isRanked, gameFormat }, (response: any) => {
       console.log('[Home] Reçu ACK pour createGame:', response, 'timestamp:', new Date().toISOString());
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current) {
+        console.log('[Home] Composant démonté, abandon de la réponse');
+        setIsCreatingGame(false);
+        return;
+      }
       try {
         const parsedData = GameStartSchema.parse(response);
         setIsCreatingGame(false);
@@ -160,11 +164,19 @@ const Home: React.FC = () => {
         });
         console.log('[Home] Navigation vers WaitingRoom pour gameId:', parsedData.gameId);
       } catch (error) {
-        console.error('[ERROR] createGame ACK validation failed:', error);
+        console.error('[ERROR] createGame ACK validation failed:', error, 'response:', response);
         toast.error('Erreur lors de la création de la partie.', { toastId: 'game_created_error' });
         setIsCreatingGame(false);
       }
     });
+    // Ajouter un timeout pour détecter l'absence de réponse
+    setTimeout(() => {
+      if (isCreatingGame && isMountedRef.current) {
+        console.error('[Home] Timeout: Aucune réponse reçue pour createGame après 10 secondes');
+        toast.error('Le serveur ne répond pas. Veuillez réessayer.', { toastId: 'create_game_timeout' });
+        setIsCreatingGame(false);
+      }
+    }, 10000);
   }, [socket, isRanked, gameFormat, user, navigate]);
 
   const handleJoinGame = useCallback(
