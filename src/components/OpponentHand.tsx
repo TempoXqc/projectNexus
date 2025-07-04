@@ -1,12 +1,14 @@
-﻿import { memo } from 'react';
+﻿// frontend/src/components/OpponentHand.tsx
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '@tempoxqc/project-nexus-types';
 
 interface OpponentHandProps {
   opponentHand: Card[];
+  backcardImage?: string;
 }
 
-function OpponentHand({ opponentHand }: OpponentHandProps) {
+function OpponentHand({ opponentHand, backcardImage }: OpponentHandProps) {
   return (
     <div
       className="flex justify-center gap-4"
@@ -28,7 +30,7 @@ function OpponentHand({ opponentHand }: OpponentHandProps) {
           style={{ width: '175px', height: '240px', position: 'relative', margin: '-2%' }}
         >
           <img
-            src="/cards/backcard.png"
+            src={backcardImage}
             alt="Opponent card"
             className="w-full h-full object-cover rounded"
           />

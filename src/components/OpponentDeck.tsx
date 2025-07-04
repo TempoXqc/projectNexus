@@ -1,21 +1,25 @@
+// frontend/src/components/OpponentDeck.tsx
 import { memo } from 'react';
 
 interface OpponentDeckProps {
   count: number;
+  backcardImage?: string;
 }
 
-function OpponentDeck({ count }: OpponentDeckProps) {
+function OpponentDeck({ count, backcardImage }: OpponentDeckProps) {
   return (
     <div
-      className="flex items-center justify-center relative border-2 border-gray-500 bg-gray-800 rounded"
+      className="flex flex-col items-center justify-center relative cursor-pointer border-4 border-gray-600 rounded-lg p-1 bg-black/40"
       style={{ width: '120px', height: '160px' }}
     >
       <img
-        src="/cards/nexus-back.jpg"
+        src={backcardImage}
         alt="Opponent Deck"
-        className="w-full h-full object-cover rounded"
+        className="w-full h-full object-cover rounded shadow"
       />
-      <span className="absolute text-white font-bold text-xl">{count}</span>
+      <span className="absolute inset-0 flex items-center justify-center text-white font-bold text-xl">
+        {count}
+      </span>
     </div>
   );
 }

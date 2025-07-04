@@ -1,15 +1,16 @@
+// frontend/src/components/OpponentGraveyard.tsx
 import { memo, useMemo } from 'react';
-import Modal from './Modal.tsx';
-import { Card } from '@tempoxqc/project-nexus-types';
+import Modal from '@/components/Modal.tsx';
 
 interface OpponentGraveyardProps {
   count: number;
   onClick: () => void;
   isOpen: boolean;
   onClose: () => void;
-  graveyard: Card[];
+  graveyard: any[];
   hoveredCardId: string | null;
   setHoveredCardId: (id: string | null) => void;
+  backcardImage?: string;
 }
 
 function OpponentGraveyard({
@@ -20,6 +21,7 @@ function OpponentGraveyard({
                              graveyard,
                              hoveredCardId,
                              setHoveredCardId,
+                             backcardImage,
                            }: OpponentGraveyardProps) {
   const reversedGraveyard = useMemo(() => graveyard.slice().reverse(), [graveyard]);
 
@@ -33,8 +35,8 @@ function OpponentGraveyard({
         {count > 0 ? (
           <>
             <img
-              src="/cards/nexus-back.jpg"
-              alt="OpponentGraveyard"
+              src={backcardImage}
+              alt="Opponent Graveyard"
               className="w-full h-full object-cover rounded shadow grayscale"
             />
             <span className="absolute inset-0 flex items-center justify-center text-white font-bold text-xl">

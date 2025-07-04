@@ -1,15 +1,15 @@
 ﻿import { memo, useMemo } from 'react';
-import Modal from './Modal.tsx';
-import { Card } from '@tempoxqc/project-nexus-types';
+import Modal from '@/components/Modal.tsx';
 
 interface GraveyardProps {
   count: number;
   onClick: () => void;
   isOpen: boolean;
   onClose: () => void;
-  graveyard: Card[] | null;
+  graveyard: any[] | null;
   hoveredCardId: string | null;
   setHoveredCardId: (id: string | null) => void;
+  backcardImage?: string;
 }
 
 function PlayerGraveyard({
@@ -20,6 +20,7 @@ function PlayerGraveyard({
                            graveyard,
                            hoveredCardId,
                            setHoveredCardId,
+                           backcardImage,
                          }: GraveyardProps) {
   const reversedGraveyard = useMemo(() => graveyard?.slice().reverse(), [graveyard]);
 
@@ -33,8 +34,8 @@ function PlayerGraveyard({
         {count > 0 ? (
           <>
             <img
-              src="/cards/nexus-back.jpg"
-              alt="PlayerGraveyard"
+              src={backcardImage}
+              alt="Player Graveyard"
               className="w-full h-full object-cover rounded shadow grayscale"
             />
             <span className="absolute inset-0 flex items-center justify-center text-white font-bold text-xl">
@@ -50,7 +51,7 @@ function PlayerGraveyard({
 
       <Modal isOpen={isOpen} onClose={onClose} title="Cimetière" width="720px">
         <div className="flex flex-wrap gap-4 justify-center relative">
-          {reversedGraveyard.length > 0 ? (
+          {reversedGraveyard?.length > 0 ? (
             reversedGraveyard?.map((card) => (
               <div
                 key={card.id}

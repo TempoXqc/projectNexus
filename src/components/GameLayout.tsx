@@ -52,6 +52,7 @@ interface GameLayoutProps {
   setOpponentTokenZoneOpen: (isOpen: boolean) => void;
   setChatInput: (input: string) => void;
   deckSelectionData: { player1DeckId: string[] | string | null; player2DeckIds: string[]; selectedDecks: string[] } | null;
+  backcard: { id: string; name: string; image: string } | null;
   children?: ReactNode;
 }
 
@@ -90,7 +91,9 @@ const GameLayout = memo(
      setOpponentTokenZoneOpen,
      setChatInput,
      deckSelectionData,
+     backcard,
    }: GameLayoutProps) => {
+
     return (
       <div className="w-full min-h-screen flex flex-row relative overflow-hidden" role="main" aria-label="Interface de jeu">
         {!state.deckSelection.bothReady && (
@@ -225,7 +228,7 @@ const GameLayout = memo(
               hoveredCardId={state.ui.hoveredCardId}
               setHoveredCardId={setHoveredCardId}
             />
-            <OpponentHand opponentHand={state.opponent.hand} />
+            <OpponentHand opponentHand={state.opponent.hand} backcardImage={backcard?.image} />
           </div>
 
           <div className="z-30 absolute left-4 bottom-2 flex gap-4" role="region" aria-label="Zone de deck et cimetière du joueur">
@@ -234,6 +237,7 @@ const GameLayout = memo(
               handCount={state.player.hand.length}
               drawCard={drawCard}
               shuffleDeck={shuffleDeck}
+              backcardImage={backcard?.image}
             />
             <PlayerGraveyard
               count={state.player.graveyard.length}
@@ -243,6 +247,7 @@ const GameLayout = memo(
               graveyard={state.player.graveyard}
               hoveredCardId={state.ui.hoveredCardId}
               setHoveredCardId={setHoveredCardId}
+              backcardImage={backcard?.image}
             />
             <PlayerTokenZone
               tokenCount={state.player.tokenCount}
@@ -262,7 +267,7 @@ const GameLayout = memo(
 
           {!state.ui.isTokenZoneOpen && (
             <div className="z-30 absolute left-4 top-2 flex gap-4" role="region" aria-label="Zone de deck et cimetière adverse">
-              <OpponentDeck count={state.opponent.deck.length} />
+              <OpponentDeck count={state.opponent.deck.length} backcardImage={backcard?.image} />
               <OpponentGraveyard
                 count={state.opponent.graveyard.length}
                 onClick={() => setOpponentGraveyardOpen(true)}
@@ -271,6 +276,7 @@ const GameLayout = memo(
                 graveyard={state.opponent.graveyard}
                 hoveredCardId={state.ui.hoveredCardId}
                 setHoveredCardId={setHoveredCardId}
+                backcardImage={backcard?.image}
               />
               <OpponentTokenZone
                 tokenCount={state.opponent.tokenCount}

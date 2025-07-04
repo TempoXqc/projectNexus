@@ -1,3 +1,4 @@
+// frontend/src/components/PlayerDeck.tsx
 import { memo } from 'react';
 import { RefreshCcw, CreditCard as CardIcon } from 'lucide-react';
 
@@ -6,12 +7,13 @@ interface PlayerDeckProps {
   drawCard: () => void;
   shuffleDeck: () => void;
   handCount: number;
+  backcardImage?: string;
 }
 
-function PlayerDeck({ count, drawCard, shuffleDeck, handCount }: PlayerDeckProps) {
+function PlayerDeck({ count, drawCard, shuffleDeck, handCount, backcardImage }: PlayerDeckProps) {
   return (
     <div
-      className="flex flex-col items-center justify-center relative"
+      className="flex flex-col items-center justify-center relative cursor-pointer border-4 border-gray-600 rounded-lg p-1 bg-black/40"
       style={{ width: '120px', height: '160px' }}
     >
       <div
@@ -35,7 +37,7 @@ function PlayerDeck({ count, drawCard, shuffleDeck, handCount }: PlayerDeckProps
         </button>
       </div>
       <img
-        src="/cards/nexus-back.jpg"
+        src={backcardImage}
         alt="Deck"
         className="w-full h-full object-cover rounded shadow"
       />
