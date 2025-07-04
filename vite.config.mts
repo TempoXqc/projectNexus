@@ -16,15 +16,5 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true
   },
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': {
-        target: 'https://projectnexus-staging-backend.up.railway.app' || 'http://localhost:3000',
-        changeOrigin: true,
-        rewrite: (path) => path,
-      },
-    },
-  },
   envPrefix: 'VITE_'
 });
