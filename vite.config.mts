@@ -1,6 +1,9 @@
 ﻿import { defineConfig } from 'vite';
 import * as path from 'path';
 import react from '@vitejs/plugin-react';
+import { clientConfig } from './src/config/clientConfig';
+
+const backendUrl = clientConfig.apiUrl || 'http://localhost:3000';
 
 export default defineConfig({
   root: __dirname,
@@ -20,7 +23,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: backendUrl,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
