@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { GameState } from '@tempoxqc/project-nexus-types';
@@ -18,6 +18,7 @@ export default function Game() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as LocationState | null;
+  const [backcard, setBackcard] = useState<{ id: string; name: string; image: string } | null>(null);
   const {
     state,
     set,
@@ -65,7 +66,7 @@ export default function Game() {
         },
         deckSelection: {
           ...prev.deckSelection,
-          randomizers: locationState.availableDecks || prev.deckSelection.randomizers, // [{ id, name, image }, ...]
+          randomizers: locationState.availableDecks || prev.deckSelection.randomizers,
         },
       }));
     }
@@ -106,6 +107,23 @@ export default function Game() {
       socket.off('initializeDeck');
     };
   }, [socket, set]);
+
+  useEffect(() => {
+    const fetchBackcard = async () => {
+      try {
+        const response = await fetch('/api/backcard');
+        if (!response.ok) {
+          throw new Error('Erreur lors de la récupération de la backcard');
+        }
+        const data = await response.json();
+        setBackcard(data);
+      } catch (error) {
+        console.error('Erreur lors de la récupération de la backcard:', error);
+        toast.error('Impossible de charger l’image de la backcard.');
+      }
+    };
+    fetchBackcard();
+  }, []);
 
   const sendChatMessage = useCallback(() => {
     if (state.chat.input.trim() && gameId && state.connection.isConnected) {
@@ -464,6 +482,7 @@ export default function Game() {
       setOpponentTokenZoneOpen={setOpponentTokenZoneOpen}
       setChatInput={setChatInput}
       deckSelectionData={state.deckSelection.deckSelectionData}
+      backcard={backcard}
     />
   );
 }
