@@ -22,12 +22,14 @@ function OpponentField({
       className="relative z-40"
       style={{
         position: 'absolute',
-        top: '38%',
+        top: '25%',
         left: '50%',
-        transform: 'translate(-50%, -50%)',
-        height: '190px',
+        transform: 'translateX(-50%)',
+        height: '11.11vw',
+        maxHeight: '213.33px',
         overflow: 'visible',
-        width: '75%',
+        width: '55vw',
+        maxWidth: '1600px',
       }}
     >
       {visibleCards.map((card, visibleIndex) => (
@@ -36,11 +38,16 @@ function OpponentField({
           initial={{ opacity: 0, scale: 0.8, x: 20 }}
           animate={{ opacity: 1, scale: 1, x: 0, rotate: card.exhausted ? 90 : 0 }}
           transition={{ duration: 0.3 }}
-          className="absolute w-[115px] h-[160px] bg-white shadow rounded"
           onMouseEnter={() => setHoveredCardId(card.id)}
           onMouseLeave={() => setHoveredCardId(null)}
+          className="absolute bg-white shadow rounded"
           style={{
-            left: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 120}px)`,
+            width: '5.99vw',
+            maxWidth: '153.33px',
+            height: '8.33vw',
+            maxHeight: '213.33px',
+            left: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 6.25}vw)`,
+            maxLeft: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 160}px)`,
             transformOrigin: 'center center',
             cursor: 'pointer',
           }}

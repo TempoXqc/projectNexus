@@ -57,9 +57,11 @@ function PlayerField({
         top: '55%',
         left: '50%',
         transform: 'translateX(-50%)',
-        height: '190px',
+        height: '11.11vw',
+        maxHeight: '213.33px',
         overflow: 'visible',
-        width: '75%',
+        width: '55vw',
+        maxWidth: '1600px',
       }}
     >
       {visibleCards.map(({ card, index }, visibleIndex) => (
@@ -77,9 +79,14 @@ function PlayerField({
             rotate: card.exhausted ? 90 : 0,
           }}
           transition={{ duration: 0.3 }}
-          className="absolute w-[115px] h-[160px] bg-white shadow rounded"
+          className="absolute bg-white shadow rounded"
           style={{
-            left: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 120}px)`,
+            width: '5.99vw',
+            maxWidth: '153.33px',
+            height: '8.33vw',
+            maxHeight: '213.33px',
+            left: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 6.25}vw)`,
+            maxLeft: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 160}px)`,
             transformOrigin: 'center center',
             cursor: 'pointer',
           }}

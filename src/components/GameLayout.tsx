@@ -109,7 +109,7 @@ const GameLayout = memo(
           >
             <img
               src={playerPlaymat.image}
-              className="w-[55%] h-full object-center"
+              className="w-[55vw] h-full object-center max-w-[1600px]"
               alt={`Playmat ${playerPlaymat.name}`}
               aria-label={`Playmat ${playerPlaymat.name}`}
             />
@@ -122,7 +122,7 @@ const GameLayout = memo(
           >
             <img
               src={opponentPlaymat.image}
-              className="w-[55%] h-full object-center"
+              className="w-[55vw] h-full object-center max-w-[1600px]"
               alt={`Playmat adverse ${opponentPlaymat.name}`}
               aria-label={`Playmat adverse ${opponentPlaymat.name}`}
             />
