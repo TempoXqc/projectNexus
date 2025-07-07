@@ -35,10 +35,6 @@ function PlayerHand({
     event.preventDefault();
     event.stopPropagation();
     const cardElement = cardRefs.current.get(cardId) || null;
-    console.log('Right-click on card:', {
-      cardId,
-      cardElement: cardElement ? cardElement.getBoundingClientRect() : null,
-    });
     setContextMenu({ cardElement });
   };
 
@@ -46,17 +42,18 @@ function PlayerHand({
     setContextMenu(null);
   };
 
+  const extraElevation = 10; // Surélévation pour la carte survolée
+
   return (
     <div
-      className="flex justify-center items-center gap-4 flex-1 z-2"
+      className="flex justify-center items-center gap-4 flex-1 z-30"
       onMouseEnter={() => setIsHandHovered(true)}
       onMouseLeave={() => setIsHandHovered(false)}
       style={{
         position: 'absolute',
-        top: isHandHovered ? '88%' : '100%',
+        top: '92%', // Position fixe
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        transition: 'top 0.3s ease-in-out',
         overflow: 'visible',
       }}
     >
@@ -67,10 +64,22 @@ function PlayerHand({
             if (el) cardRefs.current.set(card.id, el);
             else cardRefs.current.delete(card.id);
           }}
-          className="relative rounded shadow p-1 bg-black cursor-pointer transition-transform hover:scale-105"
-          style={{ width: '175px', height: '240px', position: 'relative', margin: '-2%' }}
+          className="relative rounded shadow p-1 bg-black cursor-pointer transition-transform duration-300"
+          style={{
+            width: '175px',
+            height: '240px',
+            position: 'relative',
+            margin: '-2%',
+            transform: `
+              ${hoveredCardId === card.id ? `translateY(-${extraElevation}px)` : 'translateY(0)'}
+            `,
+            zIndex: hoveredCardId === card.id ? 40 : 30,
+            transition: 'transform 0.3s ease, z-index 0.1s',
+          }}
           onMouseEnter={() => setHoveredCardId(card.id)}
-          onMouseLeave={() => setHoveredCardId(null)}
+          onMouseLeave={() => {
+            setHoveredCardId(null);
+          }}
           onContextMenu={(event) => handleContextMenu(event, card.id)}
         >
           <img
@@ -80,10 +89,10 @@ function PlayerHand({
           />
           {hoveredCardId === card.id && (
             <div
-              className="absolute top-0 left-1/2 transform -translate-x-1/2 flex flex-col items-center pt-2 transition-all duration-300"
+              className="absolute top-0 left-1/2 transform -translate-x-1/2 flex flex-col items-center pt-2"
               style={{
                 top: '10px',
-                left: '75%',
+                left: '50%',
                 transform: 'translate(-50%, 0)',
                 pointerEvents: 'auto',
               }}
@@ -94,12 +103,11 @@ function PlayerHand({
                     event.stopPropagation();
                     playCardToField(card);
                   }}
-                  className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 focus:outline-none"
-                  title=""
+                  className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 focus:outline-none relative"
                   aria-label="Play card to field"
                 >
                   <Play size={16} />
-                  <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
+                  <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
                     Play card on field
                   </span>
                 </button>
@@ -108,12 +116,11 @@ function PlayerHand({
                     event.stopPropagation();
                     discardCardFromHand(card);
                   }}
-                  className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 focus:outline-none"
-                  title=""
+                  className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 focus:outline-none relative"
                   aria-label="Discard card to graveyard"
                 >
                   <Trash2 size={16} />
-                  <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
+                  <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
                     Discard to graveyard
                   </span>
                 </button>
@@ -122,12 +129,11 @@ function PlayerHand({
                     event.stopPropagation();
                     addToDeck(card);
                   }}
-                  className="bg-green-500 text-white p-1 rounded-full hover:bg-green-600 focus:outline-none"
-                  title=""
+                  className="bg-green-500 text-white p-1 rounded-full hover:bg-red-600 focus:outline-none relative"
                   aria-label="Add card to deck"
                 >
                   <Plus size={16} />
-                  <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
+                  <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
                     Add to deck
                   </span>
                 </button>

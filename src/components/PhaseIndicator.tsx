@@ -36,29 +36,13 @@ function PhaseIndicator({
   }, []);
 
   useEffect(() => {
-    if (!socket || !gameId || !playerId) {
-      console.log('[DEBUG] useEffect - Socket, gameId ou playerId manquant:', { socket, gameId, playerId });
-      return;
-    }
-
     const handlePhaseUpdate = (phaseData: PhaseData) => {
-      if (!phaseData || !phaseData.phase || phaseData.turn === undefined) {
-        console.log('[DEBUG] PhaseUpdate - Invalid data:', phaseData);
-        return;
-      }
-      console.log('[DEBUG] PhaseUpdate - Received:', { phase: phaseData.phase, currentPhase, playerId });
       if (phaseData.phase !== currentPhase && isMounted.current) {
-        console.log('[DEBUG] PhaseUpdate - Appel de onPhaseChange:', phaseData.phase);
         onPhaseChange(phaseData.phase as 'Standby' | 'Main' | 'Battle' | 'End');
       }
     };
 
     const handlePhaseChangeMessage = (phaseData: PhaseData) => {
-      if (!phaseData || !phaseData.phase || phaseData.turn === undefined) {
-        console.log('[DEBUG] handlePhaseChangeMessage - Données invalides:', phaseData);
-        return;
-      }
-      console.log('[DEBUG] handlePhaseChangeMessage - Message reçu pour phase:', phaseData.phase, 'avec turn:', phaseData.turn, 'nextPlayerId:', phaseData.nextPlayerId);
       const nextPlayerId = phaseData.nextPlayerId !== undefined ? phaseData.nextPlayerId : playerId === 1 ? 2 : 1;
       const displayMessage =
         phaseData.phase === 'Main'
@@ -68,7 +52,6 @@ function PhaseIndicator({
             : phaseData.phase === 'End' || phaseData.phase === 'Standby'
               ? `Nouveau tour ${phaseData.turn} - Joueur ${nextPlayerId}`
               : `Phase: ${phaseData.phase}`;
-      console.log('[DEBUG] handlePhaseChangeMessage - Message à afficher:', displayMessage);
       if (isMounted.current) {
         setMessage(displayMessage);
         setShowMessage(true);
@@ -112,7 +95,6 @@ function PhaseIndicator({
     }
 
     if (newPhase !== currentPhase && newPhase !== lastEmittedPhase.current) {
-      console.log('[DEBUG] nextPhase - Nouvelle phase émise:', newPhase);
       socket.emit('updatePhase', { gameId, phase: newPhase, turn });
       lastEmittedPhase.current = newPhase;
       onPhaseChange(newPhase);

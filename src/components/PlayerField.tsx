@@ -38,10 +38,6 @@ function PlayerField({
     event.preventDefault();
     event.stopPropagation();
     const cardElement = cardRefs.current.get(cardId) || null;
-    console.log('Right-click on card:', {
-      cardId,
-      cardElement: cardElement ? cardElement.getBoundingClientRect() : null,
-    });
     setContextMenu({ cardElement });
   };
 

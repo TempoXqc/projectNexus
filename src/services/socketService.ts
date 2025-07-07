@@ -6,7 +6,6 @@ export class SocketService {
   private isConnecting: boolean = false;
 
   constructor() {
-    console.log('[SocketService] Initialisation avec URL:', clientConfig.socketUrl);
     this.socket = io(clientConfig.socketUrl, {
       autoConnect: false,
       transports: ['websocket', 'polling'],
@@ -17,17 +16,11 @@ export class SocketService {
 
   connect() {
     if (this.isConnecting || this.socket.connected) {
-      console.log('Connexion déjà en cours ou établie, ignoré', {
-        isConnecting: this.isConnecting,
-        connected: this.socket.connected,
-        timestamp: new Date().toISOString()
-      });
       return;
     }
     this.isConnecting = true;
     this.socket.connect();
     this.socket.on('connect', () => {
-      console.log('[WebSocket] Connecté à', clientConfig.socketUrl);
       this.isConnecting = false;
     });
     this.socket.on('connect_error', (error) => {

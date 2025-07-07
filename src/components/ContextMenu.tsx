@@ -29,7 +29,6 @@ function ContextMenu({ cardElement, onClose }: ContextMenuProps) {
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        console.log('Closing context menu due to outside click');
         onClose();
       }
     };

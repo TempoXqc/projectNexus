@@ -14,20 +14,8 @@ interface DeckInfoPreviewProps {
 function DeckInfoPreview({ hoveredDeckId, randomizers }: DeckInfoPreviewProps) {
   const deck = useMemo(() => {
     const match = randomizers.find((deck) => deck.id === hoveredDeckId);
-    console.log('[DEBUG] hoveredDeckId:', hoveredDeckId);
-    console.log('[DEBUG] Matching deck:', match);
     return match;
   }, [hoveredDeckId, randomizers]);
-
-  useEffect(() => {
-    if (!deck) {
-      console.log('[DEBUG] Aucun deck trouvé pour hoveredDeckId:', hoveredDeckId);
-    } else if (!deck.infoImage) {
-      console.log('[DEBUG] Le deck existe mais pas de infoImage:', deck);
-    } else {
-      console.log('[DEBUG] Affichage de l’image info pour le deck:', deck.name, '->', deck.infoImage);
-    }
-  }, [deck, hoveredDeckId]);
 
   if (!deck || !deck.infoImage) return null;
 

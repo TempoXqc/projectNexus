@@ -20,7 +20,6 @@ export const useCardActions = (
       toast.info('Vous avez pioché un token assassin ! -2 points de vie.', {
         toastId: 'assassin_token_draw',
       });
-      console.log('[DEBUG] handleAssassinTokenDraw applied:', { newLifePoints, newOpponentTokenCount });
 
       if (emit) {
         emit('handleAssassinTokenDraw', {
@@ -42,11 +41,6 @@ export const useCardActions = (
         !state.game.isMyTurn ||
         state.player.hand.length >= 10
       ) {
-        console.log('[DEBUG] drawCard failed:', {
-          deckLength: state.player.deck.length,
-          isMyTurn: state.game.isMyTurn,
-          handLength: state.player.hand.length,
-        });
         toast.error('Impossible de piocher : deck vide, tour non actif ou main pleine.', {
           toastId: 'draw_card_error',
         });
@@ -57,10 +51,7 @@ export const useCardActions = (
       let newDeck = state.player.deck.slice(1);
       let newHand = [...state.player.hand];
 
-      console.log('[DEBUG] Card drawn:', { drawnCard });
-
       if (drawnCard.name === 'Assassin Token' && state.opponent.tokenType === 'assassin') {
-        console.log('[DEBUG] Assassin Token detected, calling handleAssassinTokenDraw');
         const assassinResult = handleAssassinTokenDraw(emit);
         if (!assassinResult) {
           console.error('[ERROR] handleAssassinTokenDraw returned null');
@@ -71,10 +62,8 @@ export const useCardActions = (
           [drawnCard] = newDeck.slice(0, 1);
           newDeck = newDeck.slice(1);
           newHand = [...state.player.hand, drawnCard];
-          console.log('[DEBUG] Repioche:', { newDrawnCard: drawnCard });
         } else {
           newHand = [...state.player.hand];
-          console.log('[DEBUG] No cards left to repioche');
           toast.warn('Aucune carte restante pour repiocher.', {
             toastId: 'no_cards_to_draw',
           });

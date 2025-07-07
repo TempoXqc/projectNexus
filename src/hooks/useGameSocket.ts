@@ -59,14 +59,9 @@ export const useGameSocket = (
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents>>(socketService.getSocket());
 
   const tryJoin = () => {
-    if (!gameId || hasJoinedRef.current || !isConnected) {
-      console.log('tryJoin ignoré:', { gameId, hasJoined: hasJoinedRef.current, playerId, isConnected }, 'timestamp:', new Date().toISOString());
-      return;
-    }
     hasJoinedRef.current = true;
     socketRef.current.emit('checkGameExists', gameId, (exists: boolean) => {
       if (!exists) {
-        console.log(`Partie ${gameId} n'existe pas, redirection vers /`, 'timestamp:', new Date().toISOString());
         hasJoinedRef.current = false;
         navigate('/');
         toast.error("La partie n'existe plus.", { toastId: 'game_not_found' });
@@ -75,9 +70,7 @@ export const useGameSocket = (
       try {
         const parsedGameId = EmitJoinGameSchema.parse(gameId);
         socketRef.current.emit('joinGame', parsedGameId);
-        console.log(`Émission de joinGame pour gameId: ${parsedGameId}, playerId: ${playerId}`, 'timestamp:', new Date().toISOString());
       } catch (error) {
-        console.error('[ERROR] joinGame validation failed:', error, 'timestamp:', new Date().toISOString());
         hasJoinedRef.current = false;
         navigate('/');
         toast.error('ID de jeu invalide.', { toastId: 'joinGame_error' });
@@ -116,7 +109,6 @@ export const useGameSocket = (
       });
 
       socket.on('disconnect', () => {
-        console.log(`Socket déconnecté dans useGameSocket, ID: ${socket.id}, timestamp: ${new Date().toISOString()}`);
         setState((prev) => ({
           ...prev,
           connection: { ...prev.connection, isConnected: false },
@@ -126,7 +118,6 @@ export const useGameSocket = (
       });
 
       socket.on('gameNotFound', () => {
-        console.log('Partie non trouvée, redirection vers Home', 'timestamp:', new Date().toISOString());
         navigate('/');
         toast.error('La partie n\'existe plus.', { toastId: 'game_not_found' });
       });
@@ -134,16 +125,13 @@ export const useGameSocket = (
       socket.on('error', (message) => {
         console.error('Erreur serveur reçue:', message, 'timestamp:', new Date().toISOString());
         if (message === 'Erreur lors de la confirmation de préparation') {
-          console.log('Ignorer l\'erreur de confirmation de préparation, maintien de la connexion', 'timestamp:', new Date().toISOString());
           toast.warn('Erreur lors de la confirmation, veuillez réessayer.', { toastId: 'ready_error' });
           return;
         }
         if (message === 'La partie est pleine' && hasJoinedRef.current) {
-          console.log('Ignorer l\'erreur "La partie est pleine" car le joueur est déjà dans la partie', 'timestamp:', new Date().toISOString());
           return;
         }
         if (message.includes('Non autorisé')) {
-          console.log('Ignorer l\'erreur "Non autorisé", maintien de la connexion', 'timestamp:', new Date().toISOString());
           toast.warn('Action non autorisée : ce n\'est pas votre tour.', { toastId: 'not_authorized' });
           return;
         }
@@ -293,10 +281,6 @@ export const useGameSocket = (
         });
       });
 
-      socket.on('playerJoined', (data) => {
-        console.log('playerJoined reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
-      });
-
       socket.on('updateGameState', (data: GameState) => {
         setState((prev: GameState) => ({
           ...prev,
@@ -310,12 +294,8 @@ export const useGameSocket = (
         }));
       });
 
-      socket.on('endTurn', () => {
-        console.log('[WebSocket] endTurn reçu dans useGameSocket', 'timestamp:', new Date().toISOString());
-      });
 
       socket.on('yourTurn', () => {
-        console.log('[WebSocket] yourTurn reçu dans useGameSocket', 'timestamp:', new Date().toISOString());
         setState((prev: GameState) => ({
           ...prev,
           game: { ...prev.game, isMyTurn: true },
@@ -323,7 +303,6 @@ export const useGameSocket = (
       });
 
       socket.on('handleAssassinTokenDraw', (data) => {
-        console.log('[WebSocket] handleAssassinTokenDraw reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
         setState((prev: GameState) => ({
           ...prev,
           player: { ...prev.player, lifePoints: data.playerLifePoints },
@@ -388,7 +367,6 @@ export const useGameSocket = (
           parsedData = data;
       }
       socketRef.current.emit(event, parsedData, callback);
-      console.log(`Émission de ${event}:`, parsedData, 'timestamp:', new Date().toISOString());
     } catch (error) {
       toast.error(`Erreur lors de l'envoi de l'événement ${event}.`, { toastId: `${event}_emit_error` });
       console.error(`[ERROR] Emit validation failed for ${event}:`, error, 'timestamp:', new Date().toISOString());

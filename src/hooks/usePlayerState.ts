@@ -61,10 +61,6 @@ export const usePlayerState = (
         player: { ...state.player, tokenCount: newTokenCount },
         opponent: { ...state.opponent, deck: newOpponentDeck },
       });
-      console.log('[DEBUG] addAssassinTokenToOpponentDeck:', {
-        tokenCardId: tokenCard.id,
-        newOpponentDeckLength: newOpponentDeck.length,
-      });
       toast.success('Token assassin ajouté au deck adverse et mélangé !', {
         toastId: 'add_assassin_token',
       });
@@ -101,10 +97,6 @@ export const usePlayerState = (
       set({
         player: { ...state.player, tokenCount: newTokenCount },
         opponent: { ...state.opponent, deck: newOpponentDeck },
-      });
-      console.log('[DEBUG] placeAssassinTokenAtOpponentDeckBottom:', {
-        tokenCardId: tokenCard.id,
-        newOpponentDeckLength: newOpponentDeck.length,
       });
       toast.success('Token assassin placé en bas du deck adverse !', {
         toastId: 'place_assassin_token',

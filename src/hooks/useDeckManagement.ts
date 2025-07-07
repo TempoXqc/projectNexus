@@ -65,25 +65,7 @@ export const useDeckManagement = (
 
   const handleDeckChoice = useCallback(
     (deckId: string, gameId?: string, emit?: (event: string, data: any) => void) => {
-      console.log('Appel de handleDeckChoice:', {
-        deckId,
-        gameId,
-        playerId: state.connection.playerId,
-        isConnected: state.connection.isConnected,
-        hasChosenDeck: state.deckSelection.hasChosenDeck,
-        waitingForPlayer1: state.deckSelection.waitingForPlayer1,
-      });
-      if (!state.connection.playerId || !state.connection.isConnected || !gameId) {
-        console.log('Returning null because playerId, isConnected, or gameId is missing');
-        console.log('handleDeckChoice failed:', {
-          playerId: state.connection.playerId,
-          isConnected: state.connection.isConnected,
-          gameId,
-        });
-        return null;
-      }
       if (state.connection.playerId === 1 && state.deckSelection.hasChosenDeck) {
-        console.log('Returning null because player 1 already chose deck');
         return null;
       }
       if (
@@ -96,11 +78,6 @@ export const useDeckManagement = (
               : !state.deckSelection.player1DeckId?.split(',').includes(d)
           ).length >= 2)
       ) {
-        console.log('Returning null for player 2:', {
-          player1DeckId: state.deckSelection.player1DeckId,
-          waitingForPlayer1: state.deckSelection.waitingForPlayer1,
-          availableDecks: state.deckSelection.selectedDecks,
-        });
         return null;
       }
 
@@ -140,7 +117,6 @@ export const useDeckManagement = (
       });
 
       if (emit) {
-        console.log('Émission de chooseDeck:', { gameId, playerId: state.connection.playerId, deckId });
         emit('chooseDeck', { gameId, playerId: state.connection.playerId, deckId });
       }
 
@@ -152,11 +128,6 @@ export const useDeckManagement = (
   const handleReadyClick = useCallback(
     (gameId: string, emit?: (event: keyof ClientToServerEvents, data: any) => void) => {
       if (!gameId || !state.connection.playerId || state.deckSelection.isReady) {
-        console.log('Returning null because gameId, playerId, or isReady is invalid', {
-          gameId,
-          playerId: state.connection.playerId,
-          isReady: state.deckSelection.isReady,
-        });
         return null;
       }
       set({
@@ -164,7 +135,6 @@ export const useDeckManagement = (
       });
 
       if (emit) {
-        console.log('Émission de playerReady:', { gameId, playerId: state.connection.playerId }, 'timestamp:', new Date().toISOString());
         emit('playerReady', { gameId, playerId: state.connection.playerId });
       }
 

@@ -99,13 +99,6 @@ const GameLayout = memo(
    }: GameLayoutProps) => {
     const playerPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_bottom') || null : null;
     const opponentPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_top') || null : null;
-
-    console.log('[DEBUG] GameLayout - Playmats:', { playerPlaymat, opponentPlaymat, playerId, playmats });
-    console.log('[DEBUG] GameLayout - LifeToken:', { lifeToken, isNull: lifeToken === null });
-
-    // Utiliser mulliganDone pour détecter la fin de la phase de mulligan
-    const mulliganDone = state.deckSelection.mulliganDone;
-
     return (
       <div className="w-full min-h-screen flex flex-row relative overflow-hidden bg-black" role="main" aria-label="Interface de jeu">
         {playerPlaymat && (

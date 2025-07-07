@@ -89,12 +89,6 @@ const Home: React.FC = () => {
         socket.emit('refreshLobby');
         hasJoinedLobbyRef.current = true;
       } else {
-        console.log('refreshLobby non émis, conditions non remplies:', {
-          hasJoinedLobby: hasJoinedLobbyRef.current,
-          isMounted: isMountedRef.current,
-          pathname: window.location.pathname,
-          timestamp: new Date().toISOString(),
-        });
       }
     };
 
@@ -134,27 +128,21 @@ const Home: React.FC = () => {
   }, [socket]);
 
   const handleCreateGame = useCallback(() => {
-    console.log('[Home] Bouton "Créer une partie" cliqué, user:', user, 'socket.connected:', socket.connected, 'isCreatingGame:', isCreatingGame);
     if (!socket.connected) {
-      console.log('[Home] Socket non connecté, création de partie annulée');
       toast.error('Vous devez être connecté pour créer une partie.', { toastId: 'create_game_error' });
       return;
     }
     if (!user) {
-      console.log('[Home] Utilisateur non connecté, ouverture de la modale d\'authentification');
       toast.error('Vous devez être connecté avec un compte pour créer une partie.', { toastId: 'auth_required' });
       setIsAuthModalOpen(true);
       return;
     }
     if (isCreatingGame) {
-      console.log('Création de partie déjà en cours, ignoré', { timestamp: new Date().toISOString() });
       return;
     }
     setIsCreatingGame(true);
     socket.emit('createGame', { isRanked, gameFormat }, (response: any) => {
-      console.log('[Home] Réponse brute pour createGame:', response, 'timestamp:', new Date().toISOString());
       if (!isMountedRef.current) {
-        console.log('[Home] Composant démonté, abandon de la réponse');
         setIsCreatingGame(false);
         return;
       }
@@ -164,7 +152,6 @@ const Home: React.FC = () => {
         navigate(`/waiting/${parsedData.gameId}`, {
           state: { playerId: parsedData.playerId ?? null, availableDecks: parsedData.availableDecks },
         });
-        console.log('[Home] Navigation vers WaitingRoom pour gameId:', parsedData.gameId);
       } catch (error) {
         console.error('[ERROR] createGame ACK validation failed:', error, 'response:', response);
         toast.error('Erreur lors de la création de la partie.', { toastId: 'game_created_error' });
@@ -182,20 +169,16 @@ const Home: React.FC = () => {
 
   const handleJoinGame = useCallback(
     (gameId: string) => {
-      console.log('[Home] Bouton "Rejoindre" cliqué pour gameId:', gameId);
       if (!socket.connected) {
-        console.log('[Home] Socket non connecté, rejoindre partie annulé');
         toast.error('Vous devez être connecté pour rejoindre une partie.', { toastId: 'join_game_error' });
         return;
       }
       if (!user) {
-        console.log('[Home] Utilisateur non connecté, ouverture de la modale d\'authentification');
         toast.error('Vous devez être connecté avec un compte pour rejoindre une partie.', { toastId: 'auth_required' });
         setIsAuthModalOpen(true);
         return;
       }
       socket.emit('checkPlayerGame', { playerId: user.username }, (response) => {
-        console.log('[Home] Réponse checkPlayerGame:', response);
         if (response.exists && response.gameId) {
           toast.error('Vous êtes déjà dans une partie.', { toastId: 'already_in_game' });
           navigate(`/waiting/${response.gameId}`, {
@@ -206,7 +189,6 @@ const Home: React.FC = () => {
         try {
           const parsedGameId = EmitJoinGameSchema.parse(gameId);
           socket.emit('checkGameExists', parsedGameId, (exists: boolean) => {
-            console.log('[Home] Réponse checkGameExists pour gameId:', parsedGameId, 'exists:', exists);
             if (exists) {
               socket.emit('joinGame', parsedGameId);
               navigate(`/waiting/${gameId}`, { state: { playerId: null } });
@@ -225,15 +207,12 @@ const Home: React.FC = () => {
   );
 
   const handleJoinAsSpectator = (gameId: string) => {
-    console.log('[Home] Bouton "Spectater" cliqué pour gameId:', gameId);
     if (!socket.connected) {
-      console.log('[Home] Socket non connecté, spectater annulé');
       toast.error('Vous devez être connecté pour spectater une partie.', { toastId: 'spectate_game_error' });
       return;
     }
     try {
       const parsedGameId = EmitJoinGameSchema.parse(gameId);
-      console.log('Émission de joinAsSpectator pour gameId:', gameId);
       socket.emit('joinAsSpectator', parsedGameId);
       navigate(`/game/${gameId}`, { state: { isSpectator: true } });
     } catch (error) {
@@ -292,10 +271,8 @@ const Home: React.FC = () => {
   };
 
   const handleCheckPlayerGame = useCallback(() => {
-    console.log('[Home] Vérification de partie en cours pour user:', user);
     if (!socket.connected || !user) return;
     socket.emit('checkPlayerGame', { playerId: user.username }, (response) => {
-      console.log('[Home] Réponse checkPlayerGame:', response);
       if (response.exists && response.gameId) {
         navigate(`/waiting/${response.gameId}`, {
           state: { playerId: null, availableDecks: response.availableDecks },

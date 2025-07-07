@@ -89,7 +89,6 @@ export default function Game() {
     }
 
     if (locationState.lifeToken && isMounted.current) {
-      console.log('[DEBUG] LifeToken défini:', locationState.lifeToken);
       setLifeToken(locationState.lifeToken);
     }
   }, [
