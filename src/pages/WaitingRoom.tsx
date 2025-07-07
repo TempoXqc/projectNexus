@@ -18,18 +18,14 @@ const WaitingRoom: React.FC = () => {
     }
 
     if (!socket.connected) {
-      console.log('Socket non connecté, tentative de connexion...');
       socketService.connect();
     }
 
     socket.on('connect', () => {
-      console.log(`Socket connecté, ID: ${socket.id}, gameId: ${gameId}, timestamp: ${new Date().toISOString()}`);
-      // Tenter de rejoindre la partie si le joueur n'est pas encore assigné
       socket.emit('checkGameExists', gameId, (exists: boolean) => {
         if (exists) {
           socket.emit('joinGame', gameId);
         } else {
-          console.log(`Partie ${gameId} n'existe pas, redirection vers /`);
           navigate('/');
           toast.error("La partie n'existe plus.", { toastId: 'game_not_found' });
         }
@@ -37,14 +33,8 @@ const WaitingRoom: React.FC = () => {
     });
 
     socket.on('gameStart', (data) => {
-      console.log('Données brutes reçues pour gameStart:', JSON.stringify(data, null, 2));
       try {
         const parsedData = GameStartSchema.parse(data);
-        console.log('Navigation vers Game.tsx avec state:', {
-          playerId: parsedData.playerId,
-          availableDecks: parsedData.availableDecks,
-          playmats: parsedData.playmats,
-        });
         navigate(`/game/${parsedData.gameId}`, {
           state: {
             playerId: parsedData.playerId,

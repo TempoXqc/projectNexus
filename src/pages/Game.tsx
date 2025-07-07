@@ -12,6 +12,7 @@ interface LocationState {
   playerId?: number | null;
   availableDecks?: string[];
   playmats?: { id: string; name: string; image: string }[];
+  lifeToken?: { id: string; name: string; image: string };
 }
 
 export default function Game() {
@@ -20,6 +21,7 @@ export default function Game() {
   const location = useLocation();
   const locationState = location.state as LocationState | null;
   const [playmats, setPlaymats] = useState<{ id: string; name: string; image: string }[]>(locationState?.playmats || []);
+  const [lifeToken, setLifeToken] = useState<{ id: string; name: string; image: string } | null>(locationState?.lifeToken || null);
   const [backcard, setBackcard] = useState<{
     id: string;
     name: string;
@@ -83,8 +85,12 @@ export default function Game() {
     }
 
     if (locationState.playmats && isMounted.current) {
-      console.log('[DEBUG] Playmats définis:', locationState.playmats);
       setPlaymats(locationState.playmats);
+    }
+
+    if (locationState.lifeToken && isMounted.current) {
+      console.log('[DEBUG] LifeToken défini:', locationState.lifeToken);
+      setLifeToken(locationState.lifeToken);
     }
   }, [
     gameId,
@@ -596,6 +602,7 @@ export default function Game() {
       deckSelectionData={state.deckSelection.deckSelectionData}
       backcard={backcard}
       playmats={playmats}
+      lifeToken={lifeToken}
     />
   );
 }

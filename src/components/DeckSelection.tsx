@@ -92,10 +92,7 @@ function DeckSelection({
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-80 z-50"
+      className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-100 z-50"
     >
       <div className="bg-gray-800 p-6 rounded-lg shadow-2xl max-w-4xl w-full">
         <h2 className="text-white text-2xl font-bold mb-4 text-center">
@@ -144,7 +141,7 @@ function DeckSelection({
                       if (el) zoomButtonsRef.current[index] = el;
                     }}
                     onClick={(e) => {
-                      e.stopPropagation(); // Prevent triggering onDeckChoice
+                      e.stopPropagation();
                       togglePreview(deckObj.id);
                     }}
                     className="p-2 bg-gray-800 rounded-full shadow-md hover:bg-gray-700 transition"

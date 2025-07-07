@@ -146,8 +146,9 @@ function PhaseIndicator({
     );
   }, [getNextPhase]);
 
+  const rightStyle = window.innerWidth >= 2560 ? '16rem' : '10.5rem';
   return (
-    <div className="absolute bottom-10 right-80 z-50">
+    <div className="absolute z-50" style={{ bottom: '0.833vw', right: rightStyle }}>
       <div className="flex flex-col items-center w-56">
         {showMessage && (
           <div className="fixed inset-0 flex items-center justify-center z-1000">

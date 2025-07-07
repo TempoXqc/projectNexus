@@ -55,6 +55,7 @@ interface GameLayoutProps {
   backcard: { id: string; name: string; image: string } | null;
   children?: ReactNode;
   playmats: { id: string; name: string; image: string }[];
+  lifeToken: { id: string; name: string; image: string } | null;
 }
 
 const GameLayout = memo(
@@ -94,12 +95,17 @@ const GameLayout = memo(
      deckSelectionData,
      backcard,
      playmats = [],
+     lifeToken,
    }: GameLayoutProps) => {
     const playerPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_bottom') || null : null;
     const opponentPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_top') || null : null;
 
-    console.log(playerPlaymat);
-    console.log(opponentPlaymat);
+    console.log('[DEBUG] GameLayout - Playmats:', { playerPlaymat, opponentPlaymat, playerId, playmats });
+    console.log('[DEBUG] GameLayout - LifeToken:', { lifeToken, isNull: lifeToken === null });
+
+    // Utiliser mulliganDone pour détecter la fin de la phase de mulligan
+    const mulliganDone = state.deckSelection.mulliganDone;
+
     return (
       <div className="w-full min-h-screen flex flex-row relative overflow-hidden bg-black" role="main" aria-label="Interface de jeu">
         {playerPlaymat && (
@@ -109,7 +115,11 @@ const GameLayout = memo(
           >
             <img
               src={playerPlaymat.image}
-              className="w-[55vw] h-full object-center max-w-[1600px]"
+              className="w-[55vw] h-full object-contain object-center max-w-[1600px]"
+              style={{
+                maxWidth: '1600px',
+                maxHeight: '918px',
+              }}
               alt={`Playmat ${playerPlaymat.name}`}
               aria-label={`Playmat ${playerPlaymat.name}`}
             />
@@ -122,7 +132,11 @@ const GameLayout = memo(
           >
             <img
               src={opponentPlaymat.image}
-              className="w-[55vw] h-full object-center max-w-[1600px]"
+              className="w-[55vw] h-full object-contain object-center max-w-[1600px]"
+              style={{
+                maxWidth: '1600px',
+                maxHeight: '918px',
+              }}
               alt={`Playmat adverse ${opponentPlaymat.name}`}
               aria-label={`Playmat adverse ${opponentPlaymat.name}`}
             />
@@ -192,8 +206,8 @@ const GameLayout = memo(
           <div
             style={{
               position: 'absolute',
-              top: '12%',
-              left: '50%',
+              top: '5%',
+              left: '85%',
               transform: 'translateX(-50%)',
             }}
           >
@@ -201,13 +215,14 @@ const GameLayout = memo(
               playerId={playerId}
               gameId={gameId}
               opponentCounter={state.opponent.lifePoints}
+              lifeToken={lifeToken}
             />
           </div>
           <div
             style={{
               position: 'absolute',
-              top: '76%',
-              left: '50%',
+              top: '85%',
+              left: '85%',
               transform: 'translate(-50%, -50%)',
             }}
           >
@@ -216,6 +231,7 @@ const GameLayout = memo(
               gameId={gameId}
               counter={state.player.lifePoints}
               updateCounter={updateLifePoints}
+              lifeToken={lifeToken}
             />
           </div>
           <div className="z-30">
@@ -319,6 +335,11 @@ const GameLayout = memo(
             field={state.player.field}
             hand={state.player.hand}
             opponentField={state.opponent.field}
+            graveyard={state.ui.isGraveyardOpen ? state.player.graveyard : undefined}
+            opponentGraveyard={state.ui.isOpponentGraveyardOpen ? state.opponent.graveyard : undefined}
+            isGraveyardOpen={state.ui.isGraveyardOpen}
+            isOpponentGraveyardOpen={state.ui.isOpponentGraveyardOpen}
+            mulliganDone={state.deckSelection.mulliganDone}
           />
         </div>
 

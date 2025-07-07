@@ -50,7 +50,7 @@ function OpponentGraveyard({
         )}
       </div>
 
-      <Modal isOpen={isOpen} onClose={onClose} title="Cimetière adverse" width="720px">
+      <Modal isOpen={isOpen} onClose={onClose} onOutsideClick={onClose} title="Cimetière adverse" width="720px">
         <div className="flex flex-wrap gap-4 justify-center relative">
           {reversedGraveyard.length > 0 ? (
             reversedGraveyard.map((card) => (
@@ -65,24 +65,6 @@ function OpponentGraveyard({
                   alt={card.name}
                   className="w-full h-full object-cover rounded shadow"
                 />
-                {hoveredCardId === card.id && (
-                  <div className="absolute top-[-450px] left-1/2 transform -translate-x-1/2">
-                    <div className="border-4 border-black rounded-lg shadow-2xl">
-                      <img
-                        src={card.image}
-                        alt={card.name}
-                        className="rounded shadow-2xl border-2 border-black"
-                        style={{
-                          maxWidth: '300px',
-                          height: 'auto',
-                          aspectRatio: '5 / 7',
-                          objectFit: 'contain',
-                          display: 'block',
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
             ))
           ) : (
