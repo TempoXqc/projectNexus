@@ -211,8 +211,13 @@ export default function Game() {
     if (result && gameId && state.connection.isConnected) {
       emit('updateGameState' as keyof ClientToServerEvents, {
         gameId,
-        state: { hand: result.hand, deck: state.player.deck },
+        state: {
+          hand: result.hand,
+          deck: state.player.deck,
+          deckSelection: { mulliganDone: true },
+        },
       });
+      set({ deckSelection: { ...state.deckSelection, mulliganDone: true } });
     }
   }, [
     keepInitialHand,
@@ -220,6 +225,7 @@ export default function Game() {
     state.connection.isConnected,
     state.player.deck,
     emit,
+    set
   ]);
 
   const handleDoMulligan = useCallback(() => {
@@ -227,10 +233,15 @@ export default function Game() {
     if (result && gameId && state.connection.isConnected) {
       emit('updateGameState' as keyof ClientToServerEvents, {
         gameId,
-        state: { hand: result.hand, deck: result.deck },
+        state: {
+          hand: result.hand,
+          deck: result.deck,
+          deckSelection: { mulliganDone: true },
+        },
       });
+      set({ deckSelection: { ...state.deckSelection, mulliganDone: true } });
     }
-  }, [doMulligan, gameId, state.connection.isConnected, emit]);
+  }, [doMulligan, gameId, state.connection.isConnected, emit, set]);
 
   const handleQuitGame = useCallback(() => {
     if (gameId && state.connection.isConnected) {

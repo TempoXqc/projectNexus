@@ -1,4 +1,4 @@
-import { memo, useEffect, useState, useCallback } from 'react';
+import { memo, useEffect, useState, useCallback, useRef } from 'react';
 import { Play, Sword, Hourglass, Check } from 'lucide-react';
 import { Socket } from 'socket.io-client';
 import { PhaseData } from '@tempoxqc/project-nexus-types';
@@ -25,6 +25,7 @@ function PhaseIndicator({
   const [showMessage, setShowMessage] = useState(false);
   const [message, setMessage] = useState('');
   const [isAnimationActive, setIsAnimationActive] = useState(false);
+  const lastEmittedPhase = useRef<string | null>(null);
 
   useEffect(() => {
     if (!socket || !gameId || !playerId) {
@@ -38,7 +39,9 @@ function PhaseIndicator({
         return;
       }
       console.log('[DEBUG] PhaseUpdate - Received:', phaseData.phase);
-      onPhaseChange(phaseData.phase as 'Standby' | 'Main' | 'Battle' | 'End');
+      if (phaseData.phase !== currentPhase) {
+        onPhaseChange(phaseData.phase as 'Standby' | 'Main' | 'Battle' | 'End');
+      }
     };
 
     const handlePhaseChangeMessage = (phaseData: PhaseData) => {
@@ -76,10 +79,11 @@ function PhaseIndicator({
       socket.off('updatePhase', handlePhaseUpdate);
       socket.off('phaseChangeMessage', handlePhaseChangeMessage);
     };
-  }, [socket, gameId, playerId, onPhaseChange]);
-
+  }, [socket, gameId, playerId, onPhaseChange, currentPhase]);
 
   const nextPhase = useCallback(() => {
+    if (!isMyTurn || isAnimationActive) return;
+
     let newPhase: 'Standby' | 'Main' | 'Battle' | 'End' = currentPhase;
     switch (currentPhase) {
       case 'Standby':
@@ -97,9 +101,10 @@ function PhaseIndicator({
         break;
     }
 
-    if (newPhase !== currentPhase) {
+    if (newPhase !== currentPhase && newPhase !== lastEmittedPhase.current) {
       console.log('[DEBUG] nextPhase - Nouvelle phase émise:', newPhase);
       socket.emit('updatePhase', { gameId, phase: newPhase, turn });
+      lastEmittedPhase.current = newPhase;
       onPhaseChange(newPhase);
     }
   }, [isMyTurn, gameId, playerId, isAnimationActive, currentPhase, socket, turn, onPhaseChange]);

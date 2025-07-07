@@ -24,6 +24,10 @@ interface ServerToClientEvents {
   gameNotFound: () => void;
   initializeDeck: (data: { deck: Card[]; initialDraw: Card[]; tokenType: string | null; tokenCount: number }) => void;
   initialDeckList: (availableDecks: { id: string; name: string; image: string }[]) => void;
+  endTurn: () => void;
+  yourTurn: () => void;
+  phaseChangeMessage: (data: { phase: 'Standby' | 'Main' | 'Battle' | 'End'; turn: number; nextPlayerId: number }) => void;
+  handleAssassinTokenDraw: (data: { playerLifePoints: number; opponentTokenCount: number }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -138,6 +142,11 @@ export const useGameSocket = (
           console.log('Ignorer l\'erreur "La partie est pleine" car le joueur est déjà dans la partie', 'timestamp:', new Date().toISOString());
           return;
         }
+        if (message.includes('Non autorisé')) {
+          console.log('Ignorer l\'erreur "Non autorisé", maintien de la connexion', 'timestamp:', new Date().toISOString());
+          toast.warn('Action non autorisée : ce n\'est pas votre tour.', { toastId: 'not_authorized' });
+          return;
+        }
         toast.error(message, { toastId: 'server_error' });
         navigate('/');
       });
@@ -161,7 +170,7 @@ export const useGameSocket = (
             },
             deckSelection: {
               ...prev.deckSelection,
-              randomizers: parsedData.availableDecks, // [{ id, name, image }, ...]
+              randomizers: parsedData.availableDecks,
               selectedDecks: [],
               player1DeckId: null,
               waitingForPlayer1: parsedData.playerId === 2,
@@ -315,6 +324,35 @@ export const useGameSocket = (
           connection: { ...prev.connection, ...data.connection },
         }));
       });
+
+      socket.on('endTurn', () => {
+        console.log('[WebSocket] endTurn reçu dans useGameSocket', 'timestamp:', new Date().toISOString());
+      });
+
+      socket.on('yourTurn', () => {
+        console.log('[WebSocket] yourTurn reçu dans useGameSocket', 'timestamp:', new Date().toISOString());
+        setState((prev: GameState) => ({
+          ...prev,
+          game: { ...prev.game, isMyTurn: true },
+        }));
+      });
+
+      socket.on('phaseChangeMessage', (data) => {
+        console.log('[WebSocket] phaseChangeMessage reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
+        setState((prev: GameState) => ({
+          ...prev,
+          game: { ...prev.game, currentPhase: data.phase, turn: data.turn },
+        }));
+      });
+
+      socket.on('handleAssassinTokenDraw', (data) => {
+        console.log('[WebSocket] handleAssassinTokenDraw reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
+        setState((prev: GameState) => ({
+          ...prev,
+          player: { ...prev.player, lifePoints: data.playerLifePoints },
+          opponent: { ...prev.opponent, tokenCount: data.opponentTokenCount },
+        }));
+      });
     };
 
     console.log('Ajout des écouteurs de jeu', 'timestamp:', new Date().toISOString());
@@ -341,6 +379,10 @@ export const useGameSocket = (
       socket.off('disconnect');
       socket.off('error');
       socket.off('gameNotFound');
+      socket.off('endTurn');
+      socket.off('yourTurn');
+      socket.off('phaseChangeMessage');
+      socket.off('handleAssassinTokenDraw');
     };
   }, [gameId, navigate, setState, playerId, isConnected]);
 
