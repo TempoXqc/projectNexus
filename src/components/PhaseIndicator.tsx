@@ -78,12 +78,8 @@ function PhaseIndicator({
     };
   }, [socket, gameId, playerId, onPhaseChange]);
 
-  const nextPhase = useCallback(() => {
-    if (!isMyTurn || !gameId || !playerId || isAnimationActive) {
-      console.log('[DEBUG] nextPhase - Bloqué, isMyTurn:', isMyTurn, 'gameId:', gameId, 'playerId:', playerId, 'isAnimationActive:', isAnimationActive);
-      return;
-    }
 
+  const nextPhase = useCallback(() => {
     let newPhase: 'Standby' | 'Main' | 'Battle' | 'End' = currentPhase;
     switch (currentPhase) {
       case 'Standby':

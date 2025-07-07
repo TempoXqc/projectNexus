@@ -301,6 +301,20 @@ export const useGameSocket = (
       socket.on('playerJoined', (data) => {
         console.log('playerJoined reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
       });
+
+      socket.on('updateGameState', (data: GameState) => {
+        console.log('[WebSocket] updateGameState reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
+        setState((prev: GameState) => ({
+          ...prev,
+          player: { ...prev.player, ...data.player },
+          opponent: { ...prev.opponent, ...data.opponent },
+          game: { ...prev.game, ...data.game },
+          ui: { ...prev.ui, ...data.ui },
+          chat: { ...prev.chat, ...data.chat },
+          deckSelection: { ...prev.deckSelection, ...data.deckSelection },
+          connection: { ...prev.connection, ...data.connection },
+        }));
+      });
     };
 
     console.log('Ajout des écouteurs de jeu', 'timestamp:', new Date().toISOString());
@@ -313,6 +327,7 @@ export const useGameSocket = (
 
     return () => {
       console.log('Nettoyage des écouteurs de useGameSocket', 'timestamp:', new Date().toISOString());
+      socket.off('updateGameState');
       socket.off('gameStart');
       socket.off('player1ChoseDeck');
       socket.off('deckSelectionUpdate');
