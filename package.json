@@ -10,7 +10,7 @@
     "start": "vite preview"
   },
   "dependencies": {
-    "@tempoxqc/project-nexus-types": "^1.0.9",
+    "@tempoxqc/project-nexus-types": "^1.0.14",
     "@vitejs/plugin-react": "^4.6.0",
     "framer-motion": "^11.11.7",
     "immer": "^10.1.1",

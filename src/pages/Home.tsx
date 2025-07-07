@@ -171,7 +171,6 @@ const Home: React.FC = () => {
         setIsCreatingGame(false);
       }
     });
-    // Timeout pour détecter l'absence de réponse
     setTimeout(() => {
       if (isCreatingGame && isMountedRef.current) {
         console.error('[Home] Timeout: Aucune réponse reçue pour createGame après 10 secondes');

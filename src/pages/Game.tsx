@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Card, GameState } from '@tempoxqc/project-nexus-types';
@@ -11,6 +11,7 @@ import { clientConfig } from '@/config/clientConfig';
 interface LocationState {
   playerId?: number | null;
   availableDecks?: string[];
+  playmats?: { id: string; name: string; image: string }[];
 }
 
 export default function Game() {
@@ -18,6 +19,7 @@ export default function Game() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as LocationState | null;
+  const [playmats, setPlaymats] = useState<{ id: string; name: string; image: string }[]>(locationState?.playmats || []);
   const [backcard, setBackcard] = useState<{
     id: string;
     name: string;
@@ -79,6 +81,11 @@ export default function Game() {
     if (!state.connection.isConnected) {
       tryJoin();
     }
+
+    if (locationState.playmats && isMounted.current) {
+      console.log('[DEBUG] Playmats définis:', locationState.playmats);
+      setPlaymats(locationState.playmats);
+    }
   }, [
     gameId,
     locationState,
@@ -130,6 +137,15 @@ export default function Game() {
       }
     };
     fetchBackcard();
+  }, []);
+
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
 
   const sendChatMessage = useCallback(() => {
@@ -579,6 +595,7 @@ export default function Game() {
       setChatInput={setChatInput}
       deckSelectionData={state.deckSelection.deckSelectionData}
       backcard={backcard}
+      playmats={playmats}
     />
   );
 }

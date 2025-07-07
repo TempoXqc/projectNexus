@@ -154,7 +154,6 @@ export const useGameSocket = (
 
     const gameListeners = () => {
       socket.on('gameStart', (data) => {
-        console.log('gameStart reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
         try {
           const parsedData = GameStartSchema.parse(data);
           hasJoinedRef.current = true;
@@ -177,13 +176,11 @@ export const useGameSocket = (
             },
           }));
         } catch (error) {
-          console.error('[ERROR] gameStart validation failed:', error, 'timestamp:', new Date().toISOString());
           toast.error('Erreur lors du démarrage de la partie.', { toastId: 'game_start_error' });
         }
       });
 
       socket.on('player1ChoseDeck', (data) => {
-        console.log('player1ChoseDeck reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
         setState((prev: GameState): Partial<GameState> => {
           const player1DeckIds = [data.player1DeckId];
           const newState = {
@@ -201,13 +198,11 @@ export const useGameSocket = (
               selectedDecks: [...new Set([...prev.deckSelection.selectedDecks, ...player1DeckIds])],
             },
           };
-          console.log('Nouvel état après player1ChoseDeck:', newState.deckSelection, 'timestamp:', new Date().toISOString());
           return newState;
         });
       });
 
       socket.on('deckSelectionUpdate', (data) => {
-        console.log('deckSelectionUpdate reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
         setState((prev: GameState): Partial<GameState> => {
           const player1DeckIds = data['1'] || [];
           const player2DeckIds = data['2'] || [];
@@ -228,13 +223,11 @@ export const useGameSocket = (
                 : prev.deckSelection.hasChosenDeck || player2DeckIds.length > 0,
             },
           };
-          console.log('Nouvel état après deckSelectionUpdate:', newState.deckSelection, 'timestamp:', new Date().toISOString());
           return newState;
         });
       });
 
       socket.on('waitingForPlayer1Choice', (data) => {
-        console.log('waitingForPlayer1Choice reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
         setState((prev: GameState): Partial<GameState> => {
           const newState = {
             deckSelection: {
@@ -242,13 +235,11 @@ export const useGameSocket = (
               waitingForPlayer1: data.waiting,
             },
           };
-          console.log('Nouvel état après waitingForPlayer1Choice:', newState.deckSelection, 'timestamp:', new Date().toISOString());
           return newState;
         });
       });
 
       socket.on('deckSelectionDone', (data) => {
-        console.log('deckSelectionDone reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
         setState((prev: GameState): Partial<GameState> => {
           const player1DeckIds = typeof data.player1DeckId === 'string' ? data.player1DeckId.split(',') : data.player1DeckId;
           const newState = {
@@ -266,13 +257,11 @@ export const useGameSocket = (
               deckSelectionDone: true,
             },
           };
-          console.log('Nouvel état après deckSelectionDone:', newState.deckSelection, 'timestamp:', new Date().toISOString());
           return newState;
         });
       });
 
       socket.on('bothPlayersReady', (data) => {
-        console.log('bothPlayersReady reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
         setState((prev: GameState): Partial<GameState> => {
           const newState = {
             deckSelection: {
@@ -281,13 +270,11 @@ export const useGameSocket = (
               opponentReady: data.bothReady,
             },
           };
-          console.log('Nouvel état après bothPlayersReady:', newState.deckSelection, 'timestamp:', new Date().toISOString());
           return newState;
         });
       });
 
       socket.on('initializeDeck', (data) => {
-        console.log('initializeDeck reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
         setState((prev: GameState): Partial<GameState> => {
           const newState = {
             player: {
@@ -302,7 +289,6 @@ export const useGameSocket = (
               initialDraw: data.initialDraw,
             },
           };
-          console.log('Nouvel état après initializeDeck:', newState, 'timestamp:', new Date().toISOString());
           return newState;
         });
       });
@@ -312,7 +298,6 @@ export const useGameSocket = (
       });
 
       socket.on('updateGameState', (data: GameState) => {
-        console.log('[WebSocket] updateGameState reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
         setState((prev: GameState) => ({
           ...prev,
           player: { ...prev.player, ...data.player },
@@ -337,14 +322,6 @@ export const useGameSocket = (
         }));
       });
 
-      socket.on('phaseChangeMessage', (data) => {
-        console.log('[WebSocket] phaseChangeMessage reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
-        setState((prev: GameState) => ({
-          ...prev,
-          game: { ...prev.game, currentPhase: data.phase, turn: data.turn },
-        }));
-      });
-
       socket.on('handleAssassinTokenDraw', (data) => {
         console.log('[WebSocket] handleAssassinTokenDraw reçu dans useGameSocket:', data, 'timestamp:', new Date().toISOString());
         setState((prev: GameState) => ({
@@ -355,16 +332,13 @@ export const useGameSocket = (
       });
     };
 
-    console.log('Ajout des écouteurs de jeu', 'timestamp:', new Date().toISOString());
     persistentListeners();
     gameListeners();
     if (!socket.connected) {
-      console.log('Connexion du socket', 'timestamp:', new Date().toISOString());
       socket.connect();
     }
 
     return () => {
-      console.log('Nettoyage des écouteurs de useGameSocket', 'timestamp:', new Date().toISOString());
       socket.off('updateGameState');
       socket.off('gameStart');
       socket.off('player1ChoseDeck');

@@ -54,6 +54,7 @@ interface GameLayoutProps {
   deckSelectionData: { player1DeckId: string[] | string | null; player2DeckIds: string[]; selectedDecks: string[] } | null;
   backcard: { id: string; name: string; image: string } | null;
   children?: ReactNode;
+  playmats: { id: string; name: string; image: string }[];
 }
 
 const GameLayout = memo(
@@ -92,10 +93,44 @@ const GameLayout = memo(
      setChatInput,
      deckSelectionData,
      backcard,
+     playmats = [],
    }: GameLayoutProps) => {
+    const playerPlaymat = playmats.length >= 2 ? (playerId === 1 ? playmats[0] : playmats[1]) : null;
+    const opponentPlaymat = playmats.length >= 2 ? (playerId === 1 ? playmats[1] : playmats[0]) : null;
 
+    console.log(playerPlaymat);
+    console.log(opponentPlaymat);
     return (
       <div className="w-full min-h-screen flex flex-row relative overflow-hidden" role="main" aria-label="Interface de jeu">
+        {playerPlaymat && (
+          <div
+            className="absolute bottom-0 left-0 w-full h-[50vh]"
+            style={{
+              backgroundImage: `url(${playerPlaymat.image})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center bottom',
+              zIndex: 0,
+              opacity: 0.9,
+            }}
+            role="img"
+            aria-label={`Playmat ${playerPlaymat.name}`}
+          />
+        )}
+        {opponentPlaymat && (
+          <div
+            className="absolute top-0 left-0 w-full h-[50vh]"
+            style={{
+              backgroundImage: `url(${opponentPlaymat.image})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center top',
+              transform: 'rotate(180deg)',
+              zIndex: 0,
+              opacity: 0.9,
+            }}
+            role="img"
+            aria-label={`Playmat adverse ${opponentPlaymat.name}`}
+          />
+        )}
         {!state.deckSelection.bothReady && (
           <DeckSelection
             randomizers={state.deckSelection.randomizers}
@@ -154,12 +189,6 @@ const GameLayout = memo(
           className={`flex-grow min-h-screen flex flex-col justify-end items-center p-4 relative z-10 ${
             !state.ui.isRightPanelOpen ? 'w-full' : 'w-[85%]'
           }`}
-          style={{
-            backgroundImage: 'url(/addons/background-2.jpg)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            transition: 'width 0.3s ease-in-out',
-          }}
           role="region"
           aria-label="Zone de jeu principale"
         >

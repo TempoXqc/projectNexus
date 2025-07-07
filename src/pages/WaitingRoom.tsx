@@ -39,16 +39,21 @@ const WaitingRoom: React.FC = () => {
     socket.on('gameStart', (data) => {
       console.log('Données brutes reçues pour gameStart:', JSON.stringify(data, null, 2));
       try {
-        const parsedData = GameStartSchema.parse(data); // Line 42
+        const parsedData = GameStartSchema.parse(data);
         console.log('Navigation vers Game.tsx avec state:', {
           playerId: parsedData.playerId,
           availableDecks: parsedData.availableDecks,
+          playmats: parsedData.playmats,
         });
         navigate(`/game/${parsedData.gameId}`, {
-          state: { playerId: parsedData.playerId, availableDecks: parsedData.availableDecks },
+          state: {
+            playerId: parsedData.playerId,
+            availableDecks: parsedData.availableDecks,
+            playmats: parsedData.playmats,
+          },
         });
       } catch (error) {
-        console.error('[ERROR] gameStart validation failed:', error); // Line 51
+        console.error('[ERROR] gameStart validation failed:', error);
         toast.error('Erreur lors du démarrage de la partie.', { toastId: 'game_start_error' });
       }
     });

@@ -26,6 +26,14 @@ function PhaseIndicator({
   const [message, setMessage] = useState('');
   const [isAnimationActive, setIsAnimationActive] = useState(false);
   const lastEmittedPhase = useRef<string | null>(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!socket || !gameId || !playerId) {
@@ -38,8 +46,9 @@ function PhaseIndicator({
         console.log('[DEBUG] PhaseUpdate - Invalid data:', phaseData);
         return;
       }
-      console.log('[DEBUG] PhaseUpdate - Received:', phaseData.phase);
-      if (phaseData.phase !== currentPhase) {
+      console.log('[DEBUG] PhaseUpdate - Received:', { phase: phaseData.phase, currentPhase, playerId });
+      if (phaseData.phase !== currentPhase && isMounted.current) {
+        console.log('[DEBUG] PhaseUpdate - Appel de onPhaseChange:', phaseData.phase);
         onPhaseChange(phaseData.phase as 'Standby' | 'Main' | 'Battle' | 'End');
       }
     };
@@ -53,23 +62,24 @@ function PhaseIndicator({
       const nextPlayerId = phaseData.nextPlayerId !== undefined ? phaseData.nextPlayerId : playerId === 1 ? 2 : 1;
       const displayMessage =
         phaseData.phase === 'Main'
-          ? 'MainPhase'
+          ? 'Phase principale'
           : phaseData.phase === 'Battle'
-            ? 'BattlePhase'
+            ? 'Phase de combat'
             : phaseData.phase === 'End' || phaseData.phase === 'Standby'
               ? `Nouveau tour ${phaseData.turn} - Joueur ${nextPlayerId}`
               : `Phase: ${phaseData.phase}`;
       console.log('[DEBUG] handlePhaseChangeMessage - Message à afficher:', displayMessage);
-      setMessage(displayMessage);
-      setShowMessage(true);
-      setIsAnimationActive(true);
-
-      const timeoutId = setTimeout(() => {
-        setShowMessage(false);
-        setIsAnimationActive(false);
-      }, 3000);
-
-      return () => clearTimeout(timeoutId);
+      if (isMounted.current) {
+        setMessage(displayMessage);
+        setShowMessage(true);
+        setIsAnimationActive(true);
+        setTimeout(() => {
+          if (isMounted.current) {
+            setShowMessage(false);
+            setIsAnimationActive(false);
+          }
+        }, 3000);
+      }
     };
 
     socket.on('updatePhase', handlePhaseUpdate);
@@ -79,7 +89,7 @@ function PhaseIndicator({
       socket.off('updatePhase', handlePhaseUpdate);
       socket.off('phaseChangeMessage', handlePhaseChangeMessage);
     };
-  }, [socket, gameId, playerId, onPhaseChange, currentPhase]);
+  }, [socket, gameId, playerId]);
 
   const nextPhase = useCallback(() => {
     if (!isMyTurn || isAnimationActive) return;
