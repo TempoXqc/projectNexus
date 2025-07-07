@@ -95,8 +95,8 @@ const GameLayout = memo(
      backcard,
      playmats = [],
    }: GameLayoutProps) => {
-    const playerPlaymat = playmats.length >= 2 ? (playerId === 1 ? playmats[0] : playmats[1]) : null;
-    const opponentPlaymat = playmats.length >= 2 ? (playerId === 1 ? playmats[1] : playmats[0]) : null;
+    const playerPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_bottom') || null : null;
+    const opponentPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_top') || null : null;
 
     console.log(playerPlaymat);
     console.log(opponentPlaymat);
@@ -118,7 +118,7 @@ const GameLayout = memo(
         {opponentPlaymat && (
           <div
             className="absolute top-0 left-0 w-full h-[50vh] flex justify-center"
-            style={{ transform: 'rotate(180deg)', zIndex: 0 }}
+            style={{ zIndex: 0 }}
           >
             <img
               src={opponentPlaymat.image}
