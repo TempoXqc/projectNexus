@@ -101,35 +101,32 @@ const GameLayout = memo(
     console.log(playerPlaymat);
     console.log(opponentPlaymat);
     return (
-      <div className="w-full min-h-screen flex flex-row relative overflow-hidden" role="main" aria-label="Interface de jeu">
+      <div className="w-full min-h-screen flex flex-row relative overflow-hidden bg-black" role="main" aria-label="Interface de jeu">
         {playerPlaymat && (
           <div
-            className="absolute bottom-0 left-0 w-full h-[50vh]"
-            style={{
-              backgroundImage: `url(${playerPlaymat.image})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center bottom',
-              zIndex: 0,
-              opacity: 0.9,
-            }}
-            role="img"
-            aria-label={`Playmat ${playerPlaymat.name}`}
-          />
+            className="absolute bottom-0 left-0 w-full h-[50vh] flex justify-center"
+            style={{ zIndex: 0 }}
+          >
+            <img
+              src={playerPlaymat.image}
+              className="w-[55%] h-full object-center"
+              alt={`Playmat ${playerPlaymat.name}`}
+              aria-label={`Playmat ${playerPlaymat.name}`}
+            />
+          </div>
         )}
         {opponentPlaymat && (
           <div
-            className="absolute top-0 left-0 w-full h-[50vh]"
-            style={{
-              backgroundImage: `url(${opponentPlaymat.image})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center top',
-              transform: 'rotate(180deg)',
-              zIndex: 0,
-              opacity: 0.9,
-            }}
-            role="img"
-            aria-label={`Playmat adverse ${opponentPlaymat.name}`}
-          />
+            className="absolute top-0 left-0 w-full h-[50vh] flex justify-center"
+            style={{ transform: 'rotate(180deg)', zIndex: 0 }}
+          >
+            <img
+              src={opponentPlaymat.image}
+              className="w-[55%] h-full object-center"
+              alt={`Playmat adverse ${opponentPlaymat.name}`}
+              aria-label={`Playmat adverse ${opponentPlaymat.name}`}
+            />
+          </div>
         )}
         {!state.deckSelection.bothReady && (
           <DeckSelection

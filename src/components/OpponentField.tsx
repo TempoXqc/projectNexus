@@ -27,6 +27,7 @@ function OpponentField({
         transform: 'translate(-50%, -50%)',
         height: '190px',
         overflow: 'visible',
+        width: '75%',
       }}
     >
       {visibleCards.map((card, visibleIndex) => (
@@ -35,11 +36,11 @@ function OpponentField({
           initial={{ opacity: 0, scale: 0.8, x: 20 }}
           animate={{ opacity: 1, scale: 1, x: 0, rotate: card.exhausted ? 90 : 0 }}
           transition={{ duration: 0.3 }}
-          className="absolute w-[140px] h-[190px] bg-white shadow rounded"
+          className="absolute w-[115px] h-[160px] bg-white shadow rounded"
           onMouseEnter={() => setHoveredCardId(card.id)}
           onMouseLeave={() => setHoveredCardId(null)}
           style={{
-            left: `calc(50% + ${visibleIndex * 160 - ((visibleCards.length - 1) * 160) / 2}px)`,
+            left: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 120}px)`,
             transformOrigin: 'center center',
             cursor: 'pointer',
           }}

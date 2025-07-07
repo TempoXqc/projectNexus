@@ -54,11 +54,12 @@ function PlayerField({
       className="relative z-40"
       style={{
         position: 'absolute',
-        top: '62%',
+        top: '55%',
         left: '50%',
-        transform: 'translate(-50%, -50%)',
+        transform: 'translateX(-50%)',
         height: '190px',
         overflow: 'visible',
+        width: '75%',
       }}
     >
       {visibleCards.map(({ card, index }, visibleIndex) => (
@@ -76,9 +77,9 @@ function PlayerField({
             rotate: card.exhausted ? 90 : 0,
           }}
           transition={{ duration: 0.3 }}
-          className="absolute w-[140px] h-[190px] bg-white shadow rounded"
+          className="absolute w-[115px] h-[160px] bg-white shadow rounded"
           style={{
-            left: `calc(50% + ${visibleIndex * 160 - ((visibleCards.length - 1) * 160) / 2}px)`,
+            left: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 120}px)`,
             transformOrigin: 'center center',
             cursor: 'pointer',
           }}
@@ -118,8 +119,8 @@ function PlayerField({
               >
                 <Sword size={16} />
                 <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-                  Attaquer
-                </span>
+              Attaquer
+            </span>
               </button>
               <button
                 onClick={(event) => {
@@ -132,8 +133,8 @@ function PlayerField({
               >
                 <Trash2 size={16} />
                 <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-                  Retirer du terrain
-                </span>
+              Retirer du terrain
+            </span>
               </button>
               <button
                 onClick={(event) => {
@@ -146,8 +147,8 @@ function PlayerField({
               >
                 <RotateCcw size={16} />
                 <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-                  Épuiser la carte
-                </span>
+              Épuiser la carte
+            </span>
               </button>
             </div>
           </div>
