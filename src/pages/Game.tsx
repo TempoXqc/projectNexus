@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Card, GameState } from '@tempoxqc/project-nexus-types';
+import { Card, GameState, PhaseData } from '@tempoxqc/project-nexus-types';
 import { ClientToServerEvents, useGameSocket } from '@/hooks/useGameSocket.ts';
 import { useGameState } from '@/hooks/useGameState.ts';
 import GameLayout from '@/components/GameLayout.tsx';
@@ -143,6 +143,56 @@ export default function Game() {
     };
     fetchBackcard();
   }, []);
+
+  useEffect(() => {
+    socket.on('updatePhase', (phaseData: PhaseData) => {
+      console.log('[Game] updatePhase received:', phaseData);
+      set({
+        game: {
+          ...state.game,
+          currentPhase: phaseData.phase,
+          turn: phaseData.turn,
+        },
+      });
+    });
+
+    socket.on('endTurn', () => {
+      console.log('[Game] endTurn received');
+      set({
+        game: {
+          ...state.game,
+          isMyTurn: false,
+        },
+      });
+    });
+
+    socket.on('yourTurn', () => {
+      console.log('[Game] yourTurn received for player:', state.connection.playerId);
+      set({
+        game: {
+          ...state.game,
+          isMyTurn: true,
+        },
+      });
+    });
+
+    socket.on('updateGameState', (newState: GameState) => {
+      console.log('[Game] updateGameState received:', {
+        playerId: state.connection.playerId,
+        isMyTurn: newState.game.isMyTurn,
+        phase: newState.game.currentPhase,
+        turn: newState.game.turn,
+      });
+      set(newState);
+    });
+
+    return () => {
+      socket.off('updatePhase');
+      socket.off('endTurn');
+      socket.off('yourTurn');
+      socket.off('updateGameState');
+    };
+  }, [socket, set, state.connection.playerId, state.game]);
 
   const isMounted = useRef(true);
 

@@ -59,6 +59,7 @@ export const useGameSocket = (
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents>>(socketService.getSocket());
 
   const tryJoin = () => {
+    if (!gameId || !playerId) return;
     hasJoinedRef.current = true;
     socketRef.current.emit('checkGameExists', gameId, (exists: boolean) => {
       if (!exists) {
@@ -69,7 +70,16 @@ export const useGameSocket = (
       }
       try {
         const parsedGameId = EmitJoinGameSchema.parse(gameId);
-        socketRef.current.emit('joinGame', parsedGameId);
+        socketRef.current.emit('joinGame', parsedGameId, (response) => {
+          if (response && response.error === 'La partie est pleine') {
+            console.log('[useGameSocket] Tentative de reconnexion:', { gameId, playerId });
+            socketRef.current.emit('reconnectPlayer', { gameId, playerId });
+          } else if (response && response.error) {
+            hasJoinedRef.current = false;
+            navigate('/');
+            toast.error(response.error, { toastId: 'joinGame_error' });
+          }
+        });
       } catch (error) {
         hasJoinedRef.current = false;
         navigate('/');
@@ -79,7 +89,7 @@ export const useGameSocket = (
   };
 
   useEffect(() => {
-    if (!gameId) {
+    if (!gameId || !playerId) {
       navigate('/');
       return;
     }
@@ -88,6 +98,7 @@ export const useGameSocket = (
 
     const persistentListeners = () => {
       socket.on('connect', () => {
+        console.log('[useGameSocket] Connecté:', socket.id);
         setState((prev) => ({
           ...prev,
           connection: { ...prev.connection, isConnected: true },
@@ -99,7 +110,7 @@ export const useGameSocket = (
       });
 
       socket.on('connect_error', (error) => {
-        console.error('WebSocket connection error:', error, 'timestamp:', new Date().toISOString());
+        console.error('[useGameSocket] Erreur de connexion WebSocket:', error, 'timestamp:', new Date().toISOString());
         setState((prev) => ({
           ...prev,
           connection: { ...prev.connection, isConnected: false },
@@ -109,6 +120,7 @@ export const useGameSocket = (
       });
 
       socket.on('disconnect', () => {
+        console.log('[useGameSocket] Déconnexion:', socket.id);
         setState((prev) => ({
           ...prev,
           connection: { ...prev.connection, isConnected: false },
@@ -123,12 +135,14 @@ export const useGameSocket = (
       });
 
       socket.on('error', (message) => {
-        console.error('Erreur serveur reçue:', message, 'timestamp:', new Date().toISOString());
+        console.error('[useGameSocket] Erreur serveur reçue:', message, 'timestamp:', new Date().toISOString());
         if (message === 'Erreur lors de la confirmation de préparation') {
           toast.warn('Erreur lors de la confirmation, veuillez réessayer.', { toastId: 'ready_error' });
           return;
         }
         if (message === 'La partie est pleine' && hasJoinedRef.current) {
+          console.log('[useGameSocket] Tentative de reconnexion:', { gameId, playerId });
+          socket.emit('reconnectPlayer', { gameId, playerId });
           return;
         }
         if (message.includes('Non autorisé')) {
@@ -138,6 +152,16 @@ export const useGameSocket = (
         toast.error(message, { toastId: 'server_error' });
         navigate('/');
       });
+
+      socket.on('opponentDisconnected', (data: { disconnectedPlayerId: number }) => {
+        console.log('[useGameSocket] Opposant déconnecté:', data);
+        setState((prev) => ({
+          ...prev,
+          connection: { ...prev.connection, isConnected: true },
+          game: { ...prev.game, gameOver: true, winner: playerId === data.disconnectedPlayerId ? null : `player${playerId}` },
+        }));
+        toast.warn('L\'opposant s\'est déconnecté. Partie terminée.', { toastId: 'opponent_disconnected' });
+      });
     };
 
     const gameListeners = () => {
@@ -145,24 +169,33 @@ export const useGameSocket = (
         try {
           const parsedData = GameStartSchema.parse(data);
           hasJoinedRef.current = true;
-          setState((prev: GameState): Partial<GameState> => ({
-            connection: {
-              ...prev.connection,
-              playerId: parsedData.playerId,
-              isConnected: true,
-            },
-            chat: {
-              ...prev.chat,
-              messages: parsedData.chatHistory,
-            },
-            deckSelection: {
-              ...prev.deckSelection,
-              randomizers: parsedData.availableDecks,
-              selectedDecks: [],
-              player1DeckId: null,
-              waitingForPlayer1: parsedData.playerId === 2,
-            },
-          }));
+          setState((prev: GameState): Partial<GameState> => {
+            const newState = {
+              connection: {
+                ...prev.connection,
+                playerId: parsedData.playerId,
+                isConnected: true,
+              },
+              chat: {
+                ...prev.chat,
+                messages: parsedData.chatHistory,
+              },
+              deckSelection: {
+                ...prev.deckSelection,
+                randomizers: parsedData.availableDecks,
+                selectedDecks: [],
+                player1DeckId: null,
+                waitingForPlayer1: parsedData.playerId === 2,
+                deckSelectionData: {
+                  player1DeckId: [],
+                  player2DeckIds: [],
+                  selectedDecks: [],
+                },
+              },
+            };
+            console.log('[useGameSocket] gameStart - Nouvel état:', newState);
+            return newState;
+          });
         } catch (error) {
           toast.error('Erreur lors du démarrage de la partie.', { toastId: 'game_start_error' });
         }
@@ -282,6 +315,13 @@ export const useGameSocket = (
       });
 
       socket.on('updateGameState', (data: GameState) => {
+        console.log('[Game] updateGameState received:', {
+          playerId: data.connection.playerId,
+          isMyTurn: data.game.isMyTurn,
+          phase: data.game.currentPhase,
+          turn: data.game.turn,
+          updateTimestamp: data.game.updateTimestamp,
+        });
         setState((prev: GameState) => ({
           ...prev,
           player: { ...prev.player, ...data.player },
@@ -294,8 +334,16 @@ export const useGameSocket = (
         }));
       });
 
+      socket.on('endTurn', () => {
+        console.log('[Game] endTurn received');
+        setState((prev: GameState) => ({
+          ...prev,
+          game: { ...prev.game, isMyTurn: false },
+        }));
+      });
 
       socket.on('yourTurn', () => {
+        console.log('[Game] yourTurn received for player:', playerId);
         setState((prev: GameState) => ({
           ...prev,
           game: { ...prev.game, isMyTurn: true },
