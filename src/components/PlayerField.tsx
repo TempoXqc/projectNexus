@@ -103,7 +103,7 @@ function PlayerField({
             className="absolute top-0 left-1/2 transform -translate-x-1/2 flex flex-col items-center pt-2 transition-all duration-300"
             style={{
               top: '10px',
-              left: '75%',
+              left: '50%',
               transform: 'translate(-50%, 0)',
               pointerEvents: 'auto',
               opacity: card.id === hoveredCardId ? 1 : 0,

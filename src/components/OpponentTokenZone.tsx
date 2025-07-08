@@ -17,9 +17,9 @@ function OpponentTokenZone({
                              onClose,
                            }: OpponentTokenZoneProps) {
   const tokenImages: { [key: string]: string } = {
-    assassin: '/addons/tokens/token_assassin.jpg',
-    engine: '/addons/tokens/token_engine.jpg',
-    viking: '/addons/tokens/token_rage.jpg',
+    assassin: 'https://res.cloudinary.com/dsqxexeam/image/upload/v1750992505/token_assassin_mut6ll.jpg',
+    viking: 'https://res.cloudinary.com/dsqxexeam/image/upload/v1750992506/token_rage_zk5qkh.jpg',
+    engine: 'https://res.cloudinary.com/dsqxexeam/image/upload/v1750992505/token_engine_mhw9jy.jpg',
   };
 
   const tokenName = tokenType ? tokenType.charAt(0).toUpperCase() + tokenType.slice(1) : 'Aucun';
