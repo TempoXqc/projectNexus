@@ -1,3 +1,4 @@
+// client/src/components/Home.tsx
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -58,6 +59,8 @@ const Home: React.FC = () => {
           if (data.username && isMountedRef.current) {
             setUser({ username: data.username });
             toast.success(`Bienvenue, ${data.username} !`, { toastId: 'auto_login' });
+            socketService.updateToken(token);
+            socket.emit('refreshLobby');
           } else {
             localStorage.removeItem('authToken');
           }
@@ -67,7 +70,7 @@ const Home: React.FC = () => {
           localStorage.removeItem('authToken');
         });
     }
-  }, []);
+  }, [socket]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -88,7 +91,6 @@ const Home: React.FC = () => {
         setActiveGames([]);
         socket.emit('refreshLobby');
         hasJoinedLobbyRef.current = true;
-      } else {
       }
     };
 
@@ -107,16 +109,10 @@ const Home: React.FC = () => {
       toast.error('Connexion au serveur perdue.', { toastId: 'disconnect_error' });
     };
 
-    socket.once('connect', handleConnect);
+    socket.on('connect', handleConnect);
     socket.on('connect_error', handleConnectError);
     socket.on('disconnect', handleDisconnect);
     socket.on('activeGamesUpdate', handleActiveGamesUpdate);
-
-    if (socket.connected && window.location.pathname === '/') {
-      setActiveGames([]);
-      socket.emit('refreshLobby');
-      hasJoinedLobbyRef.current = true;
-    }
 
     return () => {
       isMountedRef.current = false;
@@ -141,7 +137,7 @@ const Home: React.FC = () => {
       return;
     }
     setIsCreatingGame(true);
-    socket.emit('createGame', { isRanked, gameFormat }, (response: any) => {
+    socket.emit('createGame', (response: any) => {
       if (!isMountedRef.current) {
         setIsCreatingGame(false);
         return;
@@ -158,14 +154,7 @@ const Home: React.FC = () => {
         setIsCreatingGame(false);
       }
     });
-    setTimeout(() => {
-      if (isCreatingGame && isMountedRef.current) {
-        console.error('[Home] Timeout: Aucune réponse reçue pour createGame après 10 secondes');
-        toast.error('Le serveur ne répond pas. Veuillez réessayer.', { toastId: 'create_game_timeout' });
-        setIsCreatingGame(false);
-      }
-    }, 100);
-  }, [socket, isRanked, gameFormat, user, navigate]);
+  }, [socket, user, navigate]);
 
   const handleJoinGame = useCallback(
     (gameId: string) => {
@@ -246,18 +235,22 @@ const Home: React.FC = () => {
       const response = await fetch(`${clientConfig.apiUrl}${endpoint}`, {
         method: 'POST',
         body: JSON.stringify({ username, password }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || 'Erreur lors de l\'authentification');
       }
+      console.log('[Home] Token après login:', data.token, 'timestamp:', new Date().toISOString());
       if (rememberMe) {
         localStorage.setItem('authToken', data.token);
+        socketService.updateToken(data.token);
       }
       setUser({ username: data.username });
       toast.success(isRegistering ? 'Compte créé avec succès !' : 'Connexion réussie !', { toastId: 'auth_success' });
       closeAuthModal();
+      socketService.getSocket().connect();
+      socket.emit('refreshLobby');
     } catch (error: any) {
       console.error(`Erreur lors de ${isRegistering ? 'l\'inscription' : 'la connexion'}:`, error, 'URL:', clientConfig.apiUrl);
       toast.error(error.message, { toastId: 'auth_error' });
@@ -266,20 +259,25 @@ const Home: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
+    socketService.updateToken(null);
     setUser(null);
+    socket.disconnect();
     toast.info('Déconnexion réussie.', { toastId: 'logout' });
   };
 
-  const handleCheckPlayerGame = useCallback(() => {
-    if (!socket.connected || !user) return;
-    socket.emit('checkPlayerGame', { playerId: user.username }, (response) => {
-      if (response.exists && response.gameId) {
-        navigate(`/waiting/${response.gameId}`, {
-          state: { playerId: null, availableDecks: response.availableDecks },
-        });
-      }
-    });
-  }, [socket, user, navigate]);
+  const handleCheckPlayerGame = useCallback(
+    (username: string) => {
+      if (!socket.connected || !username) return;
+      socket.emit('checkPlayerGame', { playerId: username }, (response) => {
+        if (response.exists && response.gameId) {
+          navigate(`/waiting/${response.gameId}`, {
+            state: { playerId: null, availableDecks: response.availableDecks },
+          });
+        }
+      });
+    },
+    [socket, navigate],
+  );
 
   const filteredGames = filterStatus === 'all' ? activeGames : activeGames.filter((game) => game.status === filterStatus);
 
@@ -309,10 +307,10 @@ const Home: React.FC = () => {
           <nav className="flex space-x-4">
             <button
               className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"
-              aria-label="Project-Nexus"
+              aria-label="Accueil"
               onClick={() => navigate('/')}
             >
-              Project-Nexus
+              Accueil
             </button>
             <button
               className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded"
