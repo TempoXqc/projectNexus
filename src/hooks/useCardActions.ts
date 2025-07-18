@@ -51,7 +51,7 @@ export const useCardActions = (
       let newDeck = state.player.deck.slice(1);
       let newHand = [...state.player.hand];
 
-      if (drawnCard.name === 'Assassin Token' && state.opponent.tokenType === 'assassin') {
+      if (drawnCard.name.fr === 'Assassin Token' && state.opponent.tokenType === 'assassin') {
         const assassinResult = handleAssassinTokenDraw(emit);
         if (!assassinResult) {
           console.error('[ERROR] handleAssassinTokenDraw returned null');

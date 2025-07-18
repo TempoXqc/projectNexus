@@ -87,8 +87,8 @@ function CardPreview({
     >
       <div className="border-4 border-gray-800 rounded-lg shadow-2xl">
         <img
-          src={card.image}
-          alt={card.name}
+          src={card.image.fr}
+          alt={card.name.fr}
           className="rounded shadow-2xl border-2 border-gray-800 w-full h-full object-cover"
         />
       </div>

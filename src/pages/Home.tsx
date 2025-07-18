@@ -59,7 +59,6 @@ const Home: React.FC = () => {
           if (data.username && isMountedRef.current) {
             setUser({ username: data.username });
             toast.success(`Bienvenue, ${data.username} !`, { toastId: 'auto_login' });
-            socketService.updateToken(token);
             socket.emit('refreshLobby');
           } else {
             localStorage.removeItem('authToken');
@@ -137,7 +136,7 @@ const Home: React.FC = () => {
       return;
     }
     setIsCreatingGame(true);
-    socket.emit('createGame', (response: any) => {
+    socket.emit('createGame', { isRanked, gameFormat }, (response: any) => {
       if (!isMountedRef.current) {
         setIsCreatingGame(false);
         return;
@@ -195,6 +194,7 @@ const Home: React.FC = () => {
     [socket, user, navigate],
   );
 
+
   const handleJoinAsSpectator = (gameId: string) => {
     if (!socket.connected) {
       toast.error('Vous devez être connecté pour spectater une partie.', { toastId: 'spectate_game_error' });
@@ -244,7 +244,6 @@ const Home: React.FC = () => {
       console.log('[Home] Token après login:', data.token, 'timestamp:', new Date().toISOString());
       if (rememberMe) {
         localStorage.setItem('authToken', data.token);
-        socketService.updateToken(data.token);
       }
       setUser({ username: data.username });
       toast.success(isRegistering ? 'Compte créé avec succès !' : 'Connexion réussie !', { toastId: 'auth_success' });
@@ -259,25 +258,21 @@ const Home: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
-    socketService.updateToken(null);
     setUser(null);
     socket.disconnect();
     toast.info('Déconnexion réussie.', { toastId: 'logout' });
   };
 
-  const handleCheckPlayerGame = useCallback(
-    (username: string) => {
-      if (!socket.connected || !username) return;
-      socket.emit('checkPlayerGame', { playerId: username }, (response) => {
-        if (response.exists && response.gameId) {
-          navigate(`/waiting/${response.gameId}`, {
-            state: { playerId: null, availableDecks: response.availableDecks },
-          });
-        }
-      });
-    },
-    [socket, navigate],
-  );
+  const handleCheckPlayerGame = useCallback(() => {
+    if (!socket.connected || !user) return;
+    socket.emit('checkPlayerGame', { playerId: user.username }, (response) => {
+      if (response.exists && response.gameId) {
+        navigate(`/waiting/${response.gameId}`, {
+          state: { playerId: null, availableDecks: response.availableDecks },
+        });
+      }
+    });
+  }, [socket, user, navigate]);
 
   const filteredGames = filterStatus === 'all' ? activeGames : activeGames.filter((game) => game.status === filterStatus);
 

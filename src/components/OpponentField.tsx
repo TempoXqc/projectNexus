@@ -53,8 +53,8 @@ function OpponentField({
           }}
         >
           <img
-            src={card.image}
-            alt={card.name}
+            src={card.image.fr}
+            alt={card.name.fr}
             className="w-full h-full object-cover rounded"
           />
         </motion.div>

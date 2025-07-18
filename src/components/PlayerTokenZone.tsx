@@ -191,7 +191,7 @@ function PlayerTokenZone({
                 <h3 className="text-white text-lg font-bold mb-2">Deck adverse :</h3>
                 <ul className="text-white text-sm max-h-40 overflow-y-auto">
                   {opponentDeck.map((card, index) => (
-                    <li key={card.id || `card_${index}`}>{card.name}</li>
+                    <li key={card.id || `card_${index}`}>{card.name.fr}</li>
                   ))}
                 </ul>
               </motion.div>

@@ -113,14 +113,14 @@ function InitialDrawModal({
                       togglePreview(card.id);
                     }}
                     className="p-2 bg-gray-800 rounded-full shadow-md hover:bg-gray-700 transition"
-                    aria-label={`Voir les détails de ${card.name}`}
+                    aria-label={`Voir les détails de ${card.name.fr}`}
                   >
                     <ZoomIn className="w-5 h-5 text-white" />
                   </button>
                 </div>
                 <img
-                  src={card.image}
-                  alt={card.name}
+                  src={card.image.fr}
+                  alt={card.name.fr}
                   className="w-full h-full object-cover rounded"
                 />
                 {isSelected && (

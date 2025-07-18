@@ -60,8 +60,8 @@ function PlayerGraveyard({
                 className="relative w-[100px] h-[140px] rounded"
               >
                 <img
-                  src={card.image}
-                  alt={card.name}
+                  src={card.image.fr}
+                  alt={card.name.fr}
                   className="w-full h-full object-cover rounded shadow"
                 />
               </div>
