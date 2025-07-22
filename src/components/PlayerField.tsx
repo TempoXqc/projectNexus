@@ -82,7 +82,6 @@ function PlayerField({
             height: '8.33vw',
             maxHeight: '213.33px',
             left: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 6.25}vw)`,
-            maxLeft: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 160}px)`,
             transformOrigin: 'center center',
             cursor: 'pointer',
           }}
@@ -99,6 +98,12 @@ function PlayerField({
             alt={card.name.fr}
             className="w-full h-full object-cover rounded"
           />
+          {card.stealthed && (
+            <span className="absolute top-2 left-2 bg-green-500 text-white text-xs rounded px-1">Furtif</span>
+          )}
+          {card.keywords && card.keywords.length > 0 && (
+            <span className="absolute top-2 right-2 bg-blue-500 text-white text-xs rounded px-1">{card.keywords.join(', ')}</span>
+          )}
           <div
             className="absolute top-0 left-1/2 transform -translate-x-1/2 flex flex-col items-center pt-2 transition-all duration-300"
             style={{
@@ -122,8 +127,8 @@ function PlayerField({
               >
                 <Sword size={16} />
                 <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-              Attaquer
-            </span>
+                  Attaquer
+                </span>
               </button>
               <button
                 onClick={(event) => {
@@ -136,8 +141,8 @@ function PlayerField({
               >
                 <Trash2 size={16} />
                 <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-              Retirer du terrain
-            </span>
+                  Retirer du terrain
+                </span>
               </button>
               <button
                 onClick={(event) => {
@@ -150,8 +155,8 @@ function PlayerField({
               >
                 <RotateCcw size={16} />
                 <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-              Épuiser la carte
-            </span>
+                  Épuiser la carte
+                </span>
               </button>
             </div>
           </div>

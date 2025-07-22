@@ -1,5 +1,5 @@
-import { GameState } from '@tempoxqc/project-nexus-types';
-import { memo, ReactNode } from 'react';
+import { GameState, Card } from '@tempoxqc/project-nexus-types';
+import { memo, ReactNode, useEffect, useState } from 'react';
 import InitialDrawModal from './InitialDrawModal.tsx';
 import CounterPlayer from '@/components/CounterPlayer.tsx';
 import PhaseIndicator from '@/components/PhaseIndicator.tsx';
@@ -17,6 +17,7 @@ import CardPreview from '@/components/CardPreview.tsx';
 import ChatBox from '@/components/ChatBox.tsx';
 import DeckSelection from '@/components/DeckSelection.tsx';
 import CounterOpponentPlayer from '@/components/CounterOpponentPlayer.tsx';
+import Modal from '@/components/Modal.tsx';
 
 interface GameLayoutProps {
   state: GameState;
@@ -36,9 +37,9 @@ interface GameLayoutProps {
   removeCardFromField: (index: number) => void;
   exhaustCard: (index: number) => void;
   attackCard: (index: number) => void;
-  discardCardFromHand: (card: any) => void;
-  playCardToField: (card: any) => void;
-  addToDeck: (card: any) => void;
+  discardCardFromHand: (card: Card) => void;
+  playCardToField: (card: Card) => void;
+  addToDeck: (card: Card) => void;
   drawCard: () => void;
   shuffleDeck: () => void;
   updateLifePoints: (newValue: number) => void;
@@ -56,6 +57,10 @@ interface GameLayoutProps {
   children?: ReactNode;
   playmats: { id: string; name: string; image: string }[];
   lifeToken: { id: string; name: string; image: string } | null;
+  revealedCards: Card[];
+  onSelectChoice: (cardId: string, choice: string) => void;
+  onReorderRevealedCards: (cardIds: string[]) => void;
+  onSelectSplitDamageTargets: (targets: any[]) => void;
 }
 
 const GameLayout = memo(
@@ -96,9 +101,41 @@ const GameLayout = memo(
      backcard,
      playmats = [],
      lifeToken,
+     revealedCards,
+     onSelectChoice,
+     onReorderRevealedCards,
+     onSelectSplitDamageTargets,
    }: GameLayoutProps) => {
     const playerPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_bottom') || null : null;
     const opponentPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_top') || null : null;
+    const [choiceModal, setChoiceModal] = useState<{ cardId: string; options: { title: string; actions: any[] }[] } | null>(null);
+    const [splitDamageModal, setSplitDamageModal] = useState<{ amount: number; targets: any[] } | null>(null);
+
+    // Gestion des choix interactifs
+    useEffect(() => {
+      socket.on('requestChoice', (data) => {
+        setChoiceModal(data);
+        // Attendre la réponse de l'utilisateur via la modale
+      });
+
+      socket.on('selectSplitDamageTargets', (data) => {
+        setSplitDamageModal(data);
+        // Attendre la réponse de l'utilisateur via la modale
+      });
+
+      socket.on('reorderRevealedCards', (data, callback) => {
+        set({ ui: { ...state.ui, isReorderCardsOpen: true } });
+        // Simuler une réorganisation (à remplacer par une interaction utilisateur réelle)
+        callback(data.cards.map((card: Card) => card.id));
+      });
+
+      return () => {
+        socket.off('requestChoice');
+        socket.off('selectSplitDamageTargets');
+        socket.off('reorderRevealedCards');
+      };
+    }, [socket, onSelectChoice, onSelectSplitDamageTargets, set, state.ui]);
+
     return (
       <div className="w-full min-h-screen flex flex-row relative overflow-hidden bg-black" role="main" aria-label="Interface de jeu">
         {playerPlaymat && (
@@ -207,7 +244,7 @@ const GameLayout = memo(
             <CounterOpponentPlayer
               playerId={playerId}
               gameId={gameId}
-              opponentCounter={state.opponent.lifePoints}
+              opponentCounter={state.opponent.nexus.health}
               lifeToken={lifeToken}
             />
           </div>
@@ -222,7 +259,7 @@ const GameLayout = memo(
             <CounterPlayer
               playerId={playerId}
               gameId={gameId}
-              counter={state.player.lifePoints}
+              counter={state.player.nexus.health}
               updateCounter={updateLifePoints}
               lifeToken={lifeToken}
             />
@@ -257,6 +294,8 @@ const GameLayout = memo(
               playCardToField={playCardToField}
               addToDeck={addToDeck}
               playerId={playerId}
+              isMyTurn={state.game?.isMyTurn || false}
+              currentPhase={state.game?.currentPhase || 'Standby'}
             />
             <OpponentField
               opponentField={state.opponent.field}
@@ -285,7 +324,7 @@ const GameLayout = memo(
               backcardImage={backcard?.image}
             />
             <PlayerTokenZone
-              tokenCount={state.player.tokenCount}
+              tokenCount={state.player.tokenCount || 0}
               tokenType={state.player.tokenType}
               onClick={() => setTokenZoneOpen(true)}
               isOpen={state.ui.isTokenZoneOpen}
@@ -314,7 +353,7 @@ const GameLayout = memo(
                 backcardImage={backcard?.image}
               />
               <OpponentTokenZone
-                tokenCount={state.opponent.tokenCount}
+                tokenCount={state.opponent.tokenCount || 0}
                 tokenType={state.opponent.tokenType}
                 onClick={() => setOpponentTokenZoneOpen(true)}
                 isOpen={state.ui.isOpponentTokenZoneOpen}
@@ -334,6 +373,103 @@ const GameLayout = memo(
             isOpponentGraveyardOpen={state.ui.isOpponentGraveyardOpen}
             mulliganDone={state.deckSelection.mulliganDone}
           />
+
+          {state.ui.isRevealedCardsOpen && (
+            <Modal
+              isOpen={state.ui.isRevealedCardsOpen}
+              onClose={() => set({ ui: { ...state.ui, isRevealedCardsOpen: false } })}
+              onOutsideClick={() => set({ ui: { ...state.ui, isRevealedCardsOpen: false } })}
+              title="Cartes révélées"
+              width="720px"
+            >
+              <div className="flex flex-wrap gap-4 justify-center relative">
+                {revealedCards.length > 0 ? (
+                  revealedCards.map((card) => (
+                    <div
+                      key={card.id}
+                      onMouseEnter={() => setHoveredCardId(card.id)}
+                      onMouseLeave={() => setHoveredCardId(null)}
+                      className="relative w-[100px] h-[140px] rounded"
+                    >
+                      <img
+                        src={card.image.fr}
+                        alt={card.name.fr}
+                        className="w-full h-full object-cover rounded shadow"
+                      />
+                      {card.stealthed && (
+                        <span className="absolute top-2 left-2 bg-green-500 text-white text-xs rounded px-1">Furtif</span>
+                      )}
+                      {card.keywords && card.keywords.length > 0 && (
+                        <span className="absolute top-2 right-2 bg-blue-500 text-white text-xs rounded px-1">{card.keywords.join(', ')}</span>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-gray-500">Aucune carte révélée.</p>
+                )}
+              </div>
+              <button
+                onClick={() => onReorderRevealedCards(revealedCards.map((card) => card.id))}
+                className="mt-4 w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Réorganiser les cartes
+              </button>
+            </Modal>
+          )}
+
+          {choiceModal && (
+            <Modal
+              isOpen={!!choiceModal}
+              onClose={() => setChoiceModal(null)}
+              onOutsideClick={() => setChoiceModal(null)}
+              title="Choisir une option"
+              width="500px"
+            >
+              <div className="flex flex-col gap-4">
+                {choiceModal.options.map((option, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      onSelectChoice(choiceModal.cardId, option.title);
+                      setChoiceModal(null);
+                    }}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    {option.title}
+                  </button>
+                ))}
+              </div>
+            </Modal>
+          )}
+
+          {splitDamageModal && (
+            <Modal
+              isOpen={!!splitDamageModal}
+              onClose={() => setSplitDamageModal(null)}
+              onOutsideClick={() => setSplitDamageModal(null)}
+              title="Sélectionner les cibles pour les dégâts"
+              width="720px"
+            >
+              <div className="flex flex-wrap gap-4 justify-center relative">
+                {splitDamageModal.targets.map((target, index) => (
+                  <div
+                    key={index}
+                    onClick={() => {
+                      onSelectSplitDamageTargets([target]);
+                      setSplitDamageModal(null);
+                    }}
+                    className="relative w-[100px] h-[140px] rounded cursor-pointer"
+                  >
+                    <img
+                      src={target.type === 'nexus' ? lifeToken?.image : target.image.fr}
+                      alt={target.type === 'nexus' ? 'Nexus' : target.name.fr}
+                      className="w-full h-full object-cover rounded shadow"
+                    />
+                  </div>
+                ))}
+              </div>
+            </Modal>
+          )}
         </div>
 
         <div className="chatbox-container" role="region" aria-label="Zone de chat">

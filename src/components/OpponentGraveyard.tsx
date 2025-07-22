@@ -19,7 +19,6 @@ function OpponentGraveyard({
                              isOpen,
                              onClose,
                              graveyard,
-                             hoveredCardId,
                              setHoveredCardId,
                              backcardImage,
                            }: OpponentGraveyardProps) {

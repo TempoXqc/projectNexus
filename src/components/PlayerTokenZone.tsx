@@ -4,7 +4,7 @@ import { Card } from '@tempoxqc/project-nexus-types';
 
 interface PlayerTokenZoneProps {
   tokenCount: number;
-  tokenType: 'assassin' | 'engine' | 'viking' | null;
+  tokenType: string | null | undefined
   onClick: () => void;
   isOpen: boolean;
   onClose: () => void;
@@ -117,6 +117,9 @@ function PlayerTokenZone({
                 <span className="absolute inset-0 flex items-center justify-center text-white font-bold text-4xl">
                   {tokenCount}
                 </span>
+                {tokenType === 'assassin' && (
+                  <span className="absolute top-2 left-2 bg-green-500 text-white text-xs rounded px-1">Furtif</span>
+                )}
               </motion.div>
             ) : (
               <p className="text-center text-gray-500">Aucun token disponible.</p>

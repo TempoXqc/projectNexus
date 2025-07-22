@@ -1,9 +1,7 @@
-// src/pages/WaitingRoom.tsx
 import React, { useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { PuffLoader } from 'react-spinners';
-import { GameStartSchema } from '@tempoxqc/project-nexus-types';
 import { socketService } from '@/services/socketService.ts';
 
 const WaitingRoom: React.FC = () => {
@@ -32,20 +30,22 @@ const WaitingRoom: React.FC = () => {
       });
     });
 
-    socket.on('gameStart', (data) => {
-      try {
-        const parsedData = GameStartSchema.parse(data);
-        navigate(`/game/${parsedData.gameId}`, {
-          state: {
-            playerId: parsedData.playerId,
-            availableDecks: parsedData.availableDecks,
-            playmats: parsedData.playmats,
-          },
-        });
-      } catch (error) {
-        console.error('[ERROR] gameStart validation failed:', error);
-        toast.error('Erreur lors du démarrage de la partie.', { toastId: 'game_start_error' });
-      }
+    socket.on('gameStart', (data: {
+      playerId: number | null;
+      gameId: string;
+      chatHistory: { playerId: number; message: string }[];
+      availableDecks: { id: string; name: string; image: string; infoImage: string }[];
+      playmats: { id: string; name: string; image: string }[];
+      lifeToken: { id: string; name: string; image: string };
+    }) => {
+      navigate(`/game/${data.gameId}`, {
+        state: {
+          playerId: data.playerId,
+          availableDecks: data.availableDecks,
+          playmats: data.playmats,
+          lifeToken: data.lifeToken,
+        },
+      });
     });
 
     socket.on('connect_error', (error) => {

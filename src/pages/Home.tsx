@@ -1,24 +1,21 @@
-// client/src/components/Home.tsx
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { socketService } from '../services/socketService.ts';
-import { z } from 'zod';
-import { GameStartSchema, EmitJoinGameSchema } from '@tempoxqc/project-nexus-types';
 import { FaGithub, FaDiscord, FaTwitter, FaEye, FaClock, FaGamepad, FaList } from 'react-icons/fa';
 import { clientConfig } from '@/config/clientConfig.ts';
 
-const ActiveGameSchema = z.object({
-  gameId: z.string().min(1),
-  status: z.enum(['waiting', 'started']),
-  createdAt: z.string().datetime().transform((val) => new Date(val)),
-  players: z.array(z.string().min(1)),
-});
+interface ActiveGame {
+  gameId: string;
+  status: 'waiting' | 'started';
+  createdAt: Date;
+  players: string[];
+}
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const socket = socketService.getSocket();
-  const [activeGames, setActiveGames] = useState<{ gameId: string; status: string; createdAt: Date; players: string[] }[]>([]);
+  const [activeGames, setActiveGames] = useState<ActiveGame[]>([]);
   const [isCreatingGame, setIsCreatingGame] = useState(false);
   const [isRanked, setIsRanked] = useState(false);
   const [gameFormat, setGameFormat] = useState<'BO1' | 'BO3'>('BO1');
@@ -74,10 +71,15 @@ const Home: React.FC = () => {
   useEffect(() => {
     isMountedRef.current = true;
 
-    const handleActiveGamesUpdate = (games: unknown) => {
+    const handleActiveGamesUpdate = (games: { gameId: string; status: string; createdAt: string; players: string[] }[]) => {
       if (!isMountedRef.current) return;
       try {
-        const parsedGames = z.array(ActiveGameSchema).parse(games);
+        const parsedGames = games.map(game => ({
+          gameId: game.gameId,
+          status: game.status as 'waiting' | 'started',
+          createdAt: new Date(game.createdAt),
+          players: game.players,
+        }));
         setActiveGames(parsedGames);
       } catch (error) {
         console.error('[ERROR] activeGamesUpdate validation failed:', error);
@@ -136,16 +138,22 @@ const Home: React.FC = () => {
       return;
     }
     setIsCreatingGame(true);
-    socket.emit('createGame', { isRanked, gameFormat }, (response: any) => {
+    socket.emit('createGame', { isRanked, gameFormat }, (response: {
+      gameId: string;
+      playerId: number | null;
+      chatHistory: { playerId: number; message: string }[];
+      availableDecks: { id: string; name: string; image: string; infoImage: string }[];
+      playmats: { id: string; name: string; image: string }[];
+      lifeToken: { id: string; name: string; image: string };
+    }) => {
       if (!isMountedRef.current) {
         setIsCreatingGame(false);
         return;
       }
       try {
-        const parsedData = GameStartSchema.parse(response);
         setIsCreatingGame(false);
-        navigate(`/waiting/${parsedData.gameId}`, {
-          state: { playerId: parsedData.playerId ?? null, availableDecks: parsedData.availableDecks },
+        navigate(`/waiting/${response.gameId}`, {
+          state: { playerId: response.playerId, availableDecks: response.availableDecks, playmats: response.playmats, lifeToken: response.lifeToken },
         });
       } catch (error) {
         console.error('[ERROR] createGame ACK validation failed:', error, 'response:', response);
@@ -166,7 +174,7 @@ const Home: React.FC = () => {
         setIsAuthModalOpen(true);
         return;
       }
-      socket.emit('checkPlayerGame', { playerId: user.username }, (response) => {
+      socket.emit('checkPlayerGame', { playerId: user.username }, (response: { exists: boolean; gameId?: string; availableDecks?: { id: string; name: string; image: string; infoImage: string }[] }) => {
         if (response.exists && response.gameId) {
           toast.error('Vous êtes déjà dans une partie.', { toastId: 'already_in_game' });
           navigate(`/waiting/${response.gameId}`, {
@@ -174,40 +182,27 @@ const Home: React.FC = () => {
           });
           return;
         }
-        try {
-          const parsedGameId = EmitJoinGameSchema.parse(gameId);
-          socket.emit('checkGameExists', parsedGameId, (exists: boolean) => {
-            if (exists) {
-              socket.emit('joinGame', parsedGameId);
-              navigate(`/waiting/${gameId}`, { state: { playerId: null } });
-            } else {
-              toast.error("La partie n'existe pas.", { toastId: 'game_not_found' });
-              setActiveGames((prev) => prev.filter((game) => game.gameId !== gameId));
-            }
-          });
-        } catch (error) {
-          console.error('[ERROR] joinGame validation failed:', error);
-          toast.error('ID de partie invalide.', { toastId: 'join_game_error' });
-        }
+        socket.emit('checkGameExists', gameId, (exists: boolean) => {
+          if (exists) {
+            socket.emit('joinGame', gameId);
+            navigate(`/waiting/${gameId}`, { state: { playerId: null } });
+          } else {
+            toast.error("La partie n'existe pas.", { toastId: 'game_not_found' });
+            setActiveGames((prev) => prev.filter((game) => game.gameId !== gameId));
+          }
+        });
       });
     },
     [socket, user, navigate],
   );
-
 
   const handleJoinAsSpectator = (gameId: string) => {
     if (!socket.connected) {
       toast.error('Vous devez être connecté pour spectater une partie.', { toastId: 'spectate_game_error' });
       return;
     }
-    try {
-      const parsedGameId = EmitJoinGameSchema.parse(gameId);
-      socket.emit('joinAsSpectator', parsedGameId);
-      navigate(`/game/${gameId}`, { state: { isSpectator: true } });
-    } catch (error) {
-      console.error('[ERROR] joinAsSpectator validation failed:', error);
-      toast.error('ID de partie invalide.', { toastId: 'spectate_game_error' });
-    }
+    socket.emit('joinAsSpectator', gameId);
+    navigate(`/game/${gameId}`, { state: { isSpectator: true } });
   };
 
   const handleToggleRanked = () => {
@@ -265,7 +260,7 @@ const Home: React.FC = () => {
 
   const handleCheckPlayerGame = useCallback(() => {
     if (!socket.connected || !user) return;
-    socket.emit('checkPlayerGame', { playerId: user.username }, (response) => {
+    socket.emit('checkPlayerGame', { playerId: user.username }, (response: { exists: boolean; gameId?: string; availableDecks?: { id: string; name: string; image: string; infoImage: string }[] }) => {
       if (response.exists && response.gameId) {
         navigate(`/waiting/${response.gameId}`, {
           state: { playerId: null, availableDecks: response.availableDecks },

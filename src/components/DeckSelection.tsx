@@ -46,10 +46,9 @@ function DeckSelection({
       ? player1DeckId.split(',')
       : [];
   const player2DeckIds = deckSelectionData?.player2DeckIds || [];
-  const canChooseDeck = playerId === 1 || (playerId === 2 && !waitingForPlayer1 && normalizedPlayer1DeckId.length > 0);
+  const canChooseDeck = playerId === 1 ? !hasChosenDeck : (!waitingForPlayer1 && player2DeckIds.length < 2);
   const player2DeckCount = player2DeckIds.length;
   const allDecksSelected = normalizedPlayer1DeckId.length >= 2 && player2DeckCount >= 2;
-
   const togglePreview = (deckId: string) => {
     if (previewDeckId === deckId && isPreviewClicked) {
       setPreviewDeckId(null);

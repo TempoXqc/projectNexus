@@ -1,4 +1,4 @@
-import { memo, useMemo, useEffect } from 'react';
+import { memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
 
 interface DeckInfoPreviewProps {

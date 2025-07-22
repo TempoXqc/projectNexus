@@ -1,7 +1,5 @@
-// client/src/hooks/useCardActions.ts
 import { useCallback } from 'react';
-import { GameState } from '@tempoxqc/project-nexus-types';
-import { Card } from '@tempoxqc/project-nexus-types';
+import { GameState, Card } from '@tempoxqc/project-nexus-types';
 import { toast } from 'react-toastify';
 
 export const useCardActions = (
@@ -10,11 +8,14 @@ export const useCardActions = (
 ) => {
   const handleAssassinTokenDraw = useCallback(
     (emit?: (event: string, data: any) => void) => {
-      if (state.opponent.tokenType !== 'assassin') return null;
-      const newLifePoints = Math.max(0, state.player.lifePoints - 2);
-      const newOpponentTokenCount = Math.min(state.opponent.tokenCount + 1, 8);
+      if (!state.opponent || !state.player.nexus || state.opponent.tokenType !== 'assassin') {
+        console.error('handleAssassinTokenDraw: opponent ou player.nexus non défini');
+        return null;
+      }
+      const newLifePoints = Math.max(0, state.player.nexus.health - 2);
+      const newOpponentTokenCount = Math.min(state.opponent.tokenCount! + 1, 8);
       set({
-        player: { ...state.player, lifePoints: newLifePoints },
+        player: { ...state.player, nexus: { ...state.player.nexus, health: newLifePoints } },
         opponent: { ...state.opponent, tokenCount: newOpponentTokenCount },
       });
       toast.info('Vous avez pioché un token assassin ! -2 points de vie.', {
@@ -31,7 +32,7 @@ export const useCardActions = (
 
       return { lifePoints: newLifePoints, opponentTokenCount: newOpponentTokenCount };
     },
-    [state.opponent.tokenType, state.player.lifePoints, state.opponent.tokenCount, state.player, state.opponent, set],
+    [state.opponent, state.player.nexus, state.opponent?.tokenCount, state.player, state.opponent, set],
   );
 
   const drawCard = useCallback(
@@ -51,7 +52,7 @@ export const useCardActions = (
       let newDeck = state.player.deck.slice(1);
       let newHand = [...state.player.hand];
 
-      if (drawnCard.name.fr === 'Assassin Token' && state.opponent.tokenType === 'assassin') {
+      if (drawnCard.types.some(t => t.type === 'token' && t.subTypes === 'token') && state.opponent?.tokenType === 'assassin') {
         const assassinResult = handleAssassinTokenDraw(emit);
         if (!assassinResult) {
           console.error('[ERROR] handleAssassinTokenDraw returned null');
@@ -61,7 +62,7 @@ export const useCardActions = (
         if (newDeck.length > 0) {
           [drawnCard] = newDeck.slice(0, 1);
           newDeck = newDeck.slice(1);
-          newHand = [...state.player.hand, drawnCard];
+          newHand = [...state.player.hand, { ...drawnCard, exhausted: false }];
         } else {
           newHand = [...state.player.hand];
           toast.warn('Aucune carte restante pour repiocher.', {
@@ -69,18 +70,24 @@ export const useCardActions = (
           });
         }
       } else {
-        newHand = [...state.player.hand, drawnCard];
+        newHand = [...state.player.hand, { ...drawnCard, exhausted: false }];
       }
 
       set({ player: { ...state.player, hand: newHand, deck: newDeck } });
 
       return { hand: newHand, deck: newDeck };
     },
-    [state.player.deck, state.game.isMyTurn, state.player.hand, state.opponent.tokenType, state.player, handleAssassinTokenDraw, set],
+    [state.player.deck, state.game.isMyTurn, state.player.hand, state.opponent, state.player, handleAssassinTokenDraw, set],
   );
 
   const playCardToField = useCallback(
     (card: Card) => {
+      if (!state.game) {
+        console.error('state.game is undefined in playCardToField');
+        toast.error('État du jeu non initialisé. Veuillez patienter.');
+        return null;
+      }
+      console.log('Tentative de jouer une carte. Terrain actuel :', state.player.field, 'Phase :', state.game.currentPhase, 'isMyTurn :', state.game.isMyTurn);
       if (
         !state.game.isMyTurn ||
         state.player.mustDiscard ||
@@ -93,32 +100,43 @@ export const useCardActions = (
       }
 
       const newField: (Card | null)[] = [...state.player.field];
+      while (newField.length < 8) {
+        newField.push(null);
+      }
       const emptyIndex = newField.findIndex((slot) => slot === null);
       if (emptyIndex === -1) {
+        console.error('Aucun emplacement disponible. Terrain :', newField);
         toast.error('Aucun emplacement disponible sur le terrain.', {
           toastId: 'play_card_no_space',
         });
         return null;
       }
 
-      newField[emptyIndex] = card;
+      newField[emptyIndex] = { ...card, exhausted: false, stealthed: card.faction === 'assassin' };
       const newHand = state.player.hand.filter((c: Card) => c.id !== card.id);
-      set({ player: { ...state.player, field: newField, hand: newHand } });
+      set({
+        player: { ...state.player, field: newField, hand: newHand, hasPlayedCard: true },
+        turnState: { ...state.turnState, unitsDeployed: [...state.turnState.unitsDeployed, card] },
+        lastCardPlayed: card,
+      });
 
       return { card, fieldIndex: emptyIndex, hand: newHand, field: newField };
     },
-    [state.game.isMyTurn, state.player.mustDiscard, state.game.currentPhase, state.player.field, state.player.hand, state.player, set],
+    [state.game, state.player.field, state.player.hand, state.player, state.turnState, set],
   );
 
   const discardCardFromHand = useCallback(
     (card: Card) => {
       const newHand = state.player.hand.filter((c: Card) => c.id !== card.id);
       const newGraveyard = [...state.player.graveyard, card];
-      set({ player: { ...state.player, hand: newHand, graveyard: newGraveyard } });
+      set({
+        player: { ...state.player, hand: newHand, graveyard: newGraveyard },
+        turnState: { ...state.turnState, discardedCardsCount: state.turnState.discardedCardsCount + 1 },
+      });
 
       return { hand: newHand, graveyard: newGraveyard };
     },
-    [state.player.hand, state.player.graveyard, state.player, set],
+    [state.player.hand, state.player.graveyard, state.turnState, set],
   );
 
   const removeCardFromField = useCallback(
@@ -135,11 +153,14 @@ export const useCardActions = (
       }
 
       const newGraveyard = [...state.player.graveyard, removedCard];
-      set({ player: { ...state.player, field: newField, graveyard: newGraveyard } });
+      set({
+        player: { ...state.player, field: newField, graveyard: newGraveyard },
+        lastDestroyedUnit: removedCard,
+      });
 
       return { field: newField, graveyard: newGraveyard };
     },
-    [state.player.field, state.player.graveyard, state.player, set],
+    [state.player.field, state.player.graveyard, set],
   );
 
   const exhaustCard = useCallback(
@@ -190,7 +211,10 @@ export const useCardActions = (
       newField[index] = null;
 
       const newGraveyard = [...state.player.graveyard, removedCard];
-      set({ player: { ...state.player, field: newField, graveyard: newGraveyard } });
+      set({
+        player: { ...state.player, field: newField, graveyard: newGraveyard },
+        lastDestroyedUnit: removedCard,
+      });
 
       return { cardId: card.id, field: newField, graveyard: newGraveyard };
     },

@@ -9,22 +9,25 @@ interface PlayerHandProps {
   setHoveredCardId: (id: string | null) => void;
   isHandHovered: boolean;
   setIsHandHovered: (hovered: boolean) => void;
-  mustDiscard: boolean;
+  mustDiscard: boolean | undefined ;
   discardCardFromHand: (card: Card) => void;
   playCardToField: (card: Card) => void;
   addToDeck: (card: Card) => void;
   playerId: number | null | undefined;
+  isMyTurn: boolean;
+  currentPhase: 'Standby' | 'Main' | 'Battle' | 'End';
 }
 
 function PlayerHand({
                       hand,
                       hoveredCardId,
                       setHoveredCardId,
-                      isHandHovered,
                       setIsHandHovered,
                       discardCardFromHand,
                       playCardToField,
                       addToDeck,
+                      isMyTurn,
+                      currentPhase,
                     }: PlayerHandProps) {
   const [contextMenu, setContextMenu] = useState<{
     cardElement: HTMLElement | null;
@@ -103,6 +106,7 @@ function PlayerHand({
                     event.stopPropagation();
                     playCardToField(card);
                   }}
+                  disabled={!isMyTurn || currentPhase !== 'Main'}
                   className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 focus:outline-none relative"
                   aria-label="Play card to field"
                 >

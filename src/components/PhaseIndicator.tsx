@@ -25,7 +25,6 @@ function PhaseIndicator({
   const [showMessage, setShowMessage] = useState(false);
   const [message, setMessage] = useState('');
   const [isAnimationActive, setIsAnimationActive] = useState(false);
-  const lastEmittedPhase = useRef<string | null>(null);
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -52,7 +51,7 @@ function PhaseIndicator({
           : phaseData.phase === 'Battle'
             ? 'Phase de combat'
             : phaseData.phase === 'End' || phaseData.phase === 'Standby'
-              ? `Nouveau tour ${phaseData.turn} - Joueur ${nextPlayerId}`
+              ? `Nouveau tour ${phaseData.turn} - Joueur ${nextPlayerId}${isMyTurn ? ' (Votre tour !)' : ''}`
               : `Phase: ${phaseData.phase}`;
       if (isMounted.current) {
         setMessage(displayMessage);
@@ -105,52 +104,6 @@ function PhaseIndicator({
       onPhaseChange(newPhase);
     }
   }, [isMyTurn, gameId, playerId, isAnimationActive, currentPhase, socket, turn, onPhaseChange]);
-
-  useEffect(() => {
-    const handlePhaseUpdate = (phaseData: PhaseData) => {
-      console.log('[PhaseIndicator] updatePhase received:', phaseData, 'isMyTurn:', isMyTurn);
-      if (phaseData.phase !== currentPhase && isMounted.current) {
-        onPhaseChange(phaseData.phase as 'Standby' | 'Main' | 'Battle' | 'End');
-      }
-    };
-
-    const handlePhaseChangeMessage = (phaseData: PhaseData) => {
-      console.log('[PhaseIndicator] phaseChangeMessage received:', phaseData, 'playerId:', playerId, 'isMyTurn:', isMyTurn);
-      const nextPlayerId = phaseData.nextPlayerId !== undefined ? phaseData.nextPlayerId : playerId === 1 ? 2 : 1;
-      const displayMessage =
-        phaseData.phase === 'Main'
-          ? 'Phase principale'
-          : phaseData.phase === 'Battle'
-            ? 'Phase de combat'
-            : phaseData.phase === 'End' || phaseData.phase === 'Standby'
-              ? `Nouveau tour ${phaseData.turn} - Joueur ${nextPlayerId}${isMyTurn ? ' (Votre tour !)' : ''}`
-              : `Phase: ${phaseData.phase}`;
-      if (isMounted.current) {
-        setMessage(displayMessage);
-        setShowMessage(true);
-        setIsAnimationActive(true);
-        setTimeout(() => {
-          if (isMounted.current) {
-            setShowMessage(false);
-            setIsAnimationActive(false);
-          }
-        }, 5000);
-      }
-    };
-
-    socket.on('updatePhase', handlePhaseUpdate);
-    socket.on('phaseChangeMessage', handlePhaseChangeMessage);
-    socket.on('endTurn', () => {
-      console.log('[PhaseIndicator] endTurn received, désactivation du tour');
-      isMyTurn(false); // Désactiver immédiatement isMyTurn
-    });
-
-    return () => {
-      socket.off('updatePhase', handlePhaseUpdate);
-      socket.off('phaseChangeMessage', handlePhaseChangeMessage);
-      socket.off('endTurn');
-    };
-  }, [socket, gameId, playerId, currentPhase, isMyTurn, onPhaseChange, isMyTurn]);
 
   const getNextPhase = useCallback(() => {
     switch (currentPhase) {

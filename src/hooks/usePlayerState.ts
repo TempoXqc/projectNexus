@@ -1,7 +1,5 @@
-// client/src/hooks/usePlayerState.ts
 import { useCallback } from 'react';
-import { GameState } from '@tempoxqc/project-nexus-types';
-import { Card } from '@tempoxqc/project-nexus-types';
+import { GameState, Card } from '@tempoxqc/project-nexus-types';
 import { toast } from 'react-toastify';
 import { generateTokenId } from '@/utils/generateTokenId.ts';
 
@@ -17,7 +15,7 @@ export const usePlayerState = (
         });
         return null;
       }
-      set({ player: { ...state.player, lifePoints: newValue } });
+      set({ player: { ...state.player, lifePoints: newValue, nexus: { ...state.player.nexus, health: newValue } } });
       return { lifePoints: newValue };
     },
     [state.player, set],
@@ -35,7 +33,13 @@ export const usePlayerState = (
         });
         return null;
       }
-      set({ player: { ...state.player, tokenCount: newValue } });
+      set({
+        player: {
+          ...state.player,
+          tokenCount: newValue,
+          tokenPool: Array(newValue).fill({ id: generateTokenId(), type: [state.player.tokenType || ''] }),
+        },
+      });
       return { tokenCount: newValue };
     },
     [state.player, set],
@@ -43,7 +47,7 @@ export const usePlayerState = (
 
   const addAssassinTokenToOpponentDeck = useCallback(
     (emit?: (event: string, data: any) => void) => {
-      if (state.player.tokenCount < 1) {
+      if (state.player.tokenCount! < 1) {
         toast.error('Pas assez de tokens pour ajouter un token assassin.', {
           toastId: 'add_assassin_token_error',
         });
@@ -51,14 +55,24 @@ export const usePlayerState = (
       }
       const tokenCard: Card = {
         id: generateTokenId(),
-        name: 'Assassin Token',
-        image: '/addons/tokens/token_assassin.jpg',
+        name: { fr: 'Assassin Token', en: 'Assassin Token', es: 'Assassin Token' },
+        image: { fr: '/addons/tokens/token_assassin.jpg', en: '/addons/tokens/token_assassin.jpg', es: '/addons/tokens/token_assassin.jpg' },
+        faction: 'assassin',
+        label: [],
+        cost: 0,
+        effects: {},
+        types: [{ type: 'token', subTypes: 'token', target: [], value: 0 }],
         exhausted: false,
+        stealthed: true,
       };
       const newOpponentDeck = [...state.opponent.deck, tokenCard].sort(() => Math.random() - 0.5);
-      const newTokenCount = state.player.tokenCount - 1;
+      const newTokenCount = state.player.tokenCount! - 1;
       set({
-        player: { ...state.player, tokenCount: newTokenCount },
+        player: {
+          ...state.player,
+          tokenCount: newTokenCount,
+          tokenPool: Array(newTokenCount).fill({ id: generateTokenId(), type: ['assassin'] }),
+        },
         opponent: { ...state.opponent, deck: newOpponentDeck },
       });
       toast.success('Token assassin ajouté au deck adverse et mélangé !', {
@@ -80,7 +94,7 @@ export const usePlayerState = (
 
   const placeAssassinTokenAtOpponentDeckBottom = useCallback(
     (emit?: (event: string, data: any) => void) => {
-      if (state.player.tokenCount < 1) {
+      if (state.player.tokenCount! < 1) {
         toast.error('Pas assez de tokens pour placer un token assassin.', {
           toastId: 'place_assassin_token_error',
         });
@@ -88,14 +102,24 @@ export const usePlayerState = (
       }
       const tokenCard: Card = {
         id: generateTokenId(),
-        name: 'Assassin Token',
-        image: '/addons/tokens/token_assassin.jpg',
+        name: { fr: 'Assassin Token', en: 'Assassin Token', es: 'Assassin Token' },
+        image: { fr: '/addons/tokens/token_assassin.jpg', en: '/addons/tokens/token_assassin.jpg', es: '/addons/tokens/token_assassin.jpg' },
+        faction: 'assassin',
+        label: [],
+        cost: 0,
+        effects: {},
+        types: [{ type: 'token', subTypes: 'token', target: [], value: 0 }],
         exhausted: false,
+        stealthed: true,
       };
       const newOpponentDeck = [...state.opponent.deck, tokenCard];
-      const newTokenCount = state.player.tokenCount - 1;
+      const newTokenCount = state.player.tokenCount! - 1;
       set({
-        player: { ...state.player, tokenCount: newTokenCount },
+        player: {
+          ...state.player,
+          tokenCount: newTokenCount,
+          tokenPool: Array(newTokenCount).fill({ id: generateTokenId(), type: ['assassin'] }),
+        },
         opponent: { ...state.opponent, deck: newOpponentDeck },
       });
       toast.success('Token assassin placé en bas du deck adverse !', {

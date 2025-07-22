@@ -47,7 +47,6 @@ function OpponentField({
             height: '8.33vw',
             maxHeight: '213.33px',
             left: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 6.25}vw)`,
-            maxLeft: `calc(50% + ${(visibleIndex - visibleCards.length / 2) * 160}px)`,
             transformOrigin: 'center center',
             cursor: 'pointer',
           }}

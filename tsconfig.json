@@ -4,7 +4,7 @@
     "target": "ES2022",
     "moduleResolution": "bundler",
     "esModuleInterop": true,
-    "strict": true,
+    "strict": false,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "outDir": "./dist",

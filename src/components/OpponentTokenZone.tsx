@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 interface OpponentTokenZoneProps {
   tokenCount: number;
-  tokenType: 'assassin' | 'engine' | 'viking' | null;
+  tokenType: string | null | undefined;
   onClick: () => void;
   isOpen: boolean;
   onClose: () => void;

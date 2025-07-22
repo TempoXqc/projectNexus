@@ -81,7 +81,7 @@ export const useDeckManagement = (
         return null;
       }
 
-      let tokenType: 'assassin' | 'engine' | 'viking' | 'celestial' | 'dragon' | 'samurai' | 'wizard' | null = null;
+      let tokenType: 'assassin' | 'engine' | 'viking' | null = null;
       let tokenCount = 0;
       if (deckId === 'assassin') {
         tokenType = 'assassin';
@@ -92,18 +92,6 @@ export const useDeckManagement = (
       } else if (deckId === 'viking') {
         tokenType = 'viking';
         tokenCount = 1;
-      } else if (deckId === 'celestial') {
-        tokenType = 'celestial';
-        tokenCount = 0;
-      } else if (deckId === 'dragon') {
-        tokenType = 'dragon';
-        tokenCount = 0;
-      } else if (deckId === 'samurai') {
-        tokenType = 'samurai';
-        tokenCount = 0;
-      } else if (deckId === 'wizard') {
-        tokenType = 'wizard';
-        tokenCount = 0;
       }
 
       set({

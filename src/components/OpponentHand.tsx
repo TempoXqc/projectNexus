@@ -1,10 +1,10 @@
 ﻿// frontend/src/components/OpponentHand.tsx
 import { memo } from 'react';
 import { motion } from 'framer-motion';
-import { Card } from '@tempoxqc/project-nexus-types';
+import { HiddenCard } from '@tempoxqc/project-nexus-types';
 
 interface OpponentHandProps {
-  opponentHand: Card[];
+  opponentHand: HiddenCard[];
   backcardImage?: string;
 }
 

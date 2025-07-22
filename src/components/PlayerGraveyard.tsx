@@ -1,4 +1,5 @@
 ﻿import { memo, useMemo } from 'react';
+import { Card } from '@tempoxqc/project-nexus-types';
 import Modal from '@/components/Modal.tsx';
 
 interface GraveyardProps {
@@ -6,7 +7,7 @@ interface GraveyardProps {
   onClick: () => void;
   isOpen: boolean;
   onClose: () => void;
-  graveyard: any[] | null;
+  graveyard: Card[];
   hoveredCardId: string | null;
   setHoveredCardId: (id: string | null) => void;
   backcardImage?: string;
@@ -18,7 +19,6 @@ function PlayerGraveyard({
                            isOpen,
                            onClose,
                            graveyard,
-                           hoveredCardId,
                            setHoveredCardId,
                            backcardImage,
                          }: GraveyardProps) {
@@ -64,6 +64,12 @@ function PlayerGraveyard({
                   alt={card.name.fr}
                   className="w-full h-full object-cover rounded shadow"
                 />
+                {card.stealthed && (
+                  <span className="absolute top-2 left-2 bg-green-500 text-white text-xs rounded px-1">Furtif</span>
+                )}
+                {card.keywords && card.keywords.length > 0 && (
+                  <span className="absolute top-2 right-2 bg-blue-500 text-white text-xs rounded px-1">{card.keywords.join(', ')}</span>
+                )}
               </div>
             ))
           ) : (
