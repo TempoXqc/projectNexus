@@ -16,6 +16,7 @@ interface PlayerHandProps {
   playerId: number | null | undefined;
   isMyTurn: boolean;
   currentPhase: 'Standby' | 'Main' | 'Battle' | 'End';
+  isStateInitialized: boolean;
 }
 
 function PlayerHand({
@@ -28,6 +29,7 @@ function PlayerHand({
                       addToDeck,
                       isMyTurn,
                       currentPhase,
+                      isStateInitialized
                     }: PlayerHandProps) {
   const [contextMenu, setContextMenu] = useState<{
     cardElement: HTMLElement | null;
@@ -106,7 +108,7 @@ function PlayerHand({
                     event.stopPropagation();
                     playCardToField(card);
                   }}
-                  disabled={!isMyTurn || currentPhase !== 'Main'}
+                  disabled={!isMyTurn || currentPhase !== 'Main' || !isStateInitialized}
                   className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 focus:outline-none relative"
                   aria-label="Play card to field"
                 >

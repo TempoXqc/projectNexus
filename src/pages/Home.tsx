@@ -1,32 +1,25 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { socketService } from '../services/socketService.ts';
 import { FaGithub, FaDiscord, FaTwitter, FaEye, FaClock, FaGamepad, FaList } from 'react-icons/fa';
 import { clientConfig } from '@/config/clientConfig.ts';
 
-interface ActiveGame {
-  gameId: string;
-  status: 'waiting' | 'started';
-  createdAt: Date;
-  players: string[];
-}
-
-const Home: React.FC = () => {
+const Home = () => {
   const navigate = useNavigate();
   const socket = socketService.getSocket();
-  const [activeGames, setActiveGames] = useState<ActiveGame[]>([]);
+  const [activeGames, setActiveGames] = useState([]);
   const [isCreatingGame, setIsCreatingGame] = useState(false);
   const [isRanked, setIsRanked] = useState(false);
-  const [gameFormat, setGameFormat] = useState<'BO1' | 'BO3'>('BO1');
+  const [gameFormat, setGameFormat] = useState('BO1');
   const [language, setLanguage] = useState('Français');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [user, setUser] = useState<{ username: string } | null>(null);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'waiting' | 'started'>('all');
+  const [user, setUser] = useState(null);
+  const [filterStatus, setFilterStatus] = useState('all');
   const hasJoinedLobbyRef = useRef(false);
   const isMountedRef = useRef(true);
 
@@ -56,6 +49,9 @@ const Home: React.FC = () => {
           if (data.username && isMountedRef.current) {
             setUser({ username: data.username });
             toast.success(`Bienvenue, ${data.username} !`, { toastId: 'auto_login' });
+            socket.connect();
+            socket.emit('reconnectWithToken', { token });
+            socket.emit('joinLobby');
             socket.emit('refreshLobby');
           } else {
             localStorage.removeItem('authToken');
@@ -66,17 +62,29 @@ const Home: React.FC = () => {
           localStorage.removeItem('authToken');
         });
     }
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [socket]);
 
   useEffect(() => {
     isMountedRef.current = true;
 
-    const handleActiveGamesUpdate = (games: { gameId: string; status: string; createdAt: string; players: string[] }[]) => {
+    const handleConnect = () => {
+      if (!hasJoinedLobbyRef.current && isMountedRef.current && window.location.pathname === '/') {
+        setActiveGames([]);
+        socket.emit('joinLobby');
+        socket.emit('refreshLobby');
+        hasJoinedLobbyRef.current = true;
+      }
+    };
+
+    const handleActiveGamesUpdate = (games) => {
       if (!isMountedRef.current) return;
       try {
         const parsedGames = games.map(game => ({
           gameId: game.gameId,
-          status: game.status as 'waiting' | 'started',
+          status: game.status,
           createdAt: new Date(game.createdAt),
           players: game.players,
         }));
@@ -87,15 +95,7 @@ const Home: React.FC = () => {
       }
     };
 
-    const handleConnect = () => {
-      if (!hasJoinedLobbyRef.current && isMountedRef.current && window.location.pathname === '/') {
-        setActiveGames([]);
-        socket.emit('refreshLobby');
-        hasJoinedLobbyRef.current = true;
-      }
-    };
-
-    const handleConnectError = (error: Error) => {
+    const handleConnectError = (error) => {
       console.error('WebSocket connection error:', error, 'URL:', clientConfig.socketUrl);
       toast.error('Erreur de connexion au serveur.', { toastId: 'connect_error' });
       hasJoinedLobbyRef.current = false;
@@ -114,6 +114,10 @@ const Home: React.FC = () => {
     socket.on('connect_error', handleConnectError);
     socket.on('disconnect', handleDisconnect);
     socket.on('activeGamesUpdate', handleActiveGamesUpdate);
+
+    if (!socket.connected) {
+      socket.connect();
+    }
 
     return () => {
       isMountedRef.current = false;
@@ -138,22 +142,16 @@ const Home: React.FC = () => {
       return;
     }
     setIsCreatingGame(true);
-    socket.emit('createGame', { isRanked, gameFormat }, (response: {
-      gameId: string;
-      playerId: number | null;
-      chatHistory: { playerId: number; message: string }[];
-      availableDecks: { id: string; name: string; image: string; infoImage: string }[];
-      playmats: { id: string; name: string; image: string }[];
-      lifeToken: { id: string; name: string; image: string };
-    }) => {
+    socket.emit('createGame', { isRanked, gameFormat, username: user.username }, (response) => {
       if (!isMountedRef.current) {
         setIsCreatingGame(false);
         return;
       }
       try {
         setIsCreatingGame(false);
+        console.log('[Home] Navigation state (createGame):', { playerId: response.playerId, username: user.username });
         navigate(`/waiting/${response.gameId}`, {
-          state: { playerId: response.playerId, availableDecks: response.availableDecks, playmats: response.playmats, lifeToken: response.lifeToken },
+          state: { playerId: response.playerId, availableDecks: response.availableDecks, playmats: response.playmats, lifeToken: response.lifeToken, username: user.username },
         });
       } catch (error) {
         console.error('[ERROR] createGame ACK validation failed:', error, 'response:', response);
@@ -164,7 +162,7 @@ const Home: React.FC = () => {
   }, [socket, user, navigate]);
 
   const handleJoinGame = useCallback(
-    (gameId: string) => {
+    (gameId) => {
       if (!socket.connected) {
         toast.error('Vous devez être connecté pour rejoindre une partie.', { toastId: 'join_game_error' });
         return;
@@ -174,18 +172,41 @@ const Home: React.FC = () => {
         setIsAuthModalOpen(true);
         return;
       }
-      socket.emit('checkPlayerGame', { playerId: user.username }, (response: { exists: boolean; gameId?: string; availableDecks?: { id: string; name: string; image: string; infoImage: string }[] }) => {
+      socket.emit('checkPlayerGame', { playerId: user.username }, (response) => {
+        console.log('[Home] checkPlayerGame response:', response);
         if (response.exists && response.gameId) {
           toast.error('Vous êtes déjà dans une partie.', { toastId: 'already_in_game' });
+          console.log('[Home] Navigation state (already in game):', { playerId: null, username: user.username });
           navigate(`/waiting/${response.gameId}`, {
-            state: { playerId: null, availableDecks: response.availableDecks },
+            state: { playerId: null, availableDecks: response.availableDecks, username: user.username },
           });
           return;
         }
-        socket.emit('checkGameExists', gameId, (exists: boolean) => {
+        socket.emit('checkGameExists', gameId, (exists) => {
+          console.log('[Home] checkGameExists response:', exists);
           if (exists) {
-            socket.emit('joinGame', gameId);
-            navigate(`/waiting/${gameId}`, { state: { playerId: null } });
+            socket.emit('joinGame', { gameId, username: user.username }, (response) => {
+              console.log('[Home] joinGame response:', response);
+              if (response && response.error) {
+                toast.error(response.error, { toastId: 'join_game_error' });
+                return;
+              }
+              if (!response || !response.playerId) {
+                console.error('[Home] joinGame response invalide:', response);
+                toast.error('Réponse invalide du serveur.', { toastId: 'join_game_invalid' });
+                return;
+              }
+              console.log('[Home] Navigation state (joinGame):', { playerId: response.playerId, username: user.username });
+              navigate(`/waiting/${gameId}`, {
+                state: {
+                  playerId: response.playerId,
+                  availableDecks: response.availableDecks,
+                  playmats: response.playmats,
+                  lifeToken: response.lifeToken,
+                  username: user.username,
+                },
+              });
+            });
           } else {
             toast.error("La partie n'existe pas.", { toastId: 'game_not_found' });
             setActiveGames((prev) => prev.filter((game) => game.gameId !== gameId));
@@ -196,7 +217,7 @@ const Home: React.FC = () => {
     [socket, user, navigate],
   );
 
-  const handleJoinAsSpectator = (gameId: string) => {
+  const handleJoinAsSpectator = (gameId) => {
     if (!socket.connected) {
       toast.error('Vous devez être connecté pour spectater une partie.', { toastId: 'spectate_game_error' });
       return;
@@ -209,7 +230,7 @@ const Home: React.FC = () => {
     setIsRanked((prev) => !prev);
   };
 
-  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleLanguageChange = (e) => {
     setLanguage(e.target.value);
   };
 
@@ -223,7 +244,7 @@ const Home: React.FC = () => {
     setIsRegistering(false);
   };
 
-  const handleAuthSubmit = async (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e) => {
     e.preventDefault();
     const endpoint = isRegistering ? '/api/register' : '/api/login';
     try {
@@ -244,8 +265,10 @@ const Home: React.FC = () => {
       toast.success(isRegistering ? 'Compte créé avec succès !' : 'Connexion réussie !', { toastId: 'auth_success' });
       closeAuthModal();
       socketService.getSocket().connect();
+      socket.emit('reconnectWithToken', { token: data.token });
+      socket.emit('joinLobby');
       socket.emit('refreshLobby');
-    } catch (error: any) {
+    } catch (error) {
       console.error(`Erreur lors de ${isRegistering ? 'l\'inscription' : 'la connexion'}:`, error, 'URL:', clientConfig.apiUrl);
       toast.error(error.message, { toastId: 'auth_error' });
     }
@@ -260,10 +283,12 @@ const Home: React.FC = () => {
 
   const handleCheckPlayerGame = useCallback(() => {
     if (!socket.connected || !user) return;
-    socket.emit('checkPlayerGame', { playerId: user.username }, (response: { exists: boolean; gameId?: string; availableDecks?: { id: string; name: string; image: string; infoImage: string }[] }) => {
+    socket.emit('checkPlayerGame', { playerId: user.username }, (response) => {
+      console.log('[Home] checkPlayerGame response:', response);
       if (response.exists && response.gameId) {
+        console.log('[Home] Navigation state (checkPlayerGame):', { playerId: null, username: user.username });
         navigate(`/waiting/${response.gameId}`, {
-          state: { playerId: null, availableDecks: response.availableDecks },
+          state: { playerId: null, availableDecks: response.availableDecks, username: user.username },
         });
       }
     });
@@ -446,16 +471,14 @@ const Home: React.FC = () => {
                   />
                   <div className="w-9 h-5 bg-gray-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-blue-300 transition">
                     <div
-                      className={`w-4 h-4 bg-white rounded-full shadow transform transition ${
-                        isRanked ? 'translate-x-4' : 'translate-x-0'
-                      }`}
+                      className={`w-4 h-4 bg-white rounded-full shadow transform transition ${isRanked ? 'translate-x-4' : 'translate-x-0'}`}
                     ></div>
                   </div>
                 </label>
               </div>
               <select
                 value={gameFormat}
-                onChange={(e) => setGameFormat(e.target.value as 'BO1' | 'BO3')}
+                onChange={(e) => setGameFormat(e.target.value)}
                 className="bg-gray-800 text-white border border-gray-700 rounded py-1 px-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-[120px] text-sm"
                 aria-label="Sélectionner le format de la partie"
               >

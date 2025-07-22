@@ -83,16 +83,30 @@ export const useCardActions = (
   const playCardToField = useCallback(
     (card: Card) => {
       if (!state.game) {
-        console.error('state.game is undefined in playCardToField');
+        console.error('state.game is undefined in playCardToField', {
+          state: JSON.stringify(state, null, 2),
+          card: JSON.stringify(card, null, 2),
+        });
         toast.error('État du jeu non initialisé. Veuillez patienter.');
         return null;
       }
-      console.log('Tentative de jouer une carte. Terrain actuel :', state.player.field, 'Phase :', state.game.currentPhase, 'isMyTurn :', state.game.isMyTurn);
+      console.log('Attempting to play card:', {
+        cardId: card.id,
+        isMyTurn: state.game.isMyTurn,
+        currentPhase: state.game.currentPhase,
+        mustDiscard: state.player.mustDiscard,
+        field: state.player.field,
+      });
       if (
         !state.game.isMyTurn ||
         state.player.mustDiscard ||
         state.game.currentPhase !== 'Main'
       ) {
+        console.warn('Cannot play card: conditions not met', {
+          isMyTurn: state.game.isMyTurn,
+          mustDiscard: state.player.mustDiscard,
+          currentPhase: state.game.currentPhase,
+        });
         toast.error('Impossible de jouer une carte : conditions non remplies.', {
           toastId: 'play_card_error',
         });

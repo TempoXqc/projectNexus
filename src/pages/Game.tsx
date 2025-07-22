@@ -186,32 +186,43 @@ export default function Game() {
         nexus: newState.player.nexus,
       });
       if (!newState.game) {
-        console.error('newState.game is undefined in updateGameState');
+        console.error('newState.game is undefined in updateGameState', {
+          newState: JSON.stringify(newState, null, 2),
+        });
+        toast.error('Erreur : état du jeu incomplet reçu du serveur.');
         return;
       }
-      set((prev: GameState) => ({
-        ...prev,
-        player: {
-          ...prev.player,
-          ...newState.player,
-          field: newState.player.field.length === 8 ? newState.player.field : Array(8).fill(null),
-          nexus: newState.player.nexus || { health: 30 },
-        },
-        opponent: {
-          ...prev.opponent,
-          ...newState.opponent,
-          nexus: newState.opponent.nexus || { health: 30 },
-        },
-        game: { ...prev.game, ...newState.game },
-        ui: { ...prev.ui, ...newState.ui },
-        chat: { ...prev.chat, ...newState.chat },
-        deckSelection: { ...prev.deckSelection, ...newState.deckSelection },
-        connection: { ...prev.connection, ...newState.connection },
-        revealedCards: newState.revealedCards,
-        lastCardPlayed: newState.lastCardPlayed,
-        lastDestroyedUnit: newState.lastDestroyedUnit,
-        turnState: newState.turnState,
-      }));
+      set((prev: GameState) => {
+        const updatedState = {
+          ...prev,
+          player: {
+            ...prev.player,
+            ...newState.player,
+            field: newState.player.field.length === 8 ? newState.player.field : Array(8).fill(null),
+            nexus: newState.player.nexus || { health: 30 },
+          },
+          opponent: {
+            ...prev.opponent,
+            ...newState.opponent,
+            nexus: newState.opponent.nexus || { health: 30 },
+          },
+          game: { ...prev.game, ...newState.game },
+          ui: { ...prev.ui, ...newState.ui },
+          chat: { ...prev.chat, ...newState.chat },
+          deckSelection: { ...prev.deckSelection, ...newState.deckSelection },
+          connection: { ...prev.connection, ...newState.connection },
+          revealedCards: newState.revealedCards,
+          lastCardPlayed: newState.lastCardPlayed,
+          lastDestroyedUnit: newState.lastDestroyedUnit,
+          turnState: newState.turnState,
+        };
+        console.log('[Game] Updated state:', {
+          isMyTurn: updatedState.game.isMyTurn,
+          currentPhase: updatedState.game.currentPhase,
+          turn: updatedState.game.turn,
+        });
+        return updatedState;
+      });
       setIsStateInitialized(true);
     });
 
@@ -762,6 +773,7 @@ export default function Game() {
       onSelectChoice={handleSelectChoice}
       onReorderRevealedCards={handleReorderRevealedCards}
       onSelectSplitDamageTargets={handleSelectSplitDamageTargets}
+      isStateInitialized={isStateInitialized}
     />
   );
 }

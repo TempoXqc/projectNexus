@@ -1,69 +1,13 @@
-import { useEffect, useRef, useState, Dispatch, SetStateAction } from 'react';
-import { Socket } from 'socket.io-client';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { Card, GameState } from '@tempoxqc/project-nexus-types';
 import { socketService } from '@/services/socketService.ts';
-
-interface ServerToClientEvents {
-  connect: () => void;
-  connect_error: (error: Error) => void;
-  disconnect: () => void;
-  gameStart: (data: {
-    playerId: number | null;
-    gameId: string;
-    chatHistory: { playerId: number; message: string }[];
-    availableDecks: { id: string; name: string; image: string; infoImage: string }[];
-    playmats: { id: string; name: string; image: string }[];
-    lifeToken: { id: string; name: string; image: string };
-  }) => void;
-  player1ChoseDeck: (data: { player1DeckId: string }) => void;
-  deckSelectionUpdate: (data: { '1': string[] | null; '2': string[] }) => void;
-  waitingForPlayer1Choice: (data: { waiting: boolean }) => void;
-  deckSelectionDone: (data: {
-    player1DeckId: string[] | string;
-    player2DeckIds: string[];
-    selectedDecks: string[];
-  }) => void;
-  bothPlayersReady: (data: { bothReady: boolean }) => void;
-  playerJoined: (data: { playerId: number }) => void;
-  error: (message: string) => void;
-  gameNotFound: () => void;
-  initializeDeck: (data: {
-    deck: Card[];
-    initialDraw: Card[];
-    tokenType: string | null;
-    tokenCount: number;
-  }) => void;
-  initialDeckList: (
-    availableDecks: { id: string; name: string; image: string; infoImage: string }[],
-  ) => void;
-  updatePhase: (data: {
-    phase: 'Standby' | 'Main' | 'Battle' | 'End';
-    turn: number;
-    nextPlayerId?: number;
-  }) => void;
-  endTurn: () => void;
-  yourTurn: () => void;
-  phaseChangeMessage: (data: {
-    phase: 'Standby' | 'Main' | 'Battle' | 'End';
-    turn: number;
-    nextPlayerId: number;
-  }) => void;
-  handleAssassinTokenDraw: (data: {
-    playerLifePoints: number;
-    opponentTokenCount: number;
-  }) => void;
-  requestChoice: (data: { cardId: string; options: { title: string; actions: any[] }[] }, callback: (response: string) => void) => void;
-  revealCards: (cards: Card[]) => void;
-  reorderRevealedCards: (data: { cards: Card[] }, callback: (response: string[]) => void) => void;
-  selectSplitDamageTargets: (data: { amount: number; targets: any[] }, callback: (response: any[]) => void) => void;
-  opponentDisconnected: (data: { disconnectedPlayerId: number }) => void;
-}
+import { clientConfig } from '@/config/clientConfig.ts';
 
 export interface ClientToServerEvents {
   checkGameExists: (gameId: string, callback: (exists: boolean) => void) => void;
-  joinGame: (gameId: string, callback?: (response: any) => void) => void;
+  joinGame: (data: { gameId: string; username?: string }, callback?: (response: any) => void) => void;
   reconnectPlayer: (data: { gameId: string; playerId: number | null }) => void;
   chooseDeck: (data: { gameId: string; playerId: number | null; deckId: string }) => void;
   playerReady: (data: { gameId: string; playerId: number | null }) => void;
@@ -91,49 +35,113 @@ export interface ClientToServerEvents {
 }
 
 export const useGameSocket = (
-  gameId: string | undefined,
-  setState: Dispatch<SetStateAction<GameState>>,
-  playerId: number | null,
-  isConnected: boolean,
+  gameId,
+  setState,
+  playerId,
+  isConnected,
+  username,
+  setPlayerId,
 ) => {
   const navigate = useNavigate();
   const hasJoinedRef = useRef(false);
-  const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents>>(
-    socketService.getSocket(),
-  );
-  const [revealedCards, setRevealedCards] = useState<Card[]>([]);
+  const socketRef = useRef(socketService.getSocket());
+  const [revealedCards, setRevealedCards] = useState([]);
+  const [effectiveUsername, setEffectiveUsername] = useState(username);
+  const [effectivePlayerId, setEffectivePlayerId] = useState(playerId);
+
+  useEffect(() => {
+    if (!effectiveUsername) {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        fetch(`${clientConfig.apiUrl}/api/verify`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.username) {
+              setEffectiveUsername(data.username);
+              console.log('[useGameSocket] Username récupéré via /api/verify:', data.username);
+            } else {
+              localStorage.removeItem('authToken');
+              toast.error('Utilisateur non connecté.', { toastId: 'auth_required' });
+              navigate('/');
+            }
+          })
+          .catch((error) => {
+            console.error('[useGameSocket] Erreur lors de la vérification du token:', error);
+            localStorage.removeItem('authToken');
+            toast.error('Utilisateur non connecté.', { toastId: 'auth_required' });
+            navigate('/');
+          });
+      } else {
+        console.log('[useGameSocket] Aucun token trouvé');
+        toast.error('Utilisateur non connecté.', { toastId: 'auth_required' });
+        navigate('/');
+      }
+    }
+  }, [effectiveUsername, navigate]);
 
   const tryJoin = () => {
-    if (!gameId || !playerId || !socketRef.current.connected) {
-      toast.error('Connexion perdue ou paramètres manquants.', { toastId: 'join_game_error' });
+    if (!gameId || !socketRef.current.connected) {
+      console.log('[useGameSocket] Échec tryJoin: gameId ou connexion manquant', { gameId, isConnected: socketRef.current.connected });
+      toast.error('Connexion perdue ou ID de partie manquant.', { toastId: 'join_game_error' });
       navigate('/');
       return;
     }
-    hasJoinedRef.current = true;
-    socketRef.current.emit('checkGameExists', gameId, (exists: boolean) => {
+
+    if (!effectiveUsername) {
+      console.log('[useGameSocket] Échec tryJoin: username manquant');
+      return;
+    }
+
+    console.log('[useGameSocket] tryJoin - Username:', effectiveUsername, 'PlayerId:', effectivePlayerId);
+    socketRef.current.emit('checkGameExists', gameId, (exists) => {
       if (!exists) {
         hasJoinedRef.current = false;
-        navigate('/');
+        console.log('[useGameSocket] Échec tryJoin: partie inexistante', { gameId });
         toast.error("La partie n'existe plus.", { toastId: 'game_not_found' });
+        navigate('/');
         return;
       }
-      socketRef.current.emit('joinGame', gameId, (response) => {
-        if (response && response.error === 'La partie est pleine') {
-          console.log('[useGameSocket] Tentative de reconnexion:', { gameId, playerId });
-          socketRef.current.emit('reconnectPlayer', { gameId, playerId });
-        } else if (response && response.error) {
-          hasJoinedRef.current = false;
-          navigate('/');
-          toast.error(response.error, { toastId: 'joinGame_error' });
+
+      socketRef.current.emit('checkPlayerGame', { playerId: effectiveUsername }, (response) => {
+        if (response.exists && response.gameId === gameId) {
+          setEffectivePlayerId(response.playerId || null);
+          setPlayerId(response.playerId || null);
+          console.log('[useGameSocket] PlayerId récupéré via checkPlayerGame:', response.playerId);
         }
+        socketRef.current.emit('joinGame', { gameId, username: effectiveUsername }, (response) => {
+          if (response && response.error === 'La partie est pleine' && effectivePlayerId) {
+            console.log('[useGameSocket] Tentative de reconnexion:', { gameId, playerId: effectivePlayerId });
+            socketRef.current.emit('reconnectPlayer', { gameId, playerId: effectivePlayerId });
+          } else if (response && response.error) {
+            hasJoinedRef.current = false;
+            console.log('[useGameSocket] Erreur joinGame:', response.error);
+            toast.error(response.error, { toastId: 'join_game_error' });
+            navigate('/');
+          } else {
+            setEffectivePlayerId(response.playerId || effectivePlayerId);
+            setPlayerId(response.playerId || effectivePlayerId);
+            hasJoinedRef.current = true;
+            console.log('[useGameSocket] Jointure réussie:', { gameId, playerId: response.playerId });
+            navigate(`/waiting/${gameId}`, {
+              state: {
+                playerId: response.playerId,
+                availableDecks: response.availableDecks,
+                playmats: response.playmats,
+                lifeToken: response.lifeToken,
+                username: effectiveUsername,
+              },
+            });
+          }
+        });
       });
     });
   };
 
   useEffect(() => {
-    if (!gameId || !playerId) {
-      navigate('/');
-      return;
+    if (!gameId) {
+      return; // Ne pas naviguer vers '/' si gameId est absent (évite les redirections inutiles sur la page d'accueil)
     }
 
     const socket = socketRef.current;
@@ -146,7 +154,7 @@ export const useGameSocket = (
           connection: { ...prev.connection, isConnected: true },
         }));
         toast.success('Connecté au serveur !', { toastId: 'connect' });
-        if (!hasJoinedRef.current) {
+        if (!hasJoinedRef.current && effectiveUsername) {
           tryJoin();
         }
       });
@@ -187,9 +195,9 @@ export const useGameSocket = (
           });
           return;
         }
-        if (message === 'La partie est pleine' && hasJoinedRef.current) {
-          console.log('[useGameSocket] Tentative de reconnexion:', { gameId, playerId });
-          socket.emit('reconnectPlayer', { gameId, playerId });
+        if (message === 'La partie est pleine' && hasJoinedRef.current && effectivePlayerId) {
+          console.log('[useGameSocket] Tentative de reconnexion:', { gameId, playerId: effectivePlayerId });
+          socket.emit('reconnectPlayer', { gameId, playerId: effectivePlayerId });
           return;
         }
         if (message.includes('Non autorisé')) {
@@ -202,7 +210,7 @@ export const useGameSocket = (
         navigate('/');
       });
 
-      socket.on('opponentDisconnected', (data: { disconnectedPlayerId: number }) => {
+      socket.on('opponentDisconnected', (data) => {
         console.log('[useGameSocket] Opposant déconnecté:', data);
         setState((prev) => ({
           ...prev,
@@ -210,7 +218,7 @@ export const useGameSocket = (
           game: {
             ...prev.game,
             gameOver: true,
-            winner: playerId === data.disconnectedPlayerId ? null : `player${playerId}`,
+            winner: effectivePlayerId === data.disconnectedPlayerId ? null : `player${effectivePlayerId}`,
           },
         }));
         toast.warn("L'opposant s'est déconnecté. Partie terminée.", {
@@ -218,40 +226,61 @@ export const useGameSocket = (
         });
       });
 
-      socket.on('gameStart', (data) => {
-        console.log('[useGameSocket] gameStart received:', data);
-        navigate(`/game/${data.gameId}`, {
+      socket.on('playerJoined', (data) => {
+        console.log('[useGameSocket] playerJoined reçu:', data);
+        setEffectivePlayerId(data.playerId);
+        setPlayerId(data.playerId);
+        navigate(`/waiting/${gameId}`, {
           state: {
             playerId: data.playerId,
             availableDecks: data.availableDecks,
             playmats: data.playmats,
             lifeToken: data.lifeToken,
+            username: effectiveUsername,
           },
         });
-        setState((prev) => ({
-          ...prev,
-          connection: {
-            ...prev.connection,
-            playerId: data.playerId,
-            isConnected: true,
-          },
-          chat: {
-            ...prev.chat,
-            messages: data.chatHistory,
-          },
-          deckSelection: {
-            ...prev.deckSelection,
-            randomizers: data.availableDecks,
-            selectedDecks: [],
-            player1DeckId: null,
-            waitingForPlayer1: data.playerId === 2,
-            deckSelectionData: {
-              player1DeckId: [],
-              player2DeckIds: [],
-              selectedDecks: [],
+      });
+
+      socket.on('gameStart', (data) => {
+        if (window.location.pathname.startsWith('/waiting')) {
+          console.log('[useGameSocket] gameStart reçu:', data);
+          setEffectivePlayerId(data.playerId);
+          setPlayerId(data.playerId);
+          navigate(`/game/${data.gameId}`, {
+            state: {
+              playerId: data.playerId,
+              availableDecks: data.availableDecks,
+              playmats: data.playmats,
+              lifeToken: data.lifeToken,
             },
-          },
-        }));
+          });
+          setState((prev) => ({
+            ...prev,
+            connection: {
+              ...prev.connection,
+              playerId: data.playerId,
+              isConnected: true,
+            },
+            chat: {
+              ...prev.chat,
+              messages: data.chatHistory,
+            },
+            deckSelection: {
+              ...prev.deckSelection,
+              randomizers: data.availableDecks,
+              selectedDecks: [],
+              player1DeckId: null,
+              waitingForPlayer1: data.playerId === 2,
+              deckSelectionData: {
+                player1DeckId: [],
+                player2DeckIds: [],
+                selectedDecks: [],
+              },
+            },
+          }));
+        } else {
+          console.log('[useGameSocket] gameStart ignoré: joueur pas encore dans waiting', { pathname: window.location.pathname });
+        }
       });
 
       socket.on('player1ChoseDeck', (data) => {
@@ -283,9 +312,9 @@ export const useGameSocket = (
               ...prev.deckSelection.deckSelectionData,
               player1DeckId: data['1'] || [],
               player2DeckIds: data['2'] || [],
-              selectedDecks: [...(data['1'] || []), ...(data['2'] || [])].filter((id): id is string => id !== null),
+              selectedDecks: [...(data['1'] || []), ...(data['2'] || [])].filter((id) => id !== null),
             },
-            selectedDecks: [...(data['1'] || []), ...(data['2'] || [])].filter((id): id is string => id !== null),
+            selectedDecks: [...(data['1'] || []), ...(data['2'] || [])].filter((id) => id !== null),
             hasChosenDeck: prev.connection.playerId === 1 ? !!data['1']?.length : prev.deckSelection.hasChosenDeck || !!data['2']?.length,
           },
         }));
@@ -394,7 +423,7 @@ export const useGameSocket = (
       });
 
       socket.on('yourTurn', () => {
-        console.log('[useGameSocket] yourTurn received for player:', playerId);
+        console.log('[useGameSocket] yourTurn received for player:', effectivePlayerId);
         setState((prev) => ({
           ...prev,
           game: { ...prev.game, isMyTurn: true },
@@ -412,7 +441,6 @@ export const useGameSocket = (
 
       socket.on('requestChoice', (data) => {
         console.log('[useGameSocket] requestChoice received:', data);
-        // Logique pour afficher une modale de choix (implémentée dans GameLayout.tsx)
       });
 
       socket.on('revealCards', (cards) => {
@@ -427,13 +455,11 @@ export const useGameSocket = (
 
       socket.on('reorderRevealedCards', (data, callback) => {
         console.log('[useGameSocket] reorderRevealedCards received:', data);
-        // Logique pour réorganiser les cartes (implémentée dans GameLayout.tsx)
-        callback(data.cards.map((card: Card) => card.id));
+        callback(data.cards.map((card) => card.id));
       });
 
       socket.on('selectSplitDamageTargets', (data, callback) => {
         console.log('[useGameSocket] selectSplitDamageTargets received:', data);
-        // Logique pour sélectionner les cibles (implémentée dans GameLayout.tsx)
         callback(data.targets.slice(0, data.amount));
       });
     };
@@ -450,6 +476,7 @@ export const useGameSocket = (
       socket.off('gameNotFound');
       socket.off('error');
       socket.off('opponentDisconnected');
+      socket.off('playerJoined');
       socket.off('gameStart');
       socket.off('player1ChoseDeck');
       socket.off('deckSelectionUpdate');
@@ -469,13 +496,9 @@ export const useGameSocket = (
       socket.off('reorderRevealedCards');
       socket.off('selectSplitDamageTargets');
     };
-  }, [gameId, navigate, setState, playerId, isConnected]);
+  }, [gameId, navigate, setState, effectivePlayerId, isConnected, effectiveUsername]);
 
-  const emit = (
-    event: keyof ClientToServerEvents,
-    data: any,
-    callback?: (response: any) => void,
-  ) => {
+  const emit = (event, data, callback) => {
     if (!isConnected || !socketRef.current.connected) {
       toast.error(`Impossible d'envoyer l'événement ${event}: non connecté.`, {
         toastId: `${event}_emit_error`,

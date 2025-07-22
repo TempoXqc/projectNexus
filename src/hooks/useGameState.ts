@@ -111,7 +111,19 @@ const defaultInitialGameState: GameState = {
 };
 
 export const useGameState = () => {
-  const [state, setState] = useState<GameState>(initialGameState || defaultInitialGameState);
+  const [state, setState] = useState<GameState>(() => {
+    if (!initialGameState || !initialGameState.game) {
+      console.warn('initialGameState is incomplete or missing game property, using defaultInitialGameState', {
+        initialGameState: JSON.stringify(initialGameState, null, 2),
+      });
+      return defaultInitialGameState;
+    }
+    console.log('Using initialGameState:', {
+      isMyTurn: initialGameState.game.isMyTurn,
+      currentPhase: initialGameState.game.currentPhase,
+    });
+    return initialGameState;
+  });
 
   const {
     drawCard,

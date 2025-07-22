@@ -61,6 +61,7 @@ interface GameLayoutProps {
   onSelectChoice: (cardId: string, choice: string) => void;
   onReorderRevealedCards: (cardIds: string[]) => void;
   onSelectSplitDamageTargets: (targets: any[]) => void;
+  isStateInitialized: boolean;
 }
 
 const GameLayout = memo(
@@ -105,6 +106,7 @@ const GameLayout = memo(
      onSelectChoice,
      onReorderRevealedCards,
      onSelectSplitDamageTargets,
+    isStateInitialized
    }: GameLayoutProps) => {
     const playerPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_bottom') || null : null;
     const opponentPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_top') || null : null;
@@ -283,20 +285,27 @@ const GameLayout = memo(
               exhaustCard={exhaustCard}
               attackCard={attackCard}
             />
-            <PlayerHand
-              hand={state.player.hand}
-              hoveredCardId={state.ui.hoveredCardId}
-              setHoveredCardId={setHoveredCardId}
-              isHandHovered={state.ui.isCardHovered}
-              setIsHandHovered={setIsHandHovered}
-              mustDiscard={state.player.mustDiscard}
-              discardCardFromHand={discardCardFromHand}
-              playCardToField={playCardToField}
-              addToDeck={addToDeck}
-              playerId={playerId}
-              isMyTurn={state.game?.isMyTurn || false}
-              currentPhase={state.game?.currentPhase || 'Standby'}
-            />
+            {!isStateInitialized ? (
+              <div className="flex justify-center items-center h-screen">
+                <p>Chargement de la partie...</p>
+              </div>
+            ) : (
+              <PlayerHand
+                hand={state.player.hand}
+                hoveredCardId={state.ui.hoveredCardId}
+                setHoveredCardId={setHoveredCardId}
+                isHandHovered={state.ui.isCardHovered}
+                setIsHandHovered={setIsHandHovered}
+                mustDiscard={state.player.mustDiscard}
+                discardCardFromHand={discardCardFromHand}
+                playCardToField={playCardToField}
+                addToDeck={addToDeck}
+                playerId={playerId}
+                isMyTurn={state.game?.isMyTurn || false}
+                currentPhase={state.game?.currentPhase || 'Standby'}
+                isStateInitialized={isStateInitialized}
+              />
+            )}
             <OpponentField
               opponentField={state.opponent.field}
               hoveredCardId={state.ui.hoveredCardId}

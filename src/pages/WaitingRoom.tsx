@@ -1,16 +1,56 @@
-import React, { useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useCallback, useState } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { PuffLoader } from 'react-spinners';
 import { socketService } from '@/services/socketService.ts';
+import { useGameSocket } from '@/hooks/useGameSocket';
+import { clientConfig } from '@/config/clientConfig.ts';
 
-const WaitingRoom: React.FC = () => {
-  const { gameId } = useParams<{ gameId: string }>();
+const WaitingRoom = () => {
+  const { gameId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const socket = socketService.getSocket();
+  const [username, setUsername] = useState(location.state?.username);
+  const [playerId, setPlayerId] = useState(location.state?.playerId || null);
 
   useEffect(() => {
+    if (!username) {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        fetch(`${clientConfig.apiUrl}/api/verify`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.username) {
+              setUsername(data.username);
+              console.log('[WaitingRoom] Username récupéré via /api/verify:', data.username);
+            } else {
+              localStorage.removeItem('authToken');
+              toast.error('Utilisateur non connecté.', { toastId: 'auth_required' });
+              navigate('/');
+            }
+          })
+          .catch((error) => {
+            console.error('[WaitingRoom] Erreur lors de la vérification du token:', error);
+            localStorage.removeItem('authToken');
+            toast.error('Utilisateur non connecté.', { toastId: 'auth_required' });
+            navigate('/');
+          });
+      } else {
+        toast.error('Utilisateur non connecté.', { toastId: 'auth_required' });
+        navigate('/');
+      }
+    }
+  }, [username, navigate]);
+
+  const { tryJoin } = useGameSocket(gameId, () => {}, playerId, socket.connected, username, setPlayerId);
+
+  useEffect(() => {
+    console.log('[WaitingRoom] Username:', username, 'PlayerId:', playerId, 'Location state:', location.state);
     if (!gameId) {
+      toast.error('ID de partie manquant.', { toastId: 'game_id_missing' });
       navigate('/');
       return;
     }
@@ -20,42 +60,32 @@ const WaitingRoom: React.FC = () => {
     }
 
     socket.on('connect', () => {
-      socket.emit('checkGameExists', gameId, (exists: boolean) => {
-        if (exists) {
-          socket.emit('joinGame', gameId);
-        } else {
-          navigate('/');
-          toast.error("La partie n'existe plus.", { toastId: 'game_not_found' });
-        }
-      });
+      console.log('[WaitingRoom] Connecté, appel de tryJoin');
+      tryJoin();
     });
 
-    socket.on('gameStart', (data: {
-      playerId: number | null;
-      gameId: string;
-      chatHistory: { playerId: number; message: string }[];
-      availableDecks: { id: string; name: string; image: string; infoImage: string }[];
-      playmats: { id: string; name: string; image: string }[];
-      lifeToken: { id: string; name: string; image: string };
-    }) => {
+    socket.on('gameStart', (data) => {
+      console.log('[WaitingRoom] gameStart reçu:', data);
+      setPlayerId(data.playerId);
       navigate(`/game/${data.gameId}`, {
         state: {
           playerId: data.playerId,
           availableDecks: data.availableDecks,
           playmats: data.playmats,
           lifeToken: data.lifeToken,
+          username,
         },
       });
     });
 
     socket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error);
+      console.error('[WaitingRoom] WebSocket connection error:', error);
       toast.error('Erreur de connexion au serveur.', { toastId: 'connect_error' });
       navigate('/');
     });
 
     socket.on('error', (message) => {
-      console.error('Server error:', message);
+      console.error('[WaitingRoom] Server error:', message);
       toast.error(message, { toastId: 'server_error' });
       navigate('/');
     });
@@ -66,12 +96,12 @@ const WaitingRoom: React.FC = () => {
       socket.off('connect_error');
       socket.off('error');
     };
-  }, [gameId, navigate, socket]);
+  }, [gameId, navigate, socket, username, playerId, tryJoin]);
 
   const handleLeaveGame = useCallback(() => {
-    socket.emit('leaveGame', { gameId, playerId: null });
+    socket.emit('leaveGame', { gameId, playerId });
     navigate('/');
-  }, [gameId, socket, navigate]);
+  }, [gameId, socket, navigate, playerId]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4" role="main" aria-label="Salle d'attente">
