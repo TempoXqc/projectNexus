@@ -82,61 +82,74 @@ export const useCardActions = (
 
   const playCardToField = useCallback(
     (card: Card) => {
-      if (!state.game) {
-        console.error('state.game is undefined in playCardToField', {
-          state: JSON.stringify(state, null, 2),
-          card: JSON.stringify(card, null, 2),
+      set((currentState: GameState) => {
+        if (!currentState.game) {
+          console.error('state.game is undefined in playCardToField', {
+            state: JSON.stringify(currentState, null, 2),
+            card: JSON.stringify(card, null, 2),
+          });
+          toast.error('État du jeu non initialisé. Veuillez patienter.');
+          return currentState; // Ne pas modifier l'état
+        }
+        console.log('Attempting to play card:', {
+          cardId: card.id,
+          isMyTurn: currentState.game.isMyTurn,
+          currentPhase: currentState.game.currentPhase,
+          mustDiscard: currentState.player.mustDiscard,
+          field: currentState.player.field,
         });
-        toast.error('État du jeu non initialisé. Veuillez patienter.');
-        return null;
-      }
-      console.log('Attempting to play card:', {
-        cardId: card.id,
-        isMyTurn: state.game.isMyTurn,
-        currentPhase: state.game.currentPhase,
-        mustDiscard: state.player.mustDiscard,
-        field: state.player.field,
+        if (
+          !currentState.game.isMyTurn ||
+          currentState.player.mustDiscard ||
+          currentState.game.currentPhase !== 'Main'
+        ) {
+          console.warn('Cannot play card: conditions not met', {
+            isMyTurn: currentState.game.isMyTurn,
+            mustDiscard: currentState.player.mustDiscard,
+            currentPhase: currentState.game.currentPhase,
+          });
+          toast.error('Impossible de jouer une carte : conditions non remplies.', {
+            toastId: 'play_card_error',
+          });
+          return currentState;
+        }
+
+        const newField: (Card | null)[] = [...currentState.player.field];
+        while (newField.length < 8) {
+          newField.push(null);
+        }
+        const emptyIndex = newField.findIndex((slot) => slot === null);
+        if (emptyIndex === -1) {
+          console.error('Aucun emplacement disponible. Terrain :', newField);
+          toast.error('Aucun emplacement disponible sur le terrain.', {
+            toastId: 'play_card_no_space',
+          });
+          return currentState;
+        }
+
+        newField[emptyIndex] = { ...card, exhausted: false, stealthed: card.faction === 'assassin' };
+        const newHand = currentState.player.hand.filter((c: Card) => c.id !== card.id);
+        const updatedState = {
+          ...currentState,
+          player: {
+            ...currentState.player,
+            field: newField,
+            hand: newHand,
+            hasPlayedCard: true,
+            actionPoints: (currentState.player.actionPoints || 0) - card.cost,
+          },
+          turnState: {
+            ...currentState.turnState,
+            unitsDeployed: [...currentState.turnState.unitsDeployed, card],
+          },
+          lastCardPlayed: card,
+        };
+        return updatedState;
       });
-      if (
-        !state.game.isMyTurn ||
-        state.player.mustDiscard ||
-        state.game.currentPhase !== 'Main'
-      ) {
-        console.warn('Cannot play card: conditions not met', {
-          isMyTurn: state.game.isMyTurn,
-          mustDiscard: state.player.mustDiscard,
-          currentPhase: state.game.currentPhase,
-        });
-        toast.error('Impossible de jouer une carte : conditions non remplies.', {
-          toastId: 'play_card_error',
-        });
-        return null;
-      }
 
-      const newField: (Card | null)[] = [...state.player.field];
-      while (newField.length < 8) {
-        newField.push(null);
-      }
-      const emptyIndex = newField.findIndex((slot) => slot === null);
-      if (emptyIndex === -1) {
-        console.error('Aucun emplacement disponible. Terrain :', newField);
-        toast.error('Aucun emplacement disponible sur le terrain.', {
-          toastId: 'play_card_no_space',
-        });
-        return null;
-      }
-
-      newField[emptyIndex] = { ...card, exhausted: false, stealthed: card.faction === 'assassin' };
-      const newHand = state.player.hand.filter((c: Card) => c.id !== card.id);
-      set({
-        player: { ...state.player, field: newField, hand: newHand, hasPlayedCard: true },
-        turnState: { ...state.turnState, unitsDeployed: [...state.turnState.unitsDeployed, card] },
-        lastCardPlayed: card,
-      });
-
-      return { card, fieldIndex: emptyIndex, hand: newHand, field: newField };
+      return { card, fieldIndex: state.player.field.findIndex((slot) => slot === null), hand: state.player.hand, field: state.player.field };
     },
-    [state.game, state.player.field, state.player.hand, state.player, state.turnState, set],
+    [state.player.field, state.player.hand, state.player, state.turnState, set], // Retirer state.game des dépendances
   );
 
   const discardCardFromHand = useCallback(

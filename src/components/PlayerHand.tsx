@@ -2,6 +2,7 @@ import React, { memo, useState, useRef } from 'react';
 import { Card } from '@tempoxqc/project-nexus-types';
 import { Play, Trash2, Plus } from 'lucide-react';
 import ContextMenu from './ContextMenu.tsx';
+import { toast } from 'react-toastify';
 
 interface PlayerHandProps {
   hand: Card[];
@@ -9,7 +10,6 @@ interface PlayerHandProps {
   setHoveredCardId: (id: string | null) => void;
   isHandHovered: boolean;
   setIsHandHovered: (hovered: boolean) => void;
-  mustDiscard: boolean | undefined ;
   discardCardFromHand: (card: Card) => void;
   playCardToField: (card: Card) => void;
   addToDeck: (card: Card) => void;
@@ -29,7 +29,7 @@ function PlayerHand({
                       addToDeck,
                       isMyTurn,
                       currentPhase,
-                      isStateInitialized
+                      isStateInitialized,
                     }: PlayerHandProps) {
   const [contextMenu, setContextMenu] = useState<{
     cardElement: HTMLElement | null;
@@ -47,8 +47,6 @@ function PlayerHand({
     setContextMenu(null);
   };
 
-  const extraElevation = 10; // Surélévation pour la carte survolée
-
   return (
     <div
       className="flex justify-center items-center gap-4 flex-1 z-30"
@@ -56,7 +54,7 @@ function PlayerHand({
       onMouseLeave={() => setIsHandHovered(false)}
       style={{
         position: 'absolute',
-        top: '92%', // Position fixe
+        top: '92%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
         overflow: 'visible',
@@ -75,16 +73,12 @@ function PlayerHand({
             height: '240px',
             position: 'relative',
             margin: '-2%',
-            transform: `
-              ${hoveredCardId === card.id ? `translateY(-${extraElevation}px)` : 'translateY(0)'}
-            `,
+            transform: `translateY(${hoveredCardId === card.id ? '-10px' : '0'})`,
             zIndex: hoveredCardId === card.id ? 40 : 30,
             transition: 'transform 0.3s ease, z-index 0.1s',
           }}
           onMouseEnter={() => setHoveredCardId(card.id)}
-          onMouseLeave={() => {
-            setHoveredCardId(null);
-          }}
+          onMouseLeave={() => setHoveredCardId(null)}
           onContextMenu={(event) => handleContextMenu(event, card.id)}
         >
           <img
@@ -106,6 +100,13 @@ function PlayerHand({
                 <button
                   onClick={(event) => {
                     event.stopPropagation();
+                    if (!isStateInitialized) {
+                      console.warn('Cannot play card: game state not initialized');
+                      toast.error('Jeu non initialisé. Veuillez patienter.', {
+                        toastId: 'play_card_not_initialized',
+                      });
+                      return;
+                    }
                     playCardToField(card);
                   }}
                   disabled={!isMyTurn || currentPhase !== 'Main' || !isStateInitialized}

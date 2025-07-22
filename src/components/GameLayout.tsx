@@ -296,7 +296,6 @@ const GameLayout = memo(
                 setHoveredCardId={setHoveredCardId}
                 isHandHovered={state.ui.isCardHovered}
                 setIsHandHovered={setIsHandHovered}
-                mustDiscard={state.player.mustDiscard}
                 discardCardFromHand={discardCardFromHand}
                 playCardToField={playCardToField}
                 addToDeck={addToDeck}
