@@ -18,6 +18,7 @@ import ChatBox from '@/components/ChatBox.tsx';
 import DeckSelection from '@/components/DeckSelection.tsx';
 import CounterOpponentPlayer from '@/components/CounterOpponentPlayer.tsx';
 import Modal from '@/components/Modal.tsx';
+import { toast } from 'react-toastify';
 
 interface GameLayoutProps {
   state: GameState;
@@ -290,20 +291,29 @@ const GameLayout = memo(
                 <p>Chargement de la partie...</p>
               </div>
             ) : (
-              <PlayerHand
-                hand={state.player.hand}
-                hoveredCardId={state.ui.hoveredCardId}
-                setHoveredCardId={setHoveredCardId}
-                isHandHovered={state.ui.isCardHovered}
-                setIsHandHovered={setIsHandHovered}
-                discardCardFromHand={discardCardFromHand}
-                playCardToField={playCardToField}
-                addToDeck={addToDeck}
-                playerId={playerId}
-                isMyTurn={state.game?.isMyTurn || false}
-                currentPhase={state.game?.currentPhase || 'Standby'}
-                isStateInitialized={isStateInitialized}
-              />
+              <div>
+                <div className="action-points-display">
+                  <p>Points d'action restants : {state.player.actionPoints || 0}</p>
+                </div>
+                <PlayerHand
+                  hand={state.player.hand}
+                  hoveredCardId={state.ui.hoveredCardId}
+                  setHoveredCardId={setHoveredCardId}
+                  isHandHovered={state.ui.isCardHovered}
+                  setIsHandHovered={setIsHandHovered}
+                  discardCardFromHand={discardCardFromHand}
+                  playCardToField={
+                    isStateInitialized && state.connection.gameId
+                      ? playCardToField
+                      : () => toast.error('Partie non initialisée ou ID de partie manquant.', { toastId: 'game_not_initialized' })
+                  }
+                  addToDeck={addToDeck}
+                  playerId={playerId}
+                  isMyTurn={state.game?.isMyTurn || false}
+                  currentPhase={state.game?.currentPhase || 'Standby'}
+                  isStateInitialized={isStateInitialized}
+                />
+              </div>
             )}
             <OpponentField
               opponentField={state.opponent.field}

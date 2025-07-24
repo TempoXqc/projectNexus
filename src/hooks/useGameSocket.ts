@@ -193,21 +193,21 @@ export const useGameSocket = (
           toast.warn('Erreur lors de la confirmation, veuillez réessayer.', {
             toastId: 'ready_error',
           });
-          return;
-        }
-        if (message === 'La partie est pleine' && hasJoinedRef.current && effectivePlayerId) {
+        } else if (message === 'La partie est pleine' && hasJoinedRef.current && effectivePlayerId) {
           console.log('[useGameSocket] Tentative de reconnexion:', { gameId, playerId: effectivePlayerId });
           socket.emit('reconnectPlayer', { gameId, playerId: effectivePlayerId });
-          return;
-        }
-        if (message.includes('Non autorisé')) {
+        } else if (message.includes('Non autorisé')) {
           toast.warn("Action non autorisée : ce n'est pas votre tour.", {
             toastId: 'not_authorized',
           });
-          return;
+        } else if (message === "Pas assez de points d'action pour jouer cette carte") {
+          toast.error("Pas assez de points d'action pour jouer cette carte.", {
+            toastId: 'action_points_error',
+          });
+          socket.emit('updateGameState', { gameId, state: {} });
+        } else {
+          toast.error(message, { toastId: 'server_error' });
         }
-        toast.error(message, { toastId: 'server_error' });
-        navigate('/');
       });
 
       socket.on('opponentDisconnected', (data) => {

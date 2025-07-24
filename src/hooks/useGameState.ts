@@ -109,23 +109,49 @@ const defaultInitialGameState: GameState = {
     playerId: null,
     isConnected: false,
     canInitializeDraw: false,
+    gameId: '',
   },
 };
 
-export const useGameState = () => {
+export const useGameState = (initialGameId?: string) => {
   const [state, setState] = useState<GameState>(() => {
     if (!initialGameState || !initialGameState.game) {
       console.warn('initialGameState is incomplete or missing game property, using defaultInitialGameState', {
         initialGameState: JSON.stringify(initialGameState, null, 2),
       });
-      return defaultInitialGameState;
+      return {
+        ...defaultInitialGameState,
+        connection: {
+          ...defaultInitialGameState.connection,
+          gameId: initialGameId || '', // Utiliser initialGameId si fourni
+        },
+      };
     }
     console.log('Using initialGameState:', {
       isMyTurn: initialGameState.game.isMyTurn,
       currentPhase: initialGameState.game.currentPhase,
+      gameId: initialGameId,
     });
-    return initialGameState;
+    return {
+      ...initialGameState,
+      connection: {
+        ...initialGameState.connection,
+        gameId: initialGameId || initialGameState.connection.gameId || '',
+      },
+    };
   });
+
+  const set = (updates: Partial<GameState> | ((prev: GameState) => Partial<GameState>)) => {
+    setState((prev) => {
+      const newState = typeof updates === 'function' ? updates(prev) : updates;
+      console.log('[useGameState] Updating state:', {
+        gameId: newState.connection?.gameId || prev.connection.gameId,
+        isMyTurn: newState.game?.isMyTurn ?? prev.game.isMyTurn,
+        currentPhase: newState.game?.currentPhase ?? prev.game.currentPhase,
+      });
+      return { ...prev, ...newState };
+    });
+  };
 
   const {
     drawCard,
@@ -183,7 +209,7 @@ export const useGameState = () => {
 
   return {
     state,
-    set: setState,
+    set,
     drawCard,
     playCardToField,
     discardCardFromHand,

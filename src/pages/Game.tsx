@@ -17,6 +17,7 @@ interface LocationState {
 
 export default function Game() {
   const { gameId } = useParams<{ gameId: string }>();
+  const { state, set, drawCard, playCardToField, } = useGameState(gameId);
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as LocationState | null;
@@ -57,48 +58,26 @@ export default function Game() {
 
   useEffect(() => {
     if (!gameId || !locationState?.playerId) {
+      console.error('[Game] gameId ou playerId manquant:', { gameId, playerId: locationState?.playerId });
       navigate('/');
       return;
     }
 
-    if (
-      state.connection.playerId !== locationState.playerId ||
-      !state.connection.isConnected
-    ) {
-      set((prev) => ({
-        ...prev,
-        connection: {
-          ...prev.connection,
-          playerId: locationState.playerId ?? null,
-          isConnected: true,
-        },
-        deckSelection: {
-          ...prev.deckSelection,
-          randomizers: locationState.availableDecks || prev.deckSelection.randomizers,
-        },
-      }));
-    }
-
-    if (!state.connection.isConnected) {
-      tryJoin();
-    }
-
-    if (locationState.playmats && isMounted.current) {
-      setPlaymats(locationState.playmats);
-    }
-
-    if (locationState.lifeToken && isMounted.current) {
-      setLifeToken(locationState.lifeToken);
-    }
-  }, [
-    gameId,
-    locationState,
-    state.connection.playerId,
-    state.connection.isConnected,
-    set,
-    tryJoin,
-    navigate,
-  ]);
+    console.log('[Game] Initialisation - gameId:', gameId, 'playerId:', locationState.playerId);
+    set((prev) => ({
+      ...prev,
+      connection: {
+        ...prev.connection,
+        gameId,
+        playerId: locationState.playerId ?? prev.connection.playerId,
+        isConnected: true,
+      },
+      deckSelection: {
+        ...prev.deckSelection,
+        randomizers: locationState.availableDecks || prev.deckSelection.randomizers,
+      },
+    }));
+  }, [gameId, locationState, set, navigate]);
 
   useEffect(() => {
     const fetchBackcard = async () => {
@@ -488,19 +467,9 @@ export default function Game() {
     [discardCardFromHand, gameId, state.connection.isConnected, emit],
   );
 
-  const handlePlayCardToField = useCallback(
-    (card: Card) => {
-      const result = playCardToField(card);
-      if (result && gameId && state.connection.isConnected) {
-        emit('playCard', {
-          gameId,
-          card: result.card,
-          fieldIndex: result.fieldIndex,
-        });
-      }
-    },
-    [playCardToField, gameId, state.connection.isConnected, emit],
-  );
+  const handlePlayCard = (card: Card) => {
+    playCardToField(card, emit);
+  };
 
   const handleAddToDeck = useCallback(
     (card: Card) => {
@@ -751,7 +720,7 @@ export default function Game() {
       exhaustCard={handleExhaustCard}
       attackCard={handleAttackCard}
       discardCardFromHand={handleDiscardCardFromHand}
-      playCardToField={handlePlayCardToField}
+      playCardToField={handlePlayCard}
       addToDeck={handleAddToDeck}
       drawCard={handleDrawCard}
       shuffleDeck={handleShuffleDeck}
