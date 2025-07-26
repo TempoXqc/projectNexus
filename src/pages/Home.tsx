@@ -53,6 +53,17 @@ const Home = () => {
             socket.emit('reconnectWithToken', { token });
             socket.emit('joinLobby');
             socket.emit('refreshLobby');
+            socket.emit('checkPlayerGame', { username: data.username }, (response) => {
+              console.log('[Home] checkPlayerGame response:', response);
+              if (response.exists && response.gameId) {
+                toast.info('Redirection vers votre partie en cours.', { toastId: 'already_in_game' });
+                const path = response.status === 'started' ? `/game/${response.gameId}` : `/waiting/${response.gameId}`;
+                console.log('[Home] Navigation state (already in game):', { playerId: response.playerId, username: data.username });
+                navigate(path, {
+                  state: { playerId: response.playerId, availableDecks: response.availableDecks, username: data.username },
+                });
+              }
+            });
           } else {
             localStorage.removeItem('authToken');
           }

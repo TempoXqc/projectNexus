@@ -2,11 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Card, GameState } from '@tempoxqc/project-nexus-types';
-import { useGameSocket } from '@/hooks/useGameSocket.ts';
-import { useGameState } from '@/hooks/useGameState.ts';
 import GameLayout from '@/components/GameLayout.tsx';
-import { shuffleDeck } from '@/utils/shuffleDeck.ts';
 import { clientConfig } from '@/config/clientConfig';
+import { useGame } from '@/hooks/useGame.ts';
 
 interface LocationState {
   playerId?: number | null;
@@ -17,12 +15,11 @@ interface LocationState {
 
 export default function Game() {
   const { gameId } = useParams<{ gameId: string }>();
-  const { state, set, drawCard, playCardToField, } = useGameState(gameId);
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as LocationState | null;
-  const [playmats, setPlaymats] = useState<{ id: string; name: string; image: string }[]>(locationState?.playmats || []);
-  const [lifeToken, setLifeToken] = useState<{ id: string; name: string; image: string } | null>(locationState?.lifeToken || null);
+  const [playmats] = useState<{ id: string; name: string; image: string }[]>(locationState?.playmats || []);
+  const [lifeToken] = useState<{ id: string; name: string; image: string } | null>(locationState?.lifeToken || null);
   const [backcard, setBackcard] = useState<{
     id: string;
     name: string;
@@ -48,18 +45,15 @@ export default function Game() {
     addAssassinTokenToOpponentDeck,
     placeAssassinTokenAtOpponentDeckBottom,
     addToDeck,
-  } = useGameState();
-  const { socket, emit, tryJoin, revealedCards } = useGameSocket(
-    gameId,
-    set,
-    state.connection.playerId ?? locationState?.playerId ?? null,
-    state.connection.isConnected,
-  );
+    emit,
+    revealedCards,
+    socket,
+    shuffleDeck,  // Ajouté : exposé depuis useGame
+  } = useGame(gameId);  // Appel unique avec gameId
 
   useEffect(() => {
     if (!gameId || !locationState?.playerId) {
-      console.error('[Game] gameId ou playerId manquant:', { gameId, playerId: locationState?.playerId });
-      navigate('/');
+      console.warn('[Game] gameId ou playerId manquant, tentative de reconnexion via useGame...');
       return;
     }
 
@@ -297,7 +291,7 @@ export default function Game() {
         });
         return;
       }
-      const result = handleDeckChoice(deckId, gameId, emit);
+      const result = handleDeckChoice(deckId, gameId);
       if (!result) {
         toast.error('Erreur lors du choix du deck.', {
           toastId: 'deck_choice_error',
@@ -309,7 +303,6 @@ export default function Game() {
       gameId,
       state.connection.playerId,
       state.connection.isConnected,
-      emit,
     ],
   );
 
@@ -318,13 +311,13 @@ export default function Game() {
       toast.error('ID de partie manquant.', { toastId: 'ready_click_error' });
       return;
     }
-    const result = handleReadyClick(gameId, emit);
+    const result = handleReadyClick(gameId);
     if (!result) {
       toast.error('Erreur lors de la confirmation de préparation.', {
         toastId: 'ready_click_error',
       });
     }
-  }, [handleReadyClick, gameId, emit]);
+  }, [handleReadyClick, gameId]);
 
   const handleKeepInitialHand = useCallback(() => {
     const result = keepInitialHand();
@@ -468,7 +461,7 @@ export default function Game() {
   );
 
   const handlePlayCard = (card: Card) => {
-    playCardToField(card, emit);
+    playCardToField(card);
   };
 
   const handleAddToDeck = useCallback(
@@ -499,13 +492,7 @@ export default function Game() {
       );
       return;
     }
-    const result = drawCard((event, data) =>
-      emit(event, {
-        ...data,
-        gameId,
-        playerId: state.connection.playerId,
-      }),
-    );
+    const result = drawCard();
     if (result) {
       emit('drawCard', {
         gameId,
@@ -530,7 +517,6 @@ export default function Game() {
       });
     }
   }, [
-    shuffleDeck,
     gameId,
     state.connection.isConnected,
     state.player.deck,
@@ -564,9 +550,7 @@ export default function Game() {
   );
 
   const handleAddAssassinTokenToOpponentDeck = useCallback(() => {
-    const result = addAssassinTokenToOpponentDeck((event, data) =>
-      emit(event, { ...data, gameId }),
-    );
+    const result = addAssassinTokenToOpponentDeck();
     if (!result && gameId && state.connection.isConnected) {
       toast.error('Erreur lors de l’ajout du token assassin.', {
         toastId: 'add_assassin_token_error',
@@ -576,13 +560,10 @@ export default function Game() {
     addAssassinTokenToOpponentDeck,
     gameId,
     state.connection.isConnected,
-    emit,
   ]);
 
   const handlePlaceAssassinTokenAtOpponentDeckBottom = useCallback(() => {
-    const result = placeAssassinTokenAtOpponentDeckBottom((event, data) =>
-      emit(event, { ...data, gameId }),
-    );
+    const result = placeAssassinTokenAtOpponentDeckBottom();
     if (!result && gameId && state.connection.isConnected) {
       toast.error('Erreur lors du placement du token assassin.', {
         toastId: 'place_assassin_token_error',
@@ -592,7 +573,6 @@ export default function Game() {
     placeAssassinTokenAtOpponentDeckBottom,
     gameId,
     state.connection.isConnected,
-    emit,
   ]);
 
   const setGraveyardOpen = useCallback(

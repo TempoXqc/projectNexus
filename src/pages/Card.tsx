@@ -44,7 +44,6 @@ const CardPage: React.FC = () => {
   const [hoveredCard, setHoveredCard] = useState<Card | null>(null);
   const [showSubFilters, setShowSubFilters] = useState<boolean>(false);
 
-  // Traductions pour les boutons avec majuscule
   const translations: Translations = {
     factions: {
       assassin: { fr: 'Assassins', en: 'Assassins', es: 'Asesinos' },
@@ -78,13 +77,11 @@ const CardPage: React.FC = () => {
   };
 
   useEffect(() => {
-    // Restore language from localStorage
     const savedLanguage = localStorage.getItem('language') as 'fr' | 'en' | 'es';
     if (savedLanguage) {
       setLanguage(savedLanguage);
     }
 
-    // Load cards
     fetch(`${clientConfig.apiUrl}/api/card`)
       .then((res) => res.json())
       .then(setCards)
@@ -92,7 +89,6 @@ const CardPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Save language to localStorage
     localStorage.setItem('language', language);
   }, [language]);
 
@@ -122,7 +118,6 @@ const CardPage: React.FC = () => {
     <div className="h-screen overflow-hidden bg-gray-900 text-white flex flex-col">
       <header className="sticky top-0 z-10 bg-gray-900 shadow-sm w-full">
         <div className="flex justify-center items-center w-full px-4 py-3 sm:px-8 sm:py-4">
-          {/* Centered navigation buttons */}
           <div className="flex justify-center flex-1 space-x-4">
             <button
               className="className={`bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded"
@@ -138,7 +133,6 @@ const CardPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Icons and language selector on the right */}
           <div className="flex space-x-2 sm:space-x-4 items-center">
             <a href="https://github.com/your-repo" target="_blank" rel="noopener noreferrer">
               <FaGithub className="w-6 h-6 sm:w-7 sm:h-7 text-gray-400 hover:text-white" />
@@ -162,10 +156,8 @@ const CardPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Centered filters at the top */}
       <div className="flex justify-center p-4 sm:p-6">
         <div className="flex flex-col gap-4 w-full max-w-7xl">
-          {/* Line 1: Faction filters + filter button */}
           <div className="flex flex-wrap gap-2 sm:gap-4 items-center justify-center">
             {['assassin', 'celestial', 'dragon', 'samurai', 'vampire', 'engine', 'wizard'].map((faction) => (
               <button
@@ -190,7 +182,6 @@ const CardPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Line 2: Sub-filters (types and costs on the same line) */}
           <div
             className={`flex flex-col gap-4 overflow-hidden transition-all duration-300 ${
               showSubFilters ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
@@ -228,9 +219,7 @@ const CardPage: React.FC = () => {
       </div>
 
       <main className="flex-1 flex flex-col sm:flex-row overflow-hidden">
-        {/* Card grid on the left (or top on mobile) */}
         <div className="h-full pt-2 sm:pt-4 px-4 sm:px-6 flex flex-col gap-4 sm:gap-6 overflow-y-auto custom-scrollbar w-full sm:w-7/10">
-          {/* Card grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
             {filteredCards.map((card: Card) => (
               <div
@@ -254,7 +243,6 @@ const CardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Large card display on the right (or bottom on mobile) */}
         <div className="h-full pt-2 sm:pt-4 px-2 sm:px-4 flex justify-center items-center bg-gray-800 w-full sm:w-3/10">
           {hoveredCard ? (
             <div className="w-full h-full flex justify-center items-center">

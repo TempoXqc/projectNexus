@@ -63,6 +63,7 @@ interface GameLayoutProps {
   onReorderRevealedCards: (cardIds: string[]) => void;
   onSelectSplitDamageTargets: (targets: any[]) => void;
   isStateInitialized: boolean;
+  handleQuitGame: () => void;
 }
 
 const GameLayout = memo(

@@ -3,16 +3,16 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { PuffLoader } from 'react-spinners';
 import { socketService } from '@/services/socketService.ts';
-import { useGameSocket } from '@/hooks/useGameSocket';
 import { clientConfig } from '@/config/clientConfig.ts';
+import { useGame } from '@/hooks/useGame.ts';
 
 const WaitingRoom = () => {
-  const { gameId } = useParams();
+  const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const socket = socketService.getSocket();
-  const [username, setUsername] = useState(location.state?.username);
-  const [playerId, setPlayerId] = useState(location.state?.playerId || null);
+  const [username, setUsername] = useState<string | undefined>(location.state?.username);
+  const [playerId, setPlayerId] = useState<number | null>(location.state?.playerId || null);
 
   useEffect(() => {
     if (!username) {
@@ -45,7 +45,7 @@ const WaitingRoom = () => {
     }
   }, [username, navigate]);
 
-  const { tryJoin } = useGameSocket(gameId, () => {}, playerId, socket.connected, username, setPlayerId);
+  const { tryJoin } = useGame(gameId);
 
   useEffect(() => {
     console.log('[WaitingRoom] Username:', username, 'PlayerId:', playerId, 'Location state:', location.state);
