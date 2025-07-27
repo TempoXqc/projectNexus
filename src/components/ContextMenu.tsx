@@ -11,18 +11,17 @@ function ContextMenu({ cardElement, onClose }: ContextMenuProps) {
   const [isSubMenuOpen, setIsSubMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Calculate position based on card element
   let x = 0;
   let y = 0;
   if (cardElement) {
     const rect = cardElement.getBoundingClientRect();
-    x = rect.right + 8; // Right edge of card + 8px offset
-    y = rect.top; // Top edge of card
+    x = rect.right + 8;
+    y = rect.top;
   }
 
-  // Boundary check to keep menu within viewport
-  const menuWidth = 200; // Approximate menu width
-  const menuHeight = 150; // Approximate menu height
+
+  const menuWidth = 200;
+  const menuHeight = 150;
   const adjustedX = Math.min(x, window.innerWidth - menuWidth);
   const adjustedY = Math.min(y, window.innerHeight - menuHeight);
 

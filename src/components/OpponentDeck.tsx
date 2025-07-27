@@ -1,4 +1,3 @@
-// frontend/src/components/OpponentDeck.tsx
 import { memo } from 'react';
 
 interface OpponentDeckProps {

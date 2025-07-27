@@ -64,6 +64,10 @@ interface GameLayoutProps {
   onSelectSplitDamageTargets: (targets: any[]) => void;
   isStateInitialized: boolean;
   handleQuitGame: () => void;
+  onConfirmAttack: (target: { type: 'card' | 'nexus'; id?: string }) => void;
+  attackingCardId: string | null;
+  hoveredTarget: { type: 'card' | 'nexus'; id?: string } | null;
+  setHoveredTarget: (target: { type: 'card' | 'nexus'; id?: string } | null) => void;
 }
 
 const GameLayout = memo(
@@ -108,6 +112,10 @@ const GameLayout = memo(
      onSelectChoice,
      onReorderRevealedCards,
      onSelectSplitDamageTargets,
+     onConfirmAttack,
+     attackingCardId,
+     hoveredTarget,
+     setHoveredTarget,
     isStateInitialized
    }: GameLayoutProps) => {
     const playerPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_bottom') || null : null;
@@ -115,7 +123,6 @@ const GameLayout = memo(
     const [choiceModal, setChoiceModal] = useState<{ cardId: string; options: { title: string; actions: any[] }[] } | null>(null);
     const [splitDamageModal, setSplitDamageModal] = useState<{ amount: number; targets: any[] } | null>(null);
 
-    // Gestion des choix interactifs
     useEffect(() => {
       socket.on('requestChoice', (data) => {
         setChoiceModal(data);
@@ -250,6 +257,10 @@ const GameLayout = memo(
               gameId={gameId}
               opponentCounter={state.opponent.nexus.health}
               lifeToken={lifeToken}
+              attackingCardId={attackingCardId}
+              hoveredTarget={hoveredTarget}
+              setHoveredTarget={setHoveredTarget}
+              onConfirmAttack={onConfirmAttack}
             />
           </div>
           <div
@@ -320,6 +331,10 @@ const GameLayout = memo(
               opponentField={state.opponent.field}
               hoveredCardId={state.ui.hoveredCardId}
               setHoveredCardId={setHoveredCardId}
+              attackingCardId={attackingCardId}
+              hoveredTarget={hoveredTarget}
+              setHoveredTarget={setHoveredTarget}
+              onConfirmAttack={onConfirmAttack}
             />
             <OpponentHand opponentHand={state.opponent.hand} backcardImage={backcard?.image} />
           </div>

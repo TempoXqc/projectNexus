@@ -24,6 +24,10 @@ function OpponentTokenZone({
 
   const tokenName = tokenType ? tokenType.charAt(0).toUpperCase() + tokenType.slice(1) : 'Aucun';
 
+  if (tokenCount === 0) {
+    return null;
+  }
+
   return (
     <>
       <div

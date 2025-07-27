@@ -48,8 +48,10 @@ export default function Game() {
     emit,
     revealedCards,
     socket,
-    shuffleDeck,  // Ajouté : exposé depuis useGame
-  } = useGame(gameId);  // Appel unique avec gameId
+    shuffleDeck,
+    setAttackingCardId,
+    setHoveredTarget,
+  } = useGame(gameId);
 
   useEffect(() => {
     if (!gameId || !locationState?.playerId) {
@@ -199,9 +201,20 @@ export default function Game() {
       setIsStateInitialized(true);
     });
 
+    // Gestion de requestChoice (prompt pour tester)
     socket.on('requestChoice', (data) => {
       console.log('[Game] requestChoice received:', data);
-      // Logique pour afficher une modale de choix (implémentée dans GameLayout.tsx)
+      // Remplacer par un modal UI ; pour test, un prompt simple
+      const choice = prompt(`Choisissez une option pour ${data.cardId}:\n${data.options.map(opt => opt.title).join('\n')}`);
+      socket.emit('selectChoice', { cardId: data.cardId, choice });
+    });
+
+    // Gestion de selectCardsToDiscard (prompt pour tester)
+    socket.on('selectCardsToDiscard', (data) => {
+      console.log('[Game] selectCardsToDiscard received:', data);
+      // Remplacer par un UI de sélection ; pour test, sélectionne la première carte
+      const selected = data.cards.length > 0 ? [data.cards[0].id] : [];
+      socket.emit('selectCardsToDiscardResponse', selected);  // Assure-toi d'ajouter 'selectCardsToDiscardResponse' si ton serveur l'attend, sinon ajuste le callback
     });
 
     socket.on('revealCards', (cards) => {
@@ -213,16 +226,6 @@ export default function Game() {
       }));
     });
 
-    socket.on('reorderRevealedCards', (data) => {
-      console.log('[Game] reorderRevealedCards received:', data);
-      // Logique pour réorganiser les cartes (implémentée dans GameLayout.tsx)
-    });
-
-    socket.on('selectSplitDamageTargets', (data) => {
-      console.log('[Game] selectSplitDamageTargets received:', data);
-      // Logique pour sélectionner les cibles (implémentée dans GameLayout.tsx)
-    });
-
     return () => {
       socket.off('updatePhase');
       socket.off('endTurn');
@@ -230,6 +233,7 @@ export default function Game() {
       socket.off('initializeDeck');
       socket.off('updateGameState');
       socket.off('requestChoice');
+      socket.off('selectCardsToDiscard');
       socket.off('revealCards');
       socket.off('reorderRevealedCards');
       socket.off('selectSplitDamageTargets');
@@ -434,18 +438,24 @@ export default function Game() {
     [exhaustCard, gameId, state.connection.isConnected, emit],
   );
 
-  const handleAttackCard = useCallback(
-    (index: number) => {
-      const result = attackCard(index);
-      if (result && gameId && state.connection.isConnected) {
-        emit('attackCard', {
-          gameId,
-          cardId: result.cardId,
-        });
-      }
-    },
-    [attackCard, gameId, state.connection.isConnected, emit],
-  );
+  const confirmAttack = useCallback((target: { type: 'card' | 'nexus'; id?: string }) => {
+    const attackingCardId = state.ui.attackingCardId;
+    if (!attackingCardId) return;
+
+    const index = state.player.field.findIndex((card: Card | null) => card?.id === attackingCardId);
+    if (index === -1) return;
+
+    attackCard(index, target);
+    setAttackingCardId(null);
+    setHoveredTarget(null);
+    socket.emit('attackCard', { gameId, cardId: attackingCardId, target });
+  }, [state.ui.attackingCardId, state.player.field, attackCard, setAttackingCardId, setHoveredTarget]);
+
+  const handleAttackCard = useCallback((index: number) => {
+    setAttackingCardId(state.player.field[index]?.id || null);
+    toast.info('Sélectionnez une cible pour attaquer (hover + clic)', { toastId: 'select_target' });
+  }, [state.player.field, setAttackingCardId]);
+
 
   const handleDiscardCardFromHand = useCallback(
     (card: Card) => {
@@ -723,6 +733,10 @@ export default function Game() {
       onReorderRevealedCards={handleReorderRevealedCards}
       onSelectSplitDamageTargets={handleSelectSplitDamageTargets}
       isStateInitialized={isStateInitialized}
+      onConfirmAttack={confirmAttack}
+      attackingCardId={state.ui.attackingCardId}
+      hoveredTarget={state.ui.hoveredTarget}
+      setHoveredTarget={setHoveredTarget}
     />
   );
 }

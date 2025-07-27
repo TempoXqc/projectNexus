@@ -1,5 +1,4 @@
-﻿// frontend/src/components/OpponentHand.tsx
-import { memo } from 'react';
+﻿import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { HiddenCard } from '@tempoxqc/project-nexus-types';
 

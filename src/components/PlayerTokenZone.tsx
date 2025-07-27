@@ -4,7 +4,7 @@ import { Card } from '@tempoxqc/project-nexus-types';
 
 interface PlayerTokenZoneProps {
   tokenCount: number;
-  tokenType: string | null | undefined
+  tokenType: string | null | undefined;
   onClick: () => void;
   isOpen: boolean;
   onClose: () => void;
@@ -56,6 +56,10 @@ function PlayerTokenZone({
       updateTokenCount(tokenCount - 1);
     }
   };
+
+  if (tokenCount === 0) {
+    return null;
+  }
 
   return (
     <>

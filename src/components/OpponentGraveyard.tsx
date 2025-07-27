@@ -1,4 +1,3 @@
-// frontend/src/components/OpponentGraveyard.tsx
 import { memo, useMemo } from 'react';
 import Modal from '@/components/Modal.tsx';
 
@@ -24,6 +23,8 @@ function OpponentGraveyard({
                            }: OpponentGraveyardProps) {
   const reversedGraveyard = useMemo(() => graveyard.slice().reverse(), [graveyard]);
 
+  const lastCardImage = count > 0 ? graveyard[graveyard.length - 1]?.image.fr : backcardImage;
+
   return (
     <>
       <div
@@ -34,9 +35,9 @@ function OpponentGraveyard({
         {count > 0 ? (
           <>
             <img
-              src={backcardImage}
-              alt="Opponent Graveyard"
-              className="w-full h-full object-cover rounded shadow grayscale"
+              src={lastCardImage}
+              alt="Dernière carte du cimetière adverse"
+              className="w-full h-full object-cover rounded shadow"
             />
             <span className="absolute inset-0 flex items-center justify-center text-white font-bold text-xl">
               {count}

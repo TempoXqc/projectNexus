@@ -85,6 +85,8 @@ const initialGameState: GameState = {
     isReorderCardsOpen: false,
     isSelectCardOpen: false,
     isChoiceOpen: false,
+    attackingCardId: null,
+    hoveredTarget: null,
   },
   chat: {
     messages: [],
@@ -148,14 +150,12 @@ export interface ClientToServerEvents {
   ) => void;
 }
 
-// Hook principal merged
 export const useGame = (initialGameId?: string) => {
-  // État principal (de useGameState.ts)
   const [state, setState] = useState<GameState>(() => {
     if (!initialGameState || !initialGameState.game) {
       console.warn('initialGameState is incomplete or missing game property, using defaultInitialGameState');
       return {
-        ...initialGameState, // Utilise la version intégrée
+        ...initialGameState,
         connection: {
           ...initialGameState.connection,
           gameId: initialGameId || '',
@@ -285,7 +285,7 @@ export const useGame = (initialGameId?: string) => {
 
   useEffect(() => {
     if (!state.connection.gameId) {
-      return; // Ne pas naviguer vers '/' si gameId est absent
+      return;
     }
 
     const socket = socketRef.current;
@@ -615,7 +615,6 @@ export const useGame = (initialGameId?: string) => {
     socketRef.current.emit(event, data, callback);
   };
 
-  // --- Section : Card actions (intégré de useCardActions.ts) ---
   const handleAssassinTokenDraw = useCallback((emitFn = emit) => {
     if (!state.opponent || !state.player.nexus || state.opponent.tokenType !== 'assassin') {
       console.error('handleAssassinTokenDraw: opponent ou player.nexus non défini');
@@ -688,24 +687,6 @@ export const useGame = (initialGameId?: string) => {
       return null;
     }
 
-    const fieldIndex = state.player.field.findIndex((slot) => slot === null);
-    if (fieldIndex === -1) {
-      console.error('Aucun emplacement disponible. Terrain :', state.player.field);
-      toast.error('Aucun emplacement disponible sur le terrain.', { toastId: 'play_card_no_space' });
-      return null;
-    }
-
-    console.log('Attempting to play card:', {
-      cardId: card.id,
-      isMyTurn: state.game.isMyTurn,
-      currentPhase: state.game.currentPhase,
-      mustDiscard: state.player.mustDiscard,
-      actionPoints: state.player.actionPoints,
-      cardCost: card.cost,
-      field: state.player.field,
-      gameId: state.connection.gameId,
-    });
-
     if (
       !state.game.isMyTurn ||
       state.player.mustDiscard ||
@@ -729,10 +710,49 @@ export const useGame = (initialGameId?: string) => {
       return null;
     }
 
-    // Envoyer l'action au serveur
+    // Vérifier si la carte est un spell
+    const isSpell = card.types.some(t => t.type === 'spell');
+    let fieldIndex = -1;
+    let newField = [...state.player.field];
+    let newHand = state.player.hand.filter(c => c.id !== card.id);
+
+    if (!isSpell) {
+      // Pour les units, trouver un emplacement sur le terrain
+      fieldIndex = state.player.field.findIndex((slot) => slot === null);
+      if (fieldIndex === -1) {
+        console.error('Aucun emplacement disponible. Terrain :', state.player.field);
+        toast.error('Aucun emplacement disponible sur le terrain.', { toastId: 'play_card_no_space' });
+        return null;
+      }
+      newField[fieldIndex] = { ...card, exhausted: false };
+    }
+
+    console.log('Attempting to play card:', {
+      cardId: card.id,
+      isSpell,
+      isMyTurn: state.game.isMyTurn,
+      currentPhase: state.game.currentPhase,
+      mustDiscard: state.player.mustDiscard,
+      actionPoints: state.player.actionPoints,
+      cardCost: card.cost,
+      field: state.player.field,
+      gameId: state.connection.gameId,
+    });
+
+    // Émettre l'événement playCard pour que le serveur gère l'effet (et le cimetière pour les spells)
     emitFn('playCard', { gameId: state.connection.gameId, card, fieldIndex });
 
-    return { card, fieldIndex, hand: state.player.hand, field: state.player.field };
+    // Mettre à jour l'état local (terrain pour units, main pour spells)
+    set({
+      player: {
+        ...state.player,
+        hand: newHand,
+        field: newField,
+        actionPoints: (state.player.actionPoints || 0) - card.cost,
+      },
+    });
+
+    return { card, fieldIndex, hand: newHand, field: newField };
   }, [state, set, emit]);
 
   const discardCardFromHand = useCallback((card: Card) => {
@@ -786,7 +806,7 @@ export const useGame = (initialGameId?: string) => {
     return { cardId: card.id, fieldIndex: index, field: newField };
   }, [state, set, emit]);
 
-  const attackCard = useCallback((index: number, emitFn = emit) => {
+  const attackCard = useCallback((index: number, target: { type: 'card' | 'nexus'; id?: string }, emitFn = emit) => {
     if (!state.game.isMyTurn || state.game.currentPhase !== 'Battle') {
       toast.error('Impossible d’attaquer : conditions non remplies.', { toastId: 'attack_card_error' });
       return null;
@@ -798,20 +818,10 @@ export const useGame = (initialGameId?: string) => {
       return null;
     }
 
-    const newField: (Card | null)[] = [...state.player.field];
-    const removedCard = newField[index];
-    newField[index] = null;
+    emitFn('attackCard', { gameId: state.connection.gameId, cardId: card.id, target });
 
-    const newGraveyard = [...state.player.graveyard, removedCard];
-    set({
-      player: { ...state.player, field: newField, graveyard: newGraveyard },
-      lastDestroyedUnit: removedCard,
-    });
-
-    emitFn('attackCard', { gameId: state.connection.gameId, cardId: card.id });
-
-    return { cardId: card.id, field: newField, graveyard: newGraveyard };
-  }, [state, set, emit]);
+    return { cardId: card.id, target };
+  }, [state, emit]);
 
   const addToDeck = useCallback((card: Card) => {
     const newHand = state.player.hand.filter((c: Card) => c.id !== card.id);
@@ -821,7 +831,6 @@ export const useGame = (initialGameId?: string) => {
     return { hand: newHand, deck: newDeck };
   }, [state, set]);
 
-  // --- Section : Player state (intégré de usePlayerState.ts) ---
   const updateLifePoints = useCallback((newValue: number) => {
     if (newValue < 0 || newValue > 30) {
       toast.error('Points de vie invalides (doit être entre 0 et 30).', { toastId: 'update_life_points_error' });
@@ -1050,6 +1059,14 @@ export const useGame = (initialGameId?: string) => {
     return { playerId: state.connection.playerId };
   }, [state, set, emit]);
 
+  const setAttackingCardId = useCallback((id: string | null) => {
+    set({ ui: { ...state.ui, attackingCardId: id, hoveredTarget: null } });
+  }, [state, set]);
+
+  const setHoveredTarget = useCallback((target: { type: 'card' | 'nexus'; id?: string } | null) => {
+    set({ ui: { ...state.ui, hoveredTarget: target } });
+  }, [state, set]);
+
   return {
     state,
     set,
@@ -1075,5 +1092,7 @@ export const useGame = (initialGameId?: string) => {
     handleReadyClick,
     socket: socketRef.current,
     shuffleDeck,
+    setAttackingCardId,
+    setHoveredTarget,
   };
 };

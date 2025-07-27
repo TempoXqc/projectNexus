@@ -1,4 +1,3 @@
-// frontend/src/components/PlayerDeck.tsx
 import { memo } from 'react';
 import { RefreshCcw, CreditCard as CardIcon } from 'lucide-react';
 
