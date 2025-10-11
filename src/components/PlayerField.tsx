@@ -1,7 +1,7 @@
 import React, { memo, useMemo, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Card } from '@tempoxqc/project-nexus-types';
-import { RotateCcw, Sword, Trash2 } from 'lucide-react';
+import { Card, Target } from '@tempoxqc/project-nexus-types';
+import { RotateCcw, Sword } from 'lucide-react';
 import ContextMenu from './ContextMenu.tsx';
 
 interface PlayerFieldProps {
@@ -11,15 +11,19 @@ interface PlayerFieldProps {
   removeCardFromField: (index: number) => void;
   exhaustCard: (index: number) => void;
   attackCard: (index: number) => void;
+  currentPhase: string;
+  selectingTarget: boolean;
+  possibleTargets: Target[];
+  selectTarget: (target: Target) => void;
 }
 
 function PlayerField({
                        field,
                        hoveredCardId,
                        setHoveredCardId,
-                       removeCardFromField,
                        exhaustCard,
                        attackCard,
+                       currentPhase,
                      }: PlayerFieldProps) {
   const [contextMenu, setContextMenu] = useState<{
     cardElement: HTMLElement | null;
@@ -104,62 +108,68 @@ function PlayerField({
           {card.keywords && card.keywords.length > 0 && (
             <span className="absolute top-2 right-2 bg-blue-500 text-white text-xs rounded px-1">{card.keywords.join(', ')}</span>
           )}
-          <div
-            className="absolute top-0 left-1/2 transform -translate-x-1/2 flex flex-col items-center pt-2 transition-all duration-300"
-            style={{
-              top: '10px',
-              left: '50%',
-              transform: 'translate(-50%, 0)',
-              pointerEvents: 'auto',
-              opacity: card.id === hoveredCardId ? 1 : 0,
-              zIndex: 50,
-            }}
-          >
-            <div className="flex gap-2 bg-gray-800 bg-opacity-90 p-1 rounded-lg shadow-lg">
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  attackCard(index);
-                }}
-                className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 focus:outline-none group relative"
-                title=""
-                aria-label="Attack with card"
-              >
-                <Sword size={16} />
-                <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-                  Attaquer
-                </span>
-              </button>
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  removeCardFromField(index);
-                }}
-                className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 focus:outline-none group relative"
-                title=""
-                aria-label="Remove card from field"
-              >
-                <Trash2 size={16} />
-                <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-                  Retirer du terrain
-                </span>
-              </button>
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  exhaustCard(index);
-                }}
-                className="bg-yellow-500 text-white p-1 rounded-full hover:bg-yellow-600 focus:outline-none group relative"
-                title=""
-                aria-label="Exhaust card"
-              >
-                <RotateCcw size={16} />
-                <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-                  Épuiser la carte
-                </span>
-              </button>
+          {(currentPhase === 'Main' || currentPhase === 'Battle') && card.id === hoveredCardId && (
+            <div
+              className="absolute top-0 left-1/2 transform -translate-x-1/2 flex flex-col items-center pt-2 transition-all duration-300"
+              style={{
+                top: '10px',
+                left: '50%',
+                transform: 'translate(-50%, 0)',
+                pointerEvents: 'auto',
+                opacity: 1,
+                zIndex: 50,
+              }}
+            >
+              <div className="flex gap-2 bg-gray-800 bg-opacity-90 p-1 rounded-lg shadow-lg">
+                {currentPhase === 'Battle' && !card.exhausted && (
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      attackCard(index);
+                    }}
+                    className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 focus:outline-none group relative"
+                    title=""
+                    aria-label="Attack with card"
+                  >
+                    <Sword size={16} />
+                    <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
+                      Attaquer
+                    </span>
+                  </button>
+                )}
+                {/* <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    removeCardFromField(index);
+                  }}
+                  className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 focus:outline-none group relative"
+                  title=""
+                  aria-label="Remove card from field"
+                >
+                  <Trash2 size={16} />
+                  <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
+                    Retirer du terrain
+                  </span>
+                </button> */}
+                {currentPhase === 'Main' && !card.exhausted && card.effects.on_exhaust && card.effects.on_exhaust.length > 0 && (
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      exhaustCard(index);
+                    }}
+                    className="bg-yellow-500 text-white p-1 rounded-full hover:bg-yellow-600 focus:outline-none group relative"
+                    title=""
+                    aria-label="Exhaust card"
+                  >
+                    <RotateCcw size={16} />
+                    <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
+                      Épuiser la carte
+                    </span>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </motion.div>
       ))}
       {contextMenu && (

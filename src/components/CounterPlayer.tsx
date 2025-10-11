@@ -1,9 +1,14 @@
+import { Target } from '@tempoxqc/project-nexus-types';
+
 interface CounterPlayerProps {
   playerId: number | null | undefined;
   gameId: string | undefined;
   counter: number;
   updateCounter: (value: number) => void;
   lifeToken: { id: string; name: string; image: string } | null;
+  selectingTarget: boolean;
+  possibleTargets: Target[];
+  selectTarget: (target: Target) => void;
 }
 
 export default function CounterPlayer(
@@ -16,7 +21,7 @@ export default function CounterPlayer(
     <div
       className="relative flex items-center justify-center p-2 rounded-lg z-30"
       style={{
-        backgroundImage: lifeToken ? `url(${lifeToken.image})` : 'url(https://res.cloudinary.com/dsqxexeam/image/upload/v1751913421/lifetoken_mhgzuj.png)',
+        backgroundImage: lifeToken ? `url(${lifeToken.image})` : 'ur[](https://res.cloudinary.com/dsqxexeam/image/upload/v1751913421/lifetoken_mhgzuj.png)',
         backgroundSize: 'contain',
         backgroundRepeat: 'no-repeat',
         backgroundPosition: 'center',

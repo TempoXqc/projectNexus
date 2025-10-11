@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Card, GameState } from '@tempoxqc/project-nexus-types';
+import { Card, GameState, Target } from '@tempoxqc/project-nexus-types';
 import GameLayout from '@/components/GameLayout.tsx';
 import { clientConfig } from '@/config/clientConfig';
 import { useGame } from '@/hooks/useGame.ts';
@@ -51,6 +51,12 @@ export default function Game() {
     shuffleDeck,
     setAttackingCardId,
     setHoveredTarget,
+    selectingTarget,
+    possibleTargets,
+    currentEffectCardId,
+    enterTargetSelectionMode,
+    exitTargetSelectionMode,
+    selectTarget,
   } = useGame(gameId);
 
   useEffect(() => {
@@ -59,7 +65,6 @@ export default function Game() {
       return;
     }
 
-    console.log('[Game] Initialisation - gameId:', gameId, 'playerId:', locationState.playerId);
     set((prev) => ({
       ...prev,
       connection: {
@@ -673,21 +678,14 @@ export default function Game() {
     [gameId, state.connection.isConnected, emit],
   );
 
-  const handleSelectSplitDamageTargets = useCallback(
-    (targets: any[]) => {
-      if (gameId && state.connection.isConnected) {
-        emit('selectSplitDamageTargetsResponse', {
-          targets,
-        });
-      }
-    },
-    [gameId, state.connection.isConnected, emit],
-  );
-
   const fieldKey = useMemo(
     () => state.player.field.map((c) => c?.exhausted).join('-'),
     [state.player.field],
   );
+
+  const onSelectSplitDamageTargets = (targets: Target[]) => {
+    socket.emit('selectSplitDamageTargetsResponse', targets);
+  };
 
   return (
     <GameLayout
@@ -731,12 +729,18 @@ export default function Game() {
       revealedCards={revealedCards}
       onSelectChoice={handleSelectChoice}
       onReorderRevealedCards={handleReorderRevealedCards}
-      onSelectSplitDamageTargets={handleSelectSplitDamageTargets}
       isStateInitialized={isStateInitialized}
       onConfirmAttack={confirmAttack}
       attackingCardId={state.ui.attackingCardId}
       hoveredTarget={state.ui.hoveredTarget}
       setHoveredTarget={setHoveredTarget}
+      onSelectSplitDamageTargets={onSelectSplitDamageTargets}
+      selectingTarget={selectingTarget}
+      possibleTargets={possibleTargets}
+      currentEffectCardId={currentEffectCardId}
+      enterTargetSelectionMode={enterTargetSelectionMode}
+      exitTargetSelectionMode={exitTargetSelectionMode}
+      selectTarget={selectTarget}
     />
   );
 }

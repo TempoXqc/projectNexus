@@ -1,13 +1,17 @@
+import { Target } from '@tempoxqc/project-nexus-types';
 
 interface OpponentCounterProps {
   playerId: number | null | undefined;
   gameId: string | undefined;
   opponentCounter: number;
   lifeToken: { id: string; name: string; image: string } | null;
-  attackingCardId: string | null;  // New
-  hoveredTarget: { type: 'card' | 'nexus'; id?: string } | null;  // New
-  setHoveredTarget: (target: { type: 'card' | 'nexus'; id?: string } | null) => void;  // New
-  onConfirmAttack: (target: { type: 'card' | 'nexus'; id?: string }) => void;  // New
+  attackingCardId: string | null;
+  hoveredTarget: { type: 'card' | 'nexus'; id?: string } | null;
+  setHoveredTarget: (target: { type: 'card' | 'nexus'; id?: string } | null) => void;
+  onConfirmAttack: (target: { type: 'card' | 'nexus'; id?: string }) => void;
+  selectingTarget: boolean;
+  possibleTargets: Target[];
+  selectTarget: (target: Target) => void;
 }
 
 export default function CounterOpponentPlayer({

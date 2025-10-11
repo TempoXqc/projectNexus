@@ -1,6 +1,6 @@
 import React, { memo, useState, useRef } from 'react';
 import { Card } from '@tempoxqc/project-nexus-types';
-import { Play, Trash2, Plus } from 'lucide-react';
+import { Play } from 'lucide-react';
 import ContextMenu from './ContextMenu.tsx';
 import { toast } from 'react-toastify';
 
@@ -24,9 +24,7 @@ function PlayerHand({
                       hoveredCardId,
                       setHoveredCardId,
                       setIsHandHovered,
-                      discardCardFromHand,
                       playCardToField,
-                      addToDeck,
                       isMyTurn,
                       currentPhase,
                       isStateInitialized,
@@ -86,7 +84,7 @@ function PlayerHand({
             alt={card.name.fr}
             className="w-full h-full object-cover rounded"
           />
-          {hoveredCardId === card.id && (
+          {hoveredCardId === card.id && currentPhase === 'Main' && (
             <div
               className="absolute top-0 left-1/2 transform -translate-x-1/2 flex flex-col items-center pt-2"
               style={{
@@ -110,15 +108,15 @@ function PlayerHand({
                     playCardToField(card);
                   }}
                   disabled={!isMyTurn || currentPhase !== 'Main' || !isStateInitialized}
-                  className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 focus:outline-none relative"
+                  className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 focus:outline-none relative disabled:bg-gray-500 disabled:cursor-not-allowed"
                   aria-label="Play card to field"
                 >
                   <Play size={16} />
                   <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-                    Play card on field
+                    Jouer la carte
                   </span>
                 </button>
-                <button
+                {/* <button
                   onClick={(event) => {
                     event.stopPropagation();
                     discardCardFromHand(card);
@@ -128,10 +126,10 @@ function PlayerHand({
                 >
                   <Trash2 size={16} />
                   <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-                    Discard to graveyard
+                    Défausser dans le cimetière
                   </span>
-                </button>
-                <button
+                </button> */}
+                {/* <button
                   onClick={(event) => {
                     event.stopPropagation();
                     addToDeck(card);
@@ -141,9 +139,9 @@ function PlayerHand({
                 >
                   <Plus size={16} />
                   <span className="absolute top-[-35px] left-1/2 transform -translate-x-1/2 hidden hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 shadow-md whitespace-nowrap">
-                    Add to deck
+                    Ajouter au deck
                   </span>
-                </button>
+                </button> */}
               </div>
             </div>
           )}

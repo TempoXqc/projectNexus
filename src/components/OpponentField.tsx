@@ -1,15 +1,18 @@
 import { memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Card } from '@tempoxqc/project-nexus-types';
+import { Card, Target } from '@tempoxqc/project-nexus-types';
 
 interface OpponentFieldProps {
   opponentField: (Card | null)[];
   hoveredCardId: string | null;
   setHoveredCardId: (id: string | null) => void;
-  attackingCardId: string | null;  // New
-  hoveredTarget: { type: 'card' | 'nexus'; id?: string } | null;  // New
-  setHoveredTarget: (target: { type: 'card' | 'nexus'; id?: string } | null) => void;  // New
-  onConfirmAttack: (target: { type: 'card' | 'nexus'; id?: string }) => void;  // New
+  attackingCardId: string | null;
+  hoveredTarget: { type: 'card' | 'nexus'; id?: string } | null;
+  setHoveredTarget: (target: { type: 'card' | 'nexus'; id?: string } | null) => void;
+  onConfirmAttack: (target: { type: 'card' | 'nexus'; id?: string }) => void;
+  selectingTarget: boolean;
+  possibleTargets: Target[];
+  selectTarget: (target: Target) => void;
 }
 
 function OpponentField({

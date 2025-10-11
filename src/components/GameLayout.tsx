@@ -1,4 +1,4 @@
-import { GameState, Card } from '@tempoxqc/project-nexus-types';
+import { GameState, Card, Target } from '@tempoxqc/project-nexus-types';
 import { memo, ReactNode, useEffect, useState } from 'react';
 import InitialDrawModal from './InitialDrawModal.tsx';
 import CounterPlayer from '@/components/CounterPlayer.tsx';
@@ -68,6 +68,12 @@ interface GameLayoutProps {
   attackingCardId: string | null;
   hoveredTarget: { type: 'card' | 'nexus'; id?: string } | null;
   setHoveredTarget: (target: { type: 'card' | 'nexus'; id?: string } | null) => void;
+  selectingTarget: boolean;
+  possibleTargets: Target[];
+  currentEffectCardId: string | null;
+  enterTargetSelectionMode: (cardId: string, targets: Target[]) => void;
+  exitTargetSelectionMode: () => void;
+  selectTarget: (target: Target) => void;
 }
 
 const GameLayout = memo(
@@ -116,7 +122,10 @@ const GameLayout = memo(
      attackingCardId,
      hoveredTarget,
      setHoveredTarget,
-    isStateInitialized
+     isStateInitialized,
+     selectingTarget,
+     possibleTargets,
+     selectTarget,
    }: GameLayoutProps) => {
     const playerPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_bottom') || null : null;
     const opponentPlaymat = playmats.length >= 2 ? playmats.find(p => p.id === 'playmat_top') || null : null;
@@ -238,9 +247,7 @@ const GameLayout = memo(
           </div>
         )}
         <div
-          className={`flex-grow min-h-screen flex flex-col justify-end items-center p-4 relative z-10 ${
-            !state.ui.isRightPanelOpen ? 'w-full' : 'w-[85%]'
-          }`}
+          className={`flex-grow min-h-screen flex flex-col justify-end items-center p-4 relative z-10 ${!state.ui.isRightPanelOpen ? 'w-full' : 'w-[85%]'}`}
           role="region"
           aria-label="Zone de jeu principale"
         >
@@ -261,6 +268,9 @@ const GameLayout = memo(
               hoveredTarget={hoveredTarget}
               setHoveredTarget={setHoveredTarget}
               onConfirmAttack={onConfirmAttack}
+              selectingTarget={selectingTarget}
+              possibleTargets={possibleTargets}
+              selectTarget={selectTarget}
             />
           </div>
           <div
@@ -277,6 +287,9 @@ const GameLayout = memo(
               counter={state.player.nexus.health}
               updateCounter={updateLifePoints}
               lifeToken={lifeToken}
+              selectingTarget={selectingTarget}
+              possibleTargets={possibleTargets}
+              selectTarget={selectTarget}
             />
           </div>
           <div className="z-30">
@@ -297,6 +310,10 @@ const GameLayout = memo(
               removeCardFromField={removeCardFromField}
               exhaustCard={exhaustCard}
               attackCard={attackCard}
+              currentPhase={state.game.currentPhase}
+              selectingTarget={selectingTarget}
+              possibleTargets={possibleTargets}
+              selectTarget={selectTarget}
             />
             {!isStateInitialized ? (
               <div className="flex justify-center items-center h-screen">
@@ -335,6 +352,9 @@ const GameLayout = memo(
               hoveredTarget={hoveredTarget}
               setHoveredTarget={setHoveredTarget}
               onConfirmAttack={onConfirmAttack}
+              selectingTarget={selectingTarget}
+              possibleTargets={possibleTargets}
+              selectTarget={selectTarget}
             />
             <OpponentHand opponentHand={state.opponent.hand} backcardImage={backcard?.image} />
           </div>
@@ -471,35 +491,6 @@ const GameLayout = memo(
                   >
                     {option.title}
                   </button>
-                ))}
-              </div>
-            </Modal>
-          )}
-
-          {splitDamageModal && (
-            <Modal
-              isOpen={!!splitDamageModal}
-              onClose={() => setSplitDamageModal(null)}
-              onOutsideClick={() => setSplitDamageModal(null)}
-              title="Sélectionner les cibles pour les dégâts"
-              width="720px"
-            >
-              <div className="flex flex-wrap gap-4 justify-center relative">
-                {splitDamageModal.targets.map((target, index) => (
-                  <div
-                    key={index}
-                    onClick={() => {
-                      onSelectSplitDamageTargets([target]);
-                      setSplitDamageModal(null);
-                    }}
-                    className="relative w-[100px] h-[140px] rounded cursor-pointer"
-                  >
-                    <img
-                      src={target.type === 'nexus' ? lifeToken?.image : target.image.fr}
-                      alt={target.type === 'nexus' ? 'Nexus' : target.name.fr}
-                      className="w-full h-full object-cover rounded shadow"
-                    />
-                  </div>
                 ))}
               </div>
             </Modal>

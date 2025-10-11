@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { socketService } from '@/services/socketService.ts';
 import { clientConfig } from '@/config/clientConfig.ts';
-import { GameState, Card } from '@tempoxqc/project-nexus-types';
+import { GameState, Card, Target } from '@tempoxqc/project-nexus-types';
 
 const shuffleDeck = <T>(deck: T[]): T[] => [...deck].sort(() => Math.random() - 0.5);
 const getRandomHand = <T>(deck: T[], count: number): T[] => [...deck].sort(() => 0.5 - Math.random()).slice(0, count);
@@ -87,6 +87,9 @@ const initialGameState: GameState = {
     isChoiceOpen: false,
     attackingCardId: null,
     hoveredTarget: null,
+    selectingTarget: false,
+    possibleTargets: [],
+    currentEffectCardId: null,
   },
   chat: {
     messages: [],
@@ -132,7 +135,7 @@ export interface ClientToServerEvents {
   drawCard: (data: { gameId: string; playerId: number | null }) => void;
   playCard: (data: { gameId: string; card: Card; fieldIndex: number }) => void;
   exhaustCard: (data: { gameId: string; cardId: string; fieldIndex: number }) => void;
-  attackCard: (data: { gameId: string; cardId: string }) => void;
+  attackCard: (data: { gameId: string; cardId: string; target: { type: 'card' | 'nexus'; id?: string } }) => void;
   updateLifePoints: (data: { gameId: string; lifePoints: number }) => void;
   updateTokenCount: (data: { gameId: string; tokenCount: number }) => void;
   updateGameState: (data: { gameId: string; state: Partial<GameState> }) => void;
@@ -148,6 +151,7 @@ export interface ClientToServerEvents {
       availableDecks?: { id: string; name: string; image: string; infoImage: string }[];
     }) => void,
   ) => void;
+  selectTarget: (data: { cardId: string; target: Target }) => void; // Ajout pour TS2345
 }
 
 export const useGame = (initialGameId?: string) => {
@@ -179,11 +183,6 @@ export const useGame = (initialGameId?: string) => {
   const set = (updates: Partial<GameState> | ((prev: GameState) => Partial<GameState>)) => {
     setState((prev) => {
       const newState = typeof updates === 'function' ? updates(prev) : updates;
-      console.log('[useGame] Updating state:', {
-        gameId: newState.connection?.gameId || prev.connection.gameId,
-        isMyTurn: newState.game?.isMyTurn ?? prev.game.isMyTurn,
-        currentPhase: newState.game?.currentPhase ?? prev.game.currentPhase,
-      });
       return { ...prev, ...newState };
     });
   };
@@ -739,10 +738,8 @@ export const useGame = (initialGameId?: string) => {
       gameId: state.connection.gameId,
     });
 
-    // Émettre l'événement playCard pour que le serveur gère l'effet (et le cimetière pour les spells)
     emitFn('playCard', { gameId: state.connection.gameId, card, fieldIndex });
 
-    // Mettre à jour l'état local (terrain pour units, main pour spells)
     set({
       player: {
         ...state.player,
@@ -1094,5 +1091,14 @@ export const useGame = (initialGameId?: string) => {
     shuffleDeck,
     setAttackingCardId,
     setHoveredTarget,
+    selectingTarget: state.ui.selectingTarget,
+    possibleTargets: state.ui.possibleTargets,
+    currentEffectCardId: state.ui.currentEffectCardId,
+    enterTargetSelectionMode: (cardId: string, targets: Target[]) => set({ ui: { ...state.ui, selectingTarget: true, possibleTargets: targets, currentEffectCardId: cardId } }),
+    exitTargetSelectionMode: () => set({ ui: { ...state.ui, selectingTarget: false, possibleTargets: [], currentEffectCardId: null } }),
+    selectTarget: (target: Target) => {
+      emit('selectTarget', { cardId: state.ui.currentEffectCardId, target });
+      set({ ui: { ...state.ui, selectingTarget: false, possibleTargets: [], currentEffectCardId: null } });
+    },
   };
 };
